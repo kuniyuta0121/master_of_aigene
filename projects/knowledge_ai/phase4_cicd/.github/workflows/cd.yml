@@ -1,0 +1,85 @@
+# Phase 4: CD パイプライン（継続的デリバリー）
+# ================================================
+# 考えてほしい疑問:
+#   Q1. main へのマージ時だけ CD が動く理由は？（develop ブランチへのプッシュでは動かない）
+#   Q2. ECRへのPushにはIAM権限が必要。最小権限の原則で必要な権限だけを与えるには？
+#   Q3. Blue/Green デプロイと Rolling Update の違いは？どちらをいつ使うか？
+#   Q4. デプロイ失敗時の自動ロールバック戦略は？
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # 手動実行も可能
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: knowledge-ai
+  ECS_SERVICE: knowledge-ai-service
+  ECS_CLUSTER: knowledge-ai-cluster
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    environment: production   # GitHub Environmentsの保護ルールを適用
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # OIDC を使ったAWS認証（アクセスキーを使わない安全な方法）
+      # [考える] なぜ IAMアクセスキーをSecretsに入れるより OIDC が良いのか？
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}   # コミットSHAでタグ付け（トレーサビリティ）
+        run: |
+          docker build \
+            -f phase3_docker/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --target production \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: .github/ecs-task-definition.json
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true   # デプロイ完了まで待機
+
+      # デプロイ後のスモークテスト
+      # [実装してみよう] /health エンドポイントが 200 を返すか確認するテストを追加する
+      - name: Smoke test
+        run: |
+          sleep 30  # サービス起動を待つ
+          curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
+
+      # Slackへのデプロイ通知
+      # [実装してみよう] デプロイ失敗時にも通知が来るよう if: failure() を追加する
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Deploy ${{ job.status }}: ${{ github.repository }} @ ${{ github.sha }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

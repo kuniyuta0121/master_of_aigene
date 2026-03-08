@@ -1,0 +1,99 @@
+# Phase 3: Docker Compose によるローカル開発環境
+# ==================================================
+# 考えてほしい疑問:
+#   Q1. depends_on だけでは「DBが起動済み」を保証できない理由は？
+#       （ヒント: コンテナ起動 ≠ アプリ起動完了）
+#   Q2. volumes でデータを永続化しないと何が起きるか？実験してみよう
+#   Q3. networks を定義してコンテナ間通信を分離する利点は？
+#   Q4. このComposeファイルを本番環境そのまま使ってはいけない理由は？
+
+version: "3.9"
+
+services:
+  # --- バックエンドAPI ---
+  api:
+    build:
+      context: ..
+      dockerfile: phase3_docker/Dockerfile
+      target: production
+    container_name: knowledge_ai_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/knowledge_ai
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}  # .env ファイルから読み込む
+      SQL_ECHO: "false"
+    depends_on:
+      db:
+        condition: service_healthy  # DBのヘルスチェックが通るまで待つ
+    volumes:
+      - ./chroma_db:/app/chroma_db   # ベクターDBを永続化
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # --- PostgreSQL データベース ---
+  # [考える] 本番では managed DBサービス（RDS/Cloud SQL）を使う理由は？
+  db:
+    image: postgres:16-alpine
+    container_name: knowledge_ai_db
+    environment:
+      POSTGRES_DB: knowledge_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password  # [注意] 本番では必ずSecrets Managerを使うこと
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  # --- Redis（Phase 9で認証セッション管理に使用） ---
+  redis:
+    image: redis:7-alpine
+    container_name: knowledge_ai_redis
+    command: redis-server --appendonly yes  # 永続化モード
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Prometheus + Grafana（Phase 6 の可観測性） ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: knowledge_ai_prometheus
+    volumes:
+      - ../phase6_observability/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+    profiles: ["monitoring"]  # docker compose --profile monitoring up で起動
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: knowledge_ai_grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - backend
+    profiles: ["monitoring"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+
+networks:
+  backend:
+    driver: bridge

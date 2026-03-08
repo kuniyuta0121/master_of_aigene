@@ -1,0 +1,139 @@
+version: "3.9"
+
+# TechCorp Simulator - 全スキル統合本番環境シミュレーター
+# 起動: docker compose up --build
+# シミュレーション開始: python sim_runner.py
+
+services:
+
+  # ─── インフラ層 ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: techcorp
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d techcorp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8005:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  # ─── アプリケーション層 ───────────────────────────────
+  api_gateway:
+    build: ./services/api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      NOTE_SERVICE_URL: http://note_service:8001
+      SEARCH_SERVICE_URL: http://search_service:8002
+      ANALYTICS_SERVICE_URL: http://analytics_service:8003
+      # [BUG-02] JWTシークレットがハードコードされている → Secrets Managerへ移行すべき
+      JWT_SECRET: "super-secret-do-not-use-in-prod"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      retries: 5
+
+  note_service:
+    build: ./services/note_service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://admin:secret123@postgres:5432/techcorp
+      # [BUG-03] SQL_ECHO=true が本番に残っている（ログに機密情報が漏れる）
+      SQL_ECHO: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 10s
+      retries: 5
+
+  search_service:
+    build: ./services/search_service
+    ports:
+      - "8002:8002"
+    environment:
+      PORT: "8002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 10s
+      retries: 5
+
+  analytics_service:
+    build: ./services/analytics_service
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://admin:secret123@postgres:5432/techcorp
+      CHROMA_URL: http://chromadb:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 10s
+      retries: 5
+
+  # ─── 可観測性層 ──────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/grafana/datasources:/etc/grafana/provisioning/datasources
+
+  # ─── 負荷テスト（シナリオ4で使用） ────────────────────
+  load_generator:
+    image: grafana/k6:latest
+    volumes:
+      - ./scenarios/load_test.js:/scripts/load_test.js
+    command: run /scripts/load_test.js
+    profiles: ["load-test"]  # docker compose --profile load-test up で起動
+
+volumes:
+  postgres_data:
+  chroma_data:
+  grafana_data:

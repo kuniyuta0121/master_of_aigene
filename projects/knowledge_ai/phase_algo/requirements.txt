@@ -1,0 +1,5 @@
+# 標準ライブラリのみ（heapq, collections, functools は built-in）
+# 追加ライブラリ不要で実行可能
+
+# 可視化したい場合（オプション）
+# matplotlib>=3.8.0

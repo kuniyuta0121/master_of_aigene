@@ -1,0 +1,7 @@
+torch>=2.2.0
+# GPU版の場合: pip install torch --index-url https://download.pytorch.org/whl/cu121
+# Apple Silicon (M1/M2/M3): torch には MPS バックエンドが含まれている
+
+# 転移学習（実装してみようタスク用）
+# transformers>=4.40.0
+# sentence-transformers>=3.0.0
