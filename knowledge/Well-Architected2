@@ -1,0 +1,665 @@
+以下は **AWS SA試験レベルを超える「実務アーキテクチャレビュー」チェックリスト**です。
+設計審査・Well-Architected Review・セキュリティレビューでそのまま使える粒度にしています。
+（6つの柱＋実務運用観点を追加）
+
+---
+
+# AWS 実務アーキテクチャレビュー（実践チェックリスト）
+
+## 1. アーキテクチャ基盤（最初に確認）
+
+* システム構成図が最新か
+* dev / stg / prod 環境が分離されているか
+* VPC設計が整理されているか
+* Public / Private subnet が分離されているか
+* NAT Gateway / Internet Gateway の用途が明確か
+* DNS（Route53）の設計があるか
+
+---
+
+# 2. Operational Excellence（運用）
+
+### IaC
+
+* Infrastructure as Code で管理されているか
+
+  * CloudFormation
+  * CDK
+  * Terraform
+
+* 手動設定が存在しないか
+
+* 環境差分がコード化されているか
+
+### CI/CD
+
+* デプロイは自動化されているか
+* rollback 手順が存在するか
+* Blue/Green または Canary deploy が可能か
+
+### 監視
+
+* CloudWatch metrics
+* CloudWatch logs
+* アラート（SNS / PagerDuty）
+
+監視対象
+
+```
+CPU
+Memory
+Error rate
+Latency
+Request count
+```
+
+### インシデント対応
+
+* Runbook があるか
+* 障害対応フローがあるか
+* postmortem を実施しているか
+
+---
+
+# 3. Security（セキュリティ）
+
+## Identity
+
+* IAM最小権限
+* IAM User 使用禁止（Role推奨）
+* root MFA 有効
+* SSO導入
+
+## ネットワーク
+
+* Security Group 最小ポート
+* NACL適切設定
+* Bastion / SSM利用
+
+## データ保護
+
+* S3 encryption
+* EBS encryption
+* RDS encryption
+* TLS通信
+
+## 秘密管理
+
+* Secrets Manager
+* Parameter Store
+
+## 脅威検知
+
+* CloudTrail
+* GuardDuty
+* Security Hub
+* Config
+
+---
+
+# 4. Reliability（信頼性）
+
+## 冗長化
+
+* Multi-AZ
+* Load Balancer
+* Stateless設計
+
+## 自動復旧
+
+* Auto Scaling
+* health check
+* retry / timeout
+
+## バックアップ
+
+* RDS snapshot
+* DynamoDB backup
+* S3 versioning
+
+## 災害対策
+
+RTO / RPO
+
+DR方式
+
+```
+Backup & Restore
+Pilot Light
+Warm Standby
+Active-Active
+```
+
+---
+
+# 5. Performance Efficiency（パフォーマンス）
+
+## スケーリング
+
+* Auto Scaling
+* Horizontal scaling
+
+## キャッシュ
+
+* CloudFront
+* ElastiCache
+* CDN
+
+## DB最適化
+
+* Read replica
+* Query tuning
+* Index設計
+
+## Serverless優先
+
+可能なら
+
+```
+Lambda
+Fargate
+Step Functions
+```
+
+---
+
+# 6. Cost Optimization（コスト）
+
+## リソース管理
+
+* Right sizing
+* Idle resource削除
+* Storage lifecycle
+
+## 割引
+
+* Savings Plans
+* Reserved Instance
+
+## コスト監視
+
+* AWS Budgets
+* Cost Explorer
+
+---
+
+# 7. Sustainability（環境）
+
+* Serverless利用
+* Auto scaling
+* 不要ログ削除
+* lifecycle policy
+
+---
+
+# 8. データ設計レビュー（実務重要）
+
+* データ整合性保証
+* データ暗号化
+* データライフサイクル
+* データバックアップ
+* データリカバリ手順
+
+---
+
+# 9. セキュリティ攻撃面レビュー
+
+確認するポイント
+
+```
+公開API
+認証
+rate limit
+WAF
+DDoS対策
+```
+
+AWSサービス
+
+```
+WAF
+Shield
+API Gateway throttling
+```
+
+---
+
+# 10. 運用成熟度
+
+確認事項
+
+* 運用手順書
+* 監視ダッシュボード
+* SLA / SLO
+* インシデント管理
+* 変更管理
+
+---
+
+# AWS SAが必ず見る「重要チェック」
+
+実務レビューではまずここを確認します。
+
+```
+1 IAM最小権限
+2 CloudTrail有効
+3 Multi-AZ
+4 Auto Scaling
+5 Backup
+6 IaC
+7 CloudWatch監視
+8 TLS通信
+9 Secrets Manager
+10 Cost monitoring
+```
+
+---
+
+# AWS典型アーキテクチャ
+
+```
+Route53
+↓
+CloudFront
+↓
+WAF
+↓
+ALB
+↓
+ECS / Lambda
+↓
+RDS / DynamoDB
+↓
+S3
+```
+
+---
+
+# 実務レビューの質問例
+
+AWS SAがよく聞く質問
+
+```
+ピーク負荷は？
+障害時の復旧時間は？
+バックアップ復旧手順は？
+IAM権限設計は？
+ログ監査は？
+```
+
+---
+
+もしよければ次に
+**本当にAWSエンジニアが怖がるレビュー項目**
+
+```
+AWSアーキレビュー
+危険設計TOP50
+```
+
+も出します。
+これは **実際にAWS障害・インシデントにつながった設計パターン**です。
+
+以下は、**実際のAWS運用で障害・セキュリティ事故・大規模インシデントにつながりやすい設計パターン**を、
+**AWS Well-Architectedの観点で整理した「危険設計TOP50（要点版）」**です。
+実務レビューで **先に潰すべきリスク**として使えます。
+
+---
+
+# AWS 障害・インシデントにつながる危険設計（TOP50）
+
+## 1. IAM / セキュリティ系
+
+**1. 過剰権限ポリシー**
+
+```
+Action: *
+Resource: *
+```
+
+→ 情報漏洩・乗っ取り事故の典型原因
+
+---
+
+**2. rootアカウント使用**
+
+→ 誤操作・アカウント侵害の重大リスク
+
+---
+
+**3. IAMユーザー長期キー**
+
+→ GitHub漏洩事故の定番
+
+---
+
+**4. S3 Public公開**
+
+→ AWS最大の情報漏洩原因
+
+---
+
+**5. CloudTrail未有効**
+
+→ 侵害調査不能
+
+---
+
+**6. Secretsをコードに記載**
+
+```
+DB_PASSWORD=xxxxx
+```
+
+→ Git漏洩
+
+---
+
+**7. KMS未使用**
+
+→ データ暗号化不足
+
+---
+
+**8. SecurityGroup 0.0.0.0/0**
+
+→ 不正アクセス
+
+---
+
+**9. 管理ポート公開**
+
+```
+22
+3389
+```
+
+→ ブルートフォース攻撃
+
+---
+
+**10. WAF未使用**
+
+→ Web攻撃に弱い
+
+---
+
+# 2. Reliability系（障害）
+
+**11. Single AZ構成**
+
+→ AZ障害でサービス停止
+
+---
+
+**12. LoadBalancerなし**
+
+→ 単一EC2障害
+
+---
+
+**13. AutoScalingなし**
+
+→ トラフィック急増で落ちる
+
+---
+
+**14. HealthCheck未設定**
+
+→ 障害インスタンスが生き残る
+
+---
+
+**15. Retry設計なし**
+
+→ 一時障害でシステム停止
+
+---
+
+**16. Timeout未設定**
+
+→ スレッド枯渇
+
+---
+
+**17. CircuitBreaker未設計**
+
+→ cascading failure
+
+---
+
+**18. Queue未使用**
+
+→ バースト処理で落ちる
+
+---
+
+**19. キャッシュ未使用**
+
+→ DB過負荷
+
+---
+
+**20. DB接続プールなし**
+
+→ DB枯渇
+
+---
+
+# 3. データ系事故
+
+**21. バックアップ未設定**
+
+→ データ消失
+
+---
+
+**22. RDS snapshotなし**
+
+---
+
+**23. DynamoDB backupなし**
+
+---
+
+**24. S3 versioningなし**
+
+→ 誤削除事故
+
+---
+
+**25. migration rollbackなし**
+
+→ DB破壊
+
+---
+
+**26. production DB直接操作**
+
+→ 人為ミス
+
+---
+
+**27. delete protectionなし**
+
+→ RDS削除事故
+
+---
+
+# 4. パフォーマンス事故
+
+**28. DB index未設計**
+
+→ フルスキャン
+
+---
+
+**29. N+1 query**
+
+→ DB過負荷
+
+---
+
+**30. CloudFront未使用**
+
+→ 高遅延
+
+---
+
+**31. キャッシュ戦略なし**
+
+→ DBボトルネック
+
+---
+
+**32. Lambda cold start未考慮**
+
+→ レイテンシ
+
+---
+
+# 5. コスト事故
+
+**33. AutoScalingなし**
+
+→ 過剰EC2
+
+---
+
+**34. 未使用EBS**
+
+---
+
+**35. ElasticIP放置**
+
+---
+
+**36. NAT Gateway誤用**
+
+→ 月数十万請求
+
+---
+
+**37. データ転送料金未考慮**
+
+---
+
+**38. Logging過剰**
+
+→ CloudWatch費用爆発
+
+---
+
+# 6. 運用事故
+
+**39. IaC未使用**
+
+→ 再現不能
+
+---
+
+**40. 手動デプロイ**
+
+→ ヒューマンエラー
+
+---
+
+**41. ログ収集なし**
+
+→ 障害原因不明
+
+---
+
+**42. Alertなし**
+
+→ 障害気付かない
+
+---
+
+**43. Runbookなし**
+
+→ 復旧遅延
+
+---
+
+# 7. アーキテクチャ事故
+
+**44. Stateful設計**
+
+→ スケール不可
+
+---
+
+**45. 同期API連鎖**
+
+→ cascading failure
+
+---
+
+**46. 分散トランザクション**
+
+→ データ不整合
+
+---
+
+**47. モノリス肥大**
+
+→ デプロイ不能
+
+---
+
+**48. マイクロサービス過剰**
+
+→ 運用崩壊
+
+---
+
+**49. SLA未定義**
+
+→ 可用性不明
+
+---
+
+**50. DR設計なし**
+
+→ リージョン障害で全停止
+
+---
+
+# AWS事故の80%原因
+
+実務経験ではほぼこれです。
+
+```
+IAMミス
+SingleAZ
+AutoScalingなし
+Backupなし
+```
+
+---
+
+# AWS設計レビューの黄金ルール
+
+必ず満たす
+
+```
+MultiAZ
+IAM least privilege
+Backup
+AutoScaling
+Monitoring
+```
+
+---
+
+もし必要なら、
+**AWSの本物の大事故から学んだ**
+
+```
+AWSインシデント実例
+（Netflix / GitHub / Capital Oneなど）
+```
+
+も解説できます。
+これは **AWS設計理解が一気に深まる内容**です。

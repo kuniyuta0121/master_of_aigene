@@ -1,0 +1,934 @@
+**Cloud Native Computing Foundation の公式サイトにある
+CNCF Cloud Native Landscape は、**
+
+**クラウドネイティブ技術の全体像を一覧できる「技術マップ（カタログ）」のサイト**です。 ([CNCF Landscape][1])
+
+---
+
+# 何のサイトか（簡単に）
+
+**クラウドネイティブ技術の「地図」**
+
+つまり
+
+```text
+クラウドネイティブのツールを
+カテゴリ別に整理した巨大な一覧
+```
+
+コンテナ・Kubernetes周辺のツールを
+**数百〜1000以上まとめて可視化**しています。 ([Medium][2])
+
+---
+
+# 何が載っているか
+
+代表カテゴリ
+
+| カテゴリ              | 例              |
+| ----------------- | -------------- |
+| Orchestration     | Kubernetes     |
+| Container runtime | containerd     |
+| CI/CD             | Argo, Jenkins  |
+| Monitoring        | Prometheus     |
+| Logging           | Fluentd        |
+| Service Mesh      | Istio, Linkerd |
+| Security          | Falco          |
+| Storage           | Rook           |
+
+つまり
+
+```text
+Kubernetes周辺のエコシステム一覧
+```
+
+---
+
+# 何のために使うサイトか
+
+主な用途は3つです。
+
+### 1 技術選定
+
+例
+
+```text
+ログ基盤探す
+↓
+Loggingカテゴリを見る
+↓
+Fluentd / Loki / Elasticsearch
+```
+
+---
+
+### 2 業界トレンド理解
+
+例えば
+
+```text
+Service Mesh
+Observability
+GitOps
+```
+
+などの **技術トレンドが分かる**
+
+---
+
+### 3 OSSの成熟度確認
+
+CNCFではプロジェクトに段階があります
+
+| 段階         |
+| ---------- |
+| Sandbox    |
+| Incubating |
+| Graduated  |
+
+例
+
+```text
+Kubernetes → Graduated
+Prometheus → Graduated
+Argo → Incubating
+```
+
+---
+
+# 見た目の意味
+
+あの **大量ロゴの図**は次の意味です。
+
+```
+Application Layer
+↓
+Orchestration
+↓
+Runtime
+↓
+Infrastructure
+```
+
+つまり
+
+```
+クラウドネイティブ技術のレイヤ構造
+```
+
+---
+
+# エンジニアがこのサイトを見る理由
+
+実務ではこう使います
+
+例
+
+```text
+Kubernetes構成設計
+↓
+Observabilityどうする？
+↓
+CNCF Landscape見る
+↓
+Prometheus + Grafana
+```
+
+---
+
+# 重要なポイント
+
+このサイトは
+
+```text
+技術比較サイトではない
+```
+
+目的
+
+```text
+クラウドネイティブ技術の全体地図
+```
+
+---
+
+# Kubernetes業界では有名
+
+クラウドネイティブ界隈では
+
+```
+CNCF Landscape
+```
+
+を見ると
+
+```
+その人の理解度が分かる
+```
+
+と言われるくらい有名です。
+
+---
+
+もし興味あれば、
+このサイトで **最も重要な技術（実務で使うTOP30）** を
+分野別にまとめます。
+
+実はこのLandscape、
+**全部覚える必要はなく、重要なのは30個くらいだけです。**
+
+[1]: https://landscape.cncf.io/?utm_source=chatgpt.com "CNCF Landscape"
+[2]: https://malekkazdaghli.medium.com/navigating-the-complex-cloud-native-world-6f7880ac6ced?utm_source=chatgpt.com "Navigating the complex cloud native world | by Malek Kazdaghli"
+
+以下は **CNCF Landscape の中で、実務（Kubernetes / Cloud Native）で頻繁に使われる重要技術 TOP30** を
+**分野別に整理したリスト**です。
+※実際のプロダクション環境でよく採用されるものを中心に選定。
+
+---
+
+# Cloud Native 重要技術 TOP30（CNCF Landscape）
+
+## 1. Container Runtime（コンテナ基盤）
+
+| 技術         | 用途                |
+| ---------- | ----------------- |
+| Docker     | コンテナ作成・実行         |
+| containerd | Kubernetes標準ランタイム |
+| CRI-O      | K8s専用ランタイム        |
+
+---
+
+# 2. Container Orchestration（コンテナ管理）
+
+| 技術         | 用途                |
+| ---------- | ----------------- |
+| Kubernetes | コンテナオーケストレーション    |
+| Helm       | Kubernetesパッケージ管理 |
+| Kustomize  | K8s設定管理           |
+
+---
+
+# 3. Service Mesh（サービス通信制御）
+
+| 技術      | 用途         |
+| ------- | ---------- |
+| Istio   | サービスメッシュ   |
+| Linkerd | 軽量サービスメッシュ |
+
+---
+
+# 4. API Gateway / Networking
+
+| 技術      | 用途                  |
+| ------- | ------------------- |
+| Envoy   | 高性能プロキシ             |
+| NGINX   | Web / Reverse Proxy |
+| Traefik | Kubernetes Ingress  |
+
+---
+
+# 5. Observability（監視）
+
+| 技術            | 用途       |
+| ------------- | -------- |
+| Prometheus    | メトリクス監視  |
+| Grafana       | ダッシュボード  |
+| OpenTelemetry | 分散トレーシング |
+
+---
+
+# 6. Logging（ログ）
+
+| 技術            | 用途          |
+| ------------- | ----------- |
+| Fluentd       | ログ収集        |
+| Loki          | Grafanaログ基盤 |
+| Elasticsearch | ログ検索        |
+
+---
+
+# 7. CI/CD / GitOps
+
+| 技術      | 用途            |
+| ------- | ------------- |
+| Argo CD | GitOpsデプロイ    |
+| Jenkins | CI/CD         |
+| Tekton  | Kubernetes CI |
+
+---
+
+# 8. Security
+
+| 技術    | 用途               |
+| ----- | ---------------- |
+| Falco | Kubernetesセキュリティ |
+| OPA   | ポリシー管理           |
+| Trivy | コンテナ脆弱性          |
+
+---
+
+# 9. Storage
+
+| 技術   | 用途                 |
+| ---- | ------------------ |
+| Rook | Kubernetes storage |
+| Ceph | 分散ストレージ            |
+
+---
+
+# 10. Messaging / Streaming
+
+| 技術           | 用途      |
+| ------------ | ------- |
+| Apache Kafka | メッセージ基盤 |
+| NATS         | 軽量メッセージ |
+
+---
+
+# 11. Infrastructure / Cluster管理
+
+| 技術         | 用途            |
+| ---------- | ------------- |
+| etcd       | Kubernetes DB |
+| Terraform  | IaC           |
+| Crossplane | クラウド管理        |
+
+---
+
+# Cloud Nativeエンジニアがまず覚える20
+
+実務ではこのあたりをまず押さえます。
+
+```text
+Kubernetes
+Docker
+Helm
+Prometheus
+Grafana
+Fluentd
+Loki
+OpenTelemetry
+ArgoCD
+Envoy
+NGINX
+Istio
+Linkerd
+Falco
+OPA
+Trivy
+Kafka
+NATS
+Terraform
+etcd
+```
+
+---
+
+# 実務でよくあるクラウドネイティブ構成
+
+```
+Client
+ ↓
+CDN
+ ↓
+Ingress (NGINX / Envoy)
+ ↓
+Kubernetes
+ ↓
+Service Mesh (Istio)
+ ↓
+Application Pods
+ ↓
+Database / Kafka
+```
+
+監視
+
+```
+Prometheus
+Grafana
+Loki
+OpenTelemetry
+```
+
+---
+
+もし希望あれば、
+**CNCF Landscape を理解するための最短ルート（エンジニア向け）**
+
+つまり
+
+```
+Cloud Native
+必須技術マップ（超重要30）
+```
+
+を **構造図で解説**します。
+これを理解すると **Landscapeの全体像が一気に見える**ようになります。
+
+CNCF Landscape は非常に巨大なので、**実務エンジニアが理解するための「最短ルート構造」**で整理します。
+ポイントは **クラウドネイティブは5層構造**で理解すると一気に分かります。
+
+---
+
+# Cloud Native 必須技術マップ（実務最短ルート）
+
+## ① Infrastructure Layer（基盤）
+
+ここは **クラウド or VM基盤**
+
+代表
+
+* Amazon Web Services
+* Google Cloud
+* Microsoft Azure
+
+ここで
+
+```text
+VM
+Network
+Storage
+```
+
+を提供します。
+
+---
+
+# ② Container Runtime Layer
+
+アプリをコンテナとして実行する層
+
+主要技術
+
+* Docker
+* containerd
+
+役割
+
+```text
+アプリをコンテナとして実行
+```
+
+---
+
+# ③ Orchestration Layer（最重要）
+
+クラウドネイティブの中心
+
+主要技術
+
+* Kubernetes
+
+役割
+
+```text
+コンテナを自動管理
+スケーリング
+自己修復
+デプロイ
+```
+
+ここが **Cloud Native の中核**です。
+
+---
+
+# ④ Platform Layer（運用機能）
+
+Kubernetesの上に載る運用ツール
+
+### CI/CD
+
+* Argo CD
+
+### Monitoring
+
+* Prometheus
+* Grafana
+
+### Logging
+
+* Loki
+* Fluentd
+
+### Security
+
+* Falco
+
+---
+
+# ⑤ Application Layer
+
+ここが実際のアプリ
+
+例
+
+```text
+Web API
+AI
+Microservices
+Data Processing
+```
+
+---
+
+# 全体構造
+
+クラウドネイティブは基本この形
+
+```text
+Application
+↓
+Platform Tools
+↓
+Kubernetes
+↓
+Container Runtime
+↓
+Cloud Infrastructure
+```
+
+---
+
+# 実務アーキテクチャ例
+
+典型的なKubernetesシステム
+
+```text
+Client
+↓
+CDN
+↓
+Ingress (NGINX / Envoy)
+↓
+Kubernetes
+↓
+Microservices
+↓
+Database
+```
+
+監視
+
+```text
+Prometheus
+Grafana
+Loki
+```
+
+デプロイ
+
+```text
+ArgoCD
+GitOps
+```
+
+---
+
+# CNCF Landscape を理解するコツ
+
+Landscapeは **全部覚える必要はありません。**
+
+まず理解するのは **この10個**
+
+```text
+Kubernetes
+Docker
+containerd
+Helm
+Prometheus
+Grafana
+ArgoCD
+Envoy
+Istio
+Falco
+```
+
+これで **Landscapeの8割理解できます。**
+
+---
+
+# Cloud Nativeエンジニアのスキル順
+
+学習順
+
+```
+1 Docker
+2 Kubernetes
+3 Helm
+4 Observability
+5 GitOps
+6 Service Mesh
+```
+
+---
+
+# Kubernetes周辺エコシステム
+
+```text
+Kubernetes
+├ Ingress (NGINX)
+├ Service Mesh (Istio)
+├ Monitoring (Prometheus)
+├ Logging (Loki)
+├ CI/CD (ArgoCD)
+└ Security (Falco)
+```
+
+---
+
+もしよければ次に
+**CNCF Landscape の「最重要30技術」**を
+
+* エンジニア難易度
+* 企業採用率
+* 将来性
+
+でランキング化します。
+
+これを見ると **今どの技術を勉強すべきか**がはっきりします。
+
+以下は **CNCF Landscape の中でも実務採用率・重要度・将来性を踏まえた「最重要30技術ランキング」**です。
+「今クラウドネイティブを学ぶなら何から触るべきか」という観点で整理しています。
+
+---
+
+# Cloud Native 最重要技術ランキング（TOP30）
+
+## Tier 1 — コア基盤（必須レベル）
+
+これを知らないとクラウドネイティブが成立しません。
+
+| 順位 | 技術         | 役割             |
+| -- | ---------- | -------------- |
+| 1  | Kubernetes | コンテナオーケストレーション |
+| 2  | Docker     | コンテナ作成         |
+| 3  | containerd | コンテナ実行         |
+| 4  | Helm       | K8sパッケージ管理     |
+| 5  | etcd       | KubernetesのDB  |
+
+**ここがCloud Nativeの心臓**
+
+---
+
+# Tier 2 — 運用（Observability）
+
+本番運用で必須
+
+| 順位 | 技術            | 役割      |
+| -- | ------------- | ------- |
+| 6  | Prometheus    | メトリクス監視 |
+| 7  | Grafana       | ダッシュボード |
+| 8  | OpenTelemetry | トレーシング  |
+| 9  | Loki          | ログ管理    |
+| 10 | Fluentd       | ログ収集    |
+
+---
+
+# Tier 3 — ネットワーク
+
+Kubernetes通信基盤
+
+| 順位 | 技術      | 役割      |
+| -- | ------- | ------- |
+| 11 | Envoy   | L7プロキシ  |
+| 12 | NGINX   | Ingress |
+| 13 | Traefik | Ingress |
+| 14 | Cilium  | CNI     |
+
+---
+
+# Tier 4 — GitOps / CI/CD
+
+モダン運用
+
+| 順位 | 技術             | 役割       |
+| -- | -------------- | -------- |
+| 15 | Argo CD        | GitOps   |
+| 16 | Argo Workflows | workflow |
+| 17 | Tekton         | CI       |
+| 18 | Flux           | GitOps   |
+
+---
+
+# Tier 5 — Service Mesh
+
+マイクロサービス通信制御
+
+| 順位 | 技術      | 役割           |
+| -- | ------- | ------------ |
+| 19 | Istio   | Service Mesh |
+| 20 | Linkerd | 軽量Mesh       |
+
+---
+
+# Tier 6 — セキュリティ
+
+Kubernetesセキュリティ
+
+| 順位 | 技術    | 役割               |
+| -- | ----- | ---------------- |
+| 21 | Falco | Runtime security |
+| 22 | OPA   | Policy           |
+| 23 | Trivy | 脆弱性              |
+
+---
+
+# Tier 7 — データ / メッセージ
+
+| 順位 | 技術           | 役割        |
+| -- | ------------ | --------- |
+| 24 | Apache Kafka | streaming |
+| 25 | NATS         | messaging |
+
+---
+
+# Tier 8 — Infrastructure管理
+
+| 順位 | 技術         | 役割            |
+| -- | ---------- | ------------- |
+| 26 | Terraform  | IaC           |
+| 27 | Crossplane | Cloud control |
+| 28 | Pulumi     | IaC           |
+
+---
+
+# Tier 9 — Storage
+
+| 順位 | 技術   | 役割                  |
+| -- | ---- | ------------------- |
+| 29 | Rook | storage             |
+| 30 | Ceph | distributed storage |
+
+---
+
+# 実務での重要度
+
+現実のプロジェクトでは
+
+**まずこの10個**
+
+```text
+Kubernetes
+Docker
+Helm
+Prometheus
+Grafana
+ArgoCD
+Envoy
+NGINX
+OpenTelemetry
+Terraform
+```
+
+---
+
+# Cloud Nativeの理解図
+
+```
+Application
+↓
+GitOps (ArgoCD)
+↓
+Kubernetes
+↓
+Container Runtime
+↓
+Cloud Infrastructure
+```
+
+---
+
+# 現場の典型構成
+
+```
+Client
+↓
+CloudFront
+↓
+Ingress (NGINX)
+↓
+Kubernetes
+↓
+Microservices
+↓
+Database / Kafka
+```
+
+監視
+
+```
+Prometheus
+Grafana
+Loki
+OpenTelemetry
+```
+
+---
+
+もし興味あれば次に、
+**CNCF Landscapeを理解する最重要の構造**
+
+つまり
+
+**「Kubernetesエコシステムの全体構造」**
+
+を **1枚の図レベルで完全理解できる解説**をします。
+これを理解すると **Landscapeの全体が一気に見える**ようになります。
+
+## CNCF Landscape とは
+
+**CNCF Landscape（Cloud Native Landscape）** は、
+クラウドネイティブ分野のソフトウェアやサービスを **カテゴリ別に整理した技術マップ**です。
+
+運営は
+Cloud Native Computing Foundation
+で、サイトはこちらです。
+[https://landscape.cncf.io/](https://landscape.cncf.io/)
+
+---
+
+# 一言でいうと
+
+```text
+クラウドネイティブ技術の全体地図
+```
+
+Kubernetesを中心としたエコシステムの
+**数百〜1000以上のツール**を分類して一覧化しています。
+
+---
+
+# 掲載されている主なカテゴリ
+
+Landscapeでは技術がレイヤー別に整理されています。
+
+| カテゴリ              | 内容     | 代表技術       |
+| ----------------- | ------ | ---------- |
+| Container Runtime | コンテナ実行 | containerd |
+| Orchestration     | コンテナ管理 | Kubernetes |
+| Observability     | 監視     | Prometheus |
+| Logging           | ログ     | Loki       |
+| CI/CD             | デプロイ   | Argo CD    |
+| Service Mesh      | サービス通信 | Istio      |
+| Security          | セキュリティ | Falco      |
+
+---
+
+# 何のためのサイトか
+
+主に3つの用途があります。
+
+### ① 技術選定
+
+例
+
+```
+ログ基盤を選びたい
+↓
+LandscapeのLoggingカテゴリを見る
+↓
+Fluentd / Loki / Elasticsearch
+```
+
+---
+
+### ② クラウドネイティブの全体理解
+
+Landscapeを見ると
+
+```
+Kubernetes
+↓
+その周辺ツール
+↓
+運用ツール
+```
+
+の関係が分かります。
+
+---
+
+### ③ OSSプロジェクトの成熟度確認
+
+CNCFはプロジェクトを段階管理しています。
+
+| 段階         | 意味 |
+| ---------- | -- |
+| Sandbox    | 初期 |
+| Incubating | 成長 |
+| Graduated  | 成熟 |
+
+例
+
+* Kubernetes → Graduated
+* Prometheus → Graduated
+
+---
+
+# 技術構造（Landscapeの見方）
+
+クラウドネイティブは基本この構造です。
+
+```
+Application
+↓
+Platform Tools
+↓
+Kubernetes
+↓
+Container Runtime
+↓
+Infrastructure
+```
+
+---
+
+# エンジニアが見る理由
+
+実務ではこう使います。
+
+例
+
+```
+Kubernetes構成を設計
+↓
+監視どうする？
+↓
+Landscapeを見る
+↓
+Prometheus + Grafana
+```
+
+---
+
+# 重要ポイント
+
+Landscapeは
+
+```
+比較サイトではない
+```
+
+目的は
+
+```
+クラウドネイティブ技術の全体マップ
+```
+
+です。
+
+---
+
+もしよければ次に
+**CNCF Landscape を理解するための最短ロードマップ**
+
+つまり
+
+```
+クラウドネイティブ技術
+エンジニア学習ルート
+```
+
+を解説します。
+これは **Kubernetesエンジニアが必ず通る順番**です。

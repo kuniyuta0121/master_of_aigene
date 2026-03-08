@@ -1,0 +1,290 @@
+## Lambdaのコールドスタート問題と Provisioned Concurrency
+
+AWS Lambda はリクエストが来たときに実行環境を起動します。
+この **初回起動の遅延**が **コールドスタート問題**です。
+
+---
+
+# 1. コールドスタートとは
+
+Lambdaはリクエストごとに以下の流れで処理します。
+
+```text
+リクエスト
+↓
+実行環境が存在する？
+↓
+Yes → 即実行（Warm Start）
+No  → 環境作成（Cold Start）
+```
+
+コールドスタートでは以下が発生します。
+
+```text
+コンテナ作成
+↓
+ランタイム起動
+↓
+コードロード
+↓
+依存ライブラリロード
+↓
+関数実行
+```
+
+この処理のため **遅延が発生**します。
+
+---
+
+# 2. コールドスタートの遅延時間
+
+目安
+
+| 言語      | 遅延        |
+| ------- | --------- |
+| Node.js | 50〜300ms  |
+| Python  | 100〜500ms |
+| Java    | 1〜5秒      |
+| .NET    | 1〜4秒      |
+
+原因
+
+```text
+Runtime initialization
+Dependency loading
+Container startup
+```
+
+---
+
+# 3. コールドスタートが発生する条件
+
+主に3つです。
+
+### ① 初回実行
+
+Lambdaが初めて呼ばれるとき
+
+---
+
+### ② スケールアウト
+
+同時実行が増えると
+
+```text
+1 instance → 10 instances
+```
+
+新しい実行環境が作られる
+
+---
+
+### ③ 長時間未使用
+
+Lambdaは一定時間で停止
+
+```text
+数分〜15分程度
+```
+
+---
+
+# 4. Warm Start
+
+すでに環境がある場合
+
+```text
+Warm Start
+```
+
+高速
+
+```text
+数ミリ秒
+```
+
+---
+
+# 5. Provisioned Concurrency
+
+コールドスタートを防ぐ機能
+
+正式名称
+AWS Lambda Provisioned Concurrency
+
+---
+
+## 仕組み
+
+Lambda実行環境を **事前に起動しておく**
+
+```text
+Provisioned Concurrency = 10
+```
+
+すると
+
+```text
+10 instance
+常に起動
+```
+
+---
+
+## 処理
+
+```text
+Request
+↓
+Warm instance
+↓
+即実行
+```
+
+コールドスタートが起きません。
+
+---
+
+# 6. Provisioned Concurrencyの動作
+
+例
+
+```text
+Provisioned Concurrency = 5
+```
+
+リクエスト
+
+```text
+1〜5 → Warm
+6〜 → Cold Start
+```
+
+---
+
+# 7. 料金
+
+Provisioned Concurrencyは **常に起動しているため課金**されます。
+
+課金対象
+
+```text
+起動時間
++
+実行時間
+```
+
+---
+
+# 8. 使うべきケース
+
+### API
+
+```text
+API Gateway + Lambda
+```
+
+低レイテンシ必要
+
+---
+
+### 認証
+
+```text
+Auth service
+```
+
+---
+
+### リアルタイム処理
+
+```text
+Webhook
+Chat
+```
+
+---
+
+# 9. コールドスタート対策
+
+### ① Provisioned Concurrency
+
+最も確実
+
+---
+
+### ② Lambda軽量化
+
+```text
+依存減らす
+package小さく
+```
+
+---
+
+### ③ Runtime選択
+
+```text
+Node.js
+Python
+```
+
+速い
+
+---
+
+### ④ SnapStart（Java）
+
+AWS Lambda SnapStart
+
+Java用
+
+```text
+起動状態をスナップショット
+```
+
+---
+
+# 10. 実務アーキテクチャ
+
+低レイテンシAPI
+
+```text
+Client
+↓
+API Gateway
+↓
+Lambda
+↓
+DynamoDB
+```
+
+Lambda
+
+```text
+Provisioned Concurrency
+```
+
+---
+
+# まとめ
+
+| 概念                      | 説明          |
+| ----------------------- | ----------- |
+| Cold Start              | Lambda環境初期化 |
+| Warm Start              | 既存環境再利用     |
+| Provisioned Concurrency | 事前起動        |
+
+---
+
+**一言まとめ**
+
+```text
+Provisioned Concurrency = Lambdaを常時Warm状態にする仕組み
+```
+
+---
+
+必要なら
+**Lambdaのコールドスタートを完全に理解する図（内部構造）**も解説できます。
+これを知ると **なぜ遅いのか**が完全に理解できます。

@@ -1,0 +1,554 @@
+AWS Serverless Application Model (SAM)は、Lambda、API Gateway、DynamoDBなどのサーバーレスアプリケーションを効率的に構築・デプロイできるAWS謹製のオープンソースフレームワークです。簡潔なYAMLテンプレートとCLIツールを提供し、ローカル環境でのデバッグやクラウドへの迅速なデプロイを実現します。 
+Amazon Web Services (AWS)
+Amazon Web Services (AWS)
+ +3
+AWS SAM の主な特徴と利点
+簡単な定義: 少ない記述（YAML形式）で複雑なサーバーレスリソース（関数、API、DB）を定義可能。
+開発の高速化: SAM CLIを利用し、sam init（初期化）、sam build（ビルド）、sam deploy（デプロイ）の工程を簡素化。
+ローカルデバッグ: sam local コマンドを使用して、Dockerを利用した環境でAWSにデプロイする前にテストやデバッグを実行可能。
+IaCに対応: AWS CloudFormationを拡張しているため、Infrastructure as Code (IaC) としてバージョン管理が容易。
+AWSネイティブな統合: API Gatewayのルート設定やLambdaのイベントソースマッピングなどを簡単に記述できる。 
+Amazon AWS Documentation
+Amazon AWS Documentation
+ +4
+主なコンポーネント
+SAM テンプレート: AWS CloudFormation の拡張構文。template.yaml でアプリ構成を定義する。
+SAM CLI: アプリの作成、ビルド、デバッグ、デプロイを行うコマンドラインツール。 
+Amazon AWS Documentation
+Amazon AWS Documentation
+ +4
+基本的なワークフロー
+sam init: テンプレートからプロジェクトを作成。
+sam build: アプリケーションをビルド（ソースコードのコンパイル、依存関係のパッケージ化）。
+sam local start-api: ローカル環境でAPIをエミュレートしテスト。
+sam deploy --guided: 対話形式でAWSへ初めてデプロイ。 
+サーバーワークスエンジニアブログ
+サーバーワークスエンジニアブログ
+ +3
+SAM と CloudFormation の違い
+CloudFormationがAWSの全リソースを包括的に管理するのに対し、SAMはサーバーレスアプリケーション（Lambda, API Gateway, DynamoDB, S3など）の構築に特化した機能と簡略化された構文を提供します。 
+
+AWSでよく混同される **SAM / CloudFormation / Terraform** は、
+すべて **Infrastructure as Code（IaC）** ですが、目的とスコープが違います。
+実務観点で整理します。
+
+---
+
+# 全体関係（まず理解）
+
+```text
+Terraform
+      ↑
+CloudFormation
+      ↑
+AWS SAM
+```
+
+意味
+
+* **Terraform** → マルチクラウドIaC
+* **CloudFormation** → AWS専用IaC
+* **SAM** → Serverless専用IaC
+
+---
+
+# 1. AWS SAM
+
+## 目的
+
+**Serverlessアプリを簡単にデプロイする**
+
+SAMは内部的には **CloudFormationのラッパー**です。
+
+つまり
+
+```text
+SAM → CloudFormationに変換
+```
+
+---
+
+## 対象
+
+Serverlessリソース
+
+* Lambda
+* API Gateway
+* DynamoDB
+* Step Functions
+
+---
+
+## SAM例
+
+```yaml
+Resources:
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.11
+      Handler: app.lambda_handler
+      Events:
+        Api:
+          Type: Api
+```
+
+---
+
+## 特徴
+
+メリット
+
+* Lambda開発が簡単
+* ローカル実行可能
+* Serverless特化
+
+デメリット
+
+* AWS専用
+* Serverless以外は弱い
+
+---
+
+# 2. CloudFormation
+
+## 目的
+
+AWSリソースを **コードで作成**
+
+AWS公式IaCです。
+
+---
+
+## 対象
+
+AWSリソース全部
+
+例
+
+* EC2
+* RDS
+* VPC
+* S3
+* Lambda
+* ECS
+
+---
+
+## CloudFormation例
+
+```yaml
+Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+```
+
+---
+
+## 特徴
+
+メリット
+
+* AWS公式
+* AWS機能をフル対応
+
+デメリット
+
+* 書きづらい
+* 学習コスト高い
+
+---
+
+# 3. Terraform
+
+## 目的
+
+**マルチクラウドIaC**
+
+提供
+
+HashiCorp
+
+---
+
+## 対象
+
+複数クラウド
+
+* AWS
+* GCP
+* Azure
+* Kubernetes
+* Datadog
+* GitHub
+
+---
+
+## Terraform例
+
+```hcl
+resource "aws_s3_bucket" "example" {
+  bucket = "example-bucket"
+}
+```
+
+---
+
+## 特徴
+
+メリット
+
+* マルチクラウド
+* 書きやすい
+* コミュニティ大
+
+デメリット
+
+* AWS新機能対応が遅いことあり
+
+---
+
+# まとめ（実務比較）
+
+| 項目  | SAM        | CloudFormation | Terraform  |
+| --- | ---------- | -------------- | ---------- |
+| 用途  | Serverless | AWS IaC        | マルチクラウドIaC |
+| 対象  | Lambda系    | AWS全体          | AWS+他      |
+| 言語  | YAML       | YAML/JSON      | HCL        |
+| 難易度 | 低          | 中              | 低〜中        |
+| 特徴  | Lambda開発   | AWS公式          | 汎用IaC      |
+
+---
+
+# 実務での使い分け
+
+### Serverless
+
+```text
+SAM
+```
+
+---
+
+### AWS専用インフラ
+
+```text
+CloudFormation
+または
+CDK
+```
+
+---
+
+### 複数クラウド
+
+```text
+Terraform
+```
+
+---
+
+# AWSエンジニアの実際の選択
+
+最近は
+
+```text
+AWS CDK
+Terraform
+```
+
+が多いです。
+
+SAMは
+
+```text
+Serverless専用
+```
+
+---
+
+もしよければ
+**AWS IaC の本当の勢力図**
+
+（エンジニア採用率）
+
+```
+Terraform
+AWS CDK
+CloudFormation
+SAM
+Pulumi
+```
+
+を解説します。
+実は **CloudFormationは直接書く人が減っています。**
+
+AWSの **IaC（Infrastructure as Code）** はここ数年でかなり勢力図が変わりました。
+実務の採用率・用途・開発者体験の観点で整理します。
+
+---
+
+# AWS IaC 勢力図（2025 実務）
+
+| 順位 | ツール                       | 用途         | 採用状況  |
+| -- | ------------------------- | ---------- | ----- |
+| 1  | Terraform                 | マルチクラウドIaC | 非常に多い |
+| 2  | AWS Cloud Development Kit | AWS IaC    | 急増    |
+| 3  | AWS CloudFormation        | AWS IaC    | 既存多い  |
+| 4  | AWS SAM                   | Serverless | 一部    |
+| 5  | Pulumi                    | IaC        | 新興    |
+
+---
+
+# 1. Terraform（現在の主流）
+
+提供
+HashiCorp
+
+## 特徴
+
+* AWS / GCP / Azure対応
+* Kubernetes対応
+* SaaSも管理可能
+
+例
+
+```hcl
+resource "aws_s3_bucket" "example" {
+  bucket = "my-bucket"
+}
+```
+
+## 採用理由
+
+```text
+マルチクラウド
+書きやすい
+巨大コミュニティ
+```
+
+---
+
+# 2. AWS CDK（急成長）
+
+AWS公式
+
+## 特徴
+
+IaCを **プログラミング言語で書く**
+
+対応
+
+* TypeScript
+* Python
+* Java
+* Go
+
+例
+
+```python
+s3.Bucket(self, "MyBucket")
+```
+
+---
+
+## メリット
+
+```text
+コード再利用
+抽象化
+IDE補完
+```
+
+---
+
+## 内部
+
+実は
+
+```text
+CDK
+↓
+CloudFormation
+```
+
+に変換されます。
+
+---
+
+# 3. CloudFormation
+
+AWSの元祖IaC
+
+例
+
+```yaml
+Resources:
+  MyBucket:
+    Type: AWS::S3::Bucket
+```
+
+---
+
+## 問題
+
+```text
+長い
+書きづらい
+再利用難しい
+```
+
+そのため
+
+```text
+直接書く人は減少
+```
+
+---
+
+# 4. AWS SAM
+
+Serverless専用
+
+対象
+
+* Lambda
+* API Gateway
+* DynamoDB
+
+例
+
+```yaml
+Type: AWS::Serverless::Function
+```
+
+---
+
+## 実務
+
+```text
+Lambda開発チーム
+```
+
+で使われることが多い
+
+---
+
+# 5. Pulumi
+
+新しいIaC
+
+特徴
+
+```text
+Python
+TypeScript
+Go
+```
+
+で書く
+
+---
+
+# AWS IaC 構造
+
+実はこうなっています
+
+```text
+SAM
+↓
+CDK
+↓
+CloudFormation
+↓
+AWS API
+```
+
+Terraformは
+
+```text
+Terraform
+↓
+AWS API
+```
+
+---
+
+# 実務での選択
+
+### AWSのみ
+
+おすすめ
+
+```text
+AWS CDK
+```
+
+---
+
+### マルチクラウド
+
+おすすめ
+
+```text
+Terraform
+```
+
+---
+
+### Serverless
+
+おすすめ
+
+```text
+SAM
+```
+
+---
+
+# 現場の実際の構成
+
+企業の多くは
+
+```text
+Terraform
++
+Kubernetes
+```
+
+または
+
+```text
+AWS CDK
++
+Serverless
+```
+
+---
+
+# AWSエンジニアが知っておくべき順位
+
+学習優先
+
+```text
+1 Terraform
+2 AWS CDK
+3 CloudFormation
+4 SAM
+```
+
+---
+
+もし希望あれば、
+**AWS IaCを理解するための本当に重要な設計概念**
+
+```
+State
+Drift
+Idempotency
+Dependency graph
+Plan
+```
+
+を解説します。
+ここを理解すると **IaCの本質が分かります。**

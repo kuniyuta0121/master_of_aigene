@@ -1,0 +1,609 @@
+AWS **Well-Architected Framework** を、実務の設計レビューやアーキテクチャ検討でそのまま使えるレベルまで圧縮してまとめます。
+（章構造＋実務チェックリスト形式）
+
+---
+
+# AWS Well-Architected Framework 実務要約
+
+## 0. Framework概要
+
+### 意味
+
+クラウドシステムを **安全・安定・効率・低コストで運用するための設計原則**。
+
+### 実務での使い方
+
+システム設計レビュー時の **評価軸**として使う。
+
+設計レビュー例
+
+```text
+Security      → アクセス制御・暗号化
+Reliability   → 障害耐性
+Performance   → スケーリング
+Cost          → 無駄コスト
+Operations    → 運用自動化
+Sustainability→ 資源効率
+```
+
+---
+
+# 1. Operational Excellence（運用）
+
+## 意味
+
+システム運用を **自動化・改善し続ける能力**
+
+## 設計原則
+
+* 運用をコード化
+* 小さく頻繁に変更
+* 運用を継続改善
+
+## 実務チェックリスト
+
+### Infrastructure as Code
+
+```text
+CloudFormation / Terraform / CDK
+```
+
+### CI/CD
+
+```text
+GitHub Actions
+CodePipeline
+CodeBuild
+```
+
+### 監視
+
+```text
+CloudWatch
+X-Ray
+ログ収集
+```
+
+### 運用自動化
+
+```text
+Runbook
+Auto remediation
+```
+
+---
+
+# 2. Security（セキュリティ）
+
+## 意味
+
+データ・システムを保護する
+
+## 設計原則
+
+```text
+最小権限
+多層防御
+自動化
+監査
+```
+
+## 実務チェックリスト
+
+### Identity管理
+
+```text
+IAM
+IAM Role
+AWS SSO
+```
+
+### ネットワーク防御
+
+```text
+Security Group
+NACL
+WAF
+Shield
+```
+
+### ログ監査
+
+```text
+CloudTrail
+GuardDuty
+Security Hub
+```
+
+### 暗号化
+
+```text
+KMS
+TLS
+S3 Encryption
+```
+
+---
+
+# 3. Reliability（信頼性）
+
+## 意味
+
+障害が起きてもサービスを継続できる設計
+
+## 設計原則
+
+```text
+障害は必ず起きる
+自動復旧
+冗長化
+```
+
+## 実務チェックリスト
+
+### 冗長構成
+
+```text
+Multi-AZ
+Load Balancer
+AutoScaling
+```
+
+### 障害対策
+
+```text
+Retry
+Timeout
+Circuit breaker
+```
+
+### バックアップ
+
+```text
+S3 backup
+RDS snapshot
+DynamoDB backup
+```
+
+### DR対策
+
+```text
+Multi-region
+Failover
+```
+
+---
+
+# 4. Performance Efficiency（パフォーマンス）
+
+## 意味
+
+最適なリソースで最大性能を出す
+
+## 設計原則
+
+```text
+スケールアウト
+サーバーレス活用
+キャッシュ利用
+```
+
+## 実務チェックリスト
+
+### Compute
+
+```text
+EC2
+Lambda
+Fargate
+```
+
+### Storage
+
+```text
+S3
+EFS
+EBS
+```
+
+### Database
+
+```text
+Aurora
+DynamoDB
+ElastiCache
+```
+
+### CDN
+
+```text
+CloudFront
+```
+
+---
+
+# 5. Cost Optimization（コスト）
+
+## 意味
+
+必要な性能を **最小コストで提供**
+
+## 設計原則
+
+```text
+使用量課金
+無駄削減
+継続的最適化
+```
+
+## 実務チェックリスト
+
+### インスタンス最適化
+
+```text
+Right sizing
+Savings Plans
+Reserved Instance
+```
+
+### 自動スケール
+
+```text
+AutoScaling
+Lambda
+```
+
+### コスト監視
+
+```text
+Cost Explorer
+Budgets
+```
+
+### 未使用削除
+
+```text
+EBS
+Elastic IP
+Idle resources
+```
+
+---
+
+# 6. Sustainability（持続可能性）
+
+## 意味
+
+環境負荷を減らす
+
+## 設計原則
+
+```text
+リソース効率
+不要計算削減
+```
+
+## 実務チェックリスト
+
+### 効率化
+
+```text
+Serverless
+AutoScaling
+```
+
+### データ管理
+
+```text
+Lifecycle
+Archive
+削除
+```
+
+---
+
+# 実務での使い方
+
+## 1. Architecture Review
+
+設計レビュー時に確認
+
+```text
+IAM最小権限？
+Multi-AZ構成？
+AutoScalingある？
+ログ監査ある？
+バックアップある？
+コスト監視ある？
+```
+
+---
+
+## 2. AWS公式ツール
+
+使用ツール
+
+```text
+AWS Well-Architected Tool
+```
+
+できること
+
+```text
+設計診断
+リスク検出
+改善提案
+```
+
+---
+
+# 実務で一番重要なポイント
+
+AWS設計は **この3つを守れば大事故は防げる**
+
+```text
+1 Multi-AZ
+2 IAM最小権限
+3 AutoScaling
+```
+
+---
+
+# さらに実務レベルで重要な設計
+
+AWSアーキ設計は結局この構成になる
+
+```text
+CloudFront
+↓
+WAF
+↓
+ALB
+↓
+ECS / Lambda
+↓
+RDS / DynamoDB
+↓
+S3
+```
+
+---
+
+もし希望があれば、
+**AWS Well-Architected Framework の本当に実務で重要な部分だけ**
+
+```
+AWSアーキ設計
+超実務チェックリスト（200項目）
+```
+
+作ります。
+これは **AWS SAレベルの設計レビュー項目**になります。
+
+以下は **AWS Solutions Architect（SA）が設計レビューで実際に確認するレベルのチェック項目**を、
+**AWS Well-Architected Framework（6つの柱）に対応**させて整理した実務チェックリストです。
+実プロジェクトの **アーキテクチャレビュー / 設計審査 / Well-Architected Review** で使える粒度にしています。
+
+---
+
+# AWS SAレベル 設計レビュー項目
+
+## 1. Operational Excellence（運用）
+
+### Infrastructure as Code
+
+* すべてのインフラは **IaC（CloudFormation / CDK / Terraform）** で管理されているか
+* 手動設定が残っていないか
+* 環境差分（dev / stg / prod）はコードで管理されているか
+
+### CI/CD
+
+* デプロイは自動化されているか
+* rollback 手順は自動化されているか
+* Blue/Green または Canary deploy を利用しているか
+
+### Observability
+
+* CloudWatch Metrics / Logs / Alarms が定義されているか
+* 分散トレーシング（X-Ray / OpenTelemetry）が導入されているか
+* エラーレート・レイテンシを監視しているか
+
+### Incident対応
+
+* Runbook が存在するか
+* PagerDuty / SNS 等の通知が設定されているか
+* post-mortem が運用されているか
+
+---
+
+# 2. Security（セキュリティ）
+
+## IAM
+
+* IAMポリシーは **Least Privilege** か
+* IAM User は原則使っていないか
+* IAM Role を利用しているか
+* rootアカウントはロックされているか
+
+## Network Security
+
+* Security Group が最小ポートのみ許可しているか
+* NACL は適切に設定されているか
+* Public subnet と Private subnet が分離されているか
+
+## Encryption
+
+* S3 / EBS / RDS は **KMS暗号化**されているか
+* TLS通信のみ許可されているか
+* Secrets は Secrets Manager / Parameter Store に保存されているか
+
+## Monitoring
+
+* CloudTrail が全リージョンで有効か
+* GuardDuty が有効か
+* Security Hub を利用しているか
+
+---
+
+# 3. Reliability（信頼性）
+
+## 冗長化
+
+* すべての重要サービスが **Multi-AZ** か
+* ELB / ALB が利用されているか
+* Stateless設計になっているか
+
+## 自動復旧
+
+* Auto Scaling が設定されているか
+* Health check が設定されているか
+
+## バックアップ
+
+* RDS snapshot が自動化されているか
+* DynamoDB backup が設定されているか
+* S3 versioning が有効か
+
+## Disaster Recovery
+
+* RTO / RPO が定義されているか
+* Multi-Region 構成の必要性を評価したか
+
+DRパターン
+
+```
+Backup & Restore
+Pilot Light
+Warm Standby
+Active-Active
+```
+
+---
+
+# 4. Performance Efficiency（パフォーマンス）
+
+## Compute
+
+* Auto Scaling を使用しているか
+* Spot / OnDemand を適切に使い分けているか
+
+## Caching
+
+* ElastiCache を利用しているか
+* CloudFront CDN を利用しているか
+
+## Database
+
+* Read Replica を利用しているか
+* Query optimization が行われているか
+
+## Serverless
+
+可能なら
+
+```
+Lambda
+Fargate
+Step Functions
+```
+
+を利用しているか
+
+---
+
+# 5. Cost Optimization（コスト）
+
+## Resource管理
+
+* Right sizing が行われているか
+* 未使用EBS / Elastic IP が残っていないか
+
+## Savings
+
+* Savings Plans
+* Reserved Instance
+
+を利用しているか
+
+## Cost monitoring
+
+* AWS Budgets を設定しているか
+* Cost Explorer を利用しているか
+
+---
+
+# 6. Sustainability（持続可能性）
+
+* Serverlessを優先しているか
+* 不要なログやデータを削除しているか
+* Auto Scaling を利用しているか
+
+---
+
+# SAが最初に見る重要チェック（トップ10）
+
+AWS設計レビューではまずここを確認します。
+
+```
+1 IAM最小権限
+2 CloudTrail有効
+3 Multi-AZ
+4 Auto Scaling
+5 Backup
+6 Infrastructure as Code
+7 CloudWatch監視
+8 TLS通信
+9 Secrets Manager使用
+10 Cost monitoring
+```
+
+これが守られていれば **重大事故の8割は防げます**。
+
+---
+
+# AWSアーキテクチャの典型構成
+
+SAレビューで最も多い構成
+
+```
+Route53
+↓
+CloudFront
+↓
+WAF
+↓
+ALB
+↓
+ECS / Lambda
+↓
+RDS / DynamoDB
+↓
+S3
+```
+
+---
+
+# SAレビューの質問例
+
+AWS SAはよく次の質問をします。
+
+```
+障害時どう復旧する？
+IAMは最小権限？
+バックアップから何分で復旧？
+ピークトラフィック何倍？
+コスト上限は？
+```
+
+---
+
+希望があれば次に
+**AWSプロジェクトで本当に使う**
+
+```
+AWS Architecture Review
+完全チェックリスト（300項目）
+```
+
+作れます。
+これは **AWS SA試験レベルを超える実務レビュー**です。
