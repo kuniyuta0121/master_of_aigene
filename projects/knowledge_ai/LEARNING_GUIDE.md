@@ -18,21 +18,21 @@
   Phase SYS: ML System Design       → 推薦システム・Feature Store・Model Serving・面接対策
 
 ■ API・バックエンド
-  Phase 1: FastAPI CRUD API          → Python上級・API設計
+  Phase 1: FastAPI + API設計パターン  → CRUD + ページネーション・レート制限・CQRS・冪等性・Circuit Breaker
   Phase 2: LLM + RAG 統合           → LLMを使う側・RAG・ベクターDB
 
 ■ インフラ・DevOps
-  Phase 3: Docker コンテナ化         → Docker・コンテナ化
-  Phase 4: GitHub Actions CI/CD      → CI/CD
-  Phase 5: Terraform + AWS           → IaC・クラウドアーキテクチャ
-  Phase 6: Prometheus + OpenTelemetry → 可観測性
+  Phase 3: Docker + K8s 深掘り       → namespaces/cgroups・K8sアーキテクチャ・HPA/KEDA・GPU・GitOps
+  Phase 4: CI/CD パターン            → テスト戦略・5デプロイ戦略・Progressive Delivery・ML CI/CD
+  Phase 5: クラウドアーキテクチャ      → Well-Architected・DR4戦略・サーバーレス・AWS/GCP対応表
+  Phase 6: SRE + 可観測性            → SLI/SLO/SLA・Burn Rate・インシデント対応・カオスエンジニアリング
 
 ■ データエンジニアリング
-  Phase 7: Airflow + dbt             → データパイプライン設計
+  Phase 7: データエンジニアリング      → Star Schema・DAG実装・データ品質・ストリーム処理・レイクハウス
 
 ■ 応用・専門領域
-  Phase 8: Go マイクロサービス        → Go言語・並行処理
-  Phase 9: JWT認証 + セキュリティ     → セキュリティ
+  Phase 8: Go 並行処理パターン       → goroutine/channel・Worker Pool・Circuit Breaker・Graceful Shutdown
+  Phase 9: セキュリティ工学           → OWASP Top10・JWT自作・STRIDE・ゼロトラスト・暗号学
   Phase 10: Next.js フロントエンド    → TypeScript・React・Next.js
 ```
 
@@ -53,7 +53,10 @@ DS0 → ALGO → DS1 → DS2 → DS4 → DS3 → SYS → Phase 1 → Phase 2 →
 | ML理論 | ベイズ・過学習・損失関数の数学的根拠 | DS0, DS1, DS2 |
 | ML実装力 | 勾配降下法・逆伝播・Transformerをスクラッチ実装 | DS1(from_scratch), DS2(transformer) |
 | CV/NLP | CNN・ResNet・ViT・Attention の原理と実装 | DS4, DS2 |
-| システム設計 | 億ユーザースケールのML基盤・推薦システム | SYS, DS3, Phase 1,7 |
+| システム設計 | 億ユーザースケールのML基盤・推薦システム | SYS, DS3, Phase 1,5,7 |
+| インフラ設計 | K8s・CI/CD・DR戦略・SRE | Phase 3,4,5,6 |
+| セキュリティ | OWASP・認証認可・脅威モデリング | Phase 9 |
+| データ基盤 | バッチ/ストリーム・データ品質・パイプライン設計 | Phase 7 |
 | 行動面接 | 技術的意思決定・チームリード | techcorp_sim シナリオ5 |
 
 ## 各フェーズの始め方
@@ -138,12 +141,17 @@ python ml_system_design.py  # 標準ライブラリのみ
 # → 面接 Deep Dive: コールドスタート, レイテンシSLA, 100K QPS スケーリング
 ```
 
-### Phase 1（API設計）
+### Phase 1 - API設計（CRUD + 上級パターン）
 ```bash
 cd phase1_api
 pip install -r requirements.txt
-uvicorn main:app --reload
-# http://localhost:8000/docs でSwagger UIが開く
+uvicorn main:app --reload         # CRUD API → http://localhost:8000/docs
+python api_design_patterns.py     # ★上級API設計パターン:
+                                  #   Richardson Maturity Model (Level 0-3)
+                                  #   ページネーション（Offset vs Cursor 実装）
+                                  #   レート制限（Token Bucket / Sliding Window 実装）
+                                  #   冪等性（Idempotency Key パターン）
+                                  #   CQRS / API Gateway / Circuit Breaker
 ```
 
 ### Phase 2（LLM + RAG）
@@ -151,15 +159,93 @@ uvicorn main:app --reload
 export ANTHROPIC_API_KEY="your-key"
 pip install langchain langchain-anthropic langchain-community chromadb
 # phase2_ai/rag_service.py を読んで RAGService を使ってみる
-# ※ Phase DS2 で学んだ Embedding が RAG の核心
 ```
 
-### Phase 8（Go サービス）
+### Phase 3 - Docker/K8s（コンテナ技術の全体像）
+```bash
+cd phase3_docker
+python container_deep_dive.py     # ★コンテナ/K8s の全体像:
+                                  #   コンテナの仕組み (namespaces, cgroups, UnionFS)
+                                  #   イメージ最適化 (マルチステージ, distroless)
+                                  #   K8s アーキテクチャ (Control Plane / Data Plane)
+                                  #   リソース設計 (Deployment/StatefulSet/DaemonSet)
+                                  #   スケーリング (HPA/VPA/KEDA), Helm, GitOps
+                                  #   GPU ワークロード (ML推論 on K8s)
+```
+
+### Phase 4 - CI/CD（デプロイ戦略とテスト戦略）
+```bash
+cd phase4_cicd
+python cicd_patterns.py           # ★CI/CDパターン:
+                                  #   テスト戦略 (Pyramid, Mock/Stub/Fake 実装)
+                                  #   5つのデプロイ戦略 (Rolling/BlueGreen/Canary/FeatureFlag/Shadow)
+                                  #   DB マイグレーション (expand-and-contract)
+                                  #   シークレット管理 (Vault, rotation)
+                                  #   Progressive Delivery, ML CI/CD
+```
+
+### Phase 5 - クラウドアーキテクチャ（AWS/GCP 設計）
+```bash
+cd phase5_cloud
+python cloud_architecture.py      # ★クラウドアーキテクチャ:
+                                  #   AWS Well-Architected 6本柱
+                                  #   マルチAZ/マルチリージョン設計
+                                  #   サーバーレス (Lambda + DynamoDB + Step Functions)
+                                  #   DB選択 (RDS/Aurora/DynamoDB/ElastiCache/Neptune)
+                                  #   災害復旧4戦略 (Backup→Multi-Site)
+                                  #   AWS vs GCP サービス対応表 (35+サービス)
+                                  #   面接: 100K QPS ML推論基盤の設計
+```
+
+### Phase 6 - SRE/可観測性（本番運用の技術）
+```bash
+cd phase6_observability
+python sre_practices.py           # ★SRE実践:
+                                  #   SLI/SLO/SLA 定義と Error Budget 計算
+                                  #   アラート設計 (Multi-Window Burn Rate)
+                                  #   インシデント対応 (Severity分類, Postmortem)
+                                  #   カオスエンジニアリング (GameDay計画)
+                                  #   PromQL クエリビルダー実装
+                                  #   分散トレーシング (W3C TraceContext)
+```
+
+### Phase 7 - データエンジニアリング（パイプライン設計）
+```bash
+cd phase7_data
+python data_engineering.py        # ★データエンジニアリング:
+                                  #   Star Schema / Data Vault 2.0 (実装付き)
+                                  #   バッチ vs ストリーム (Lambda/Kappa Architecture)
+                                  #   DAG エグゼキュータ (トポロジカルソートで実装)
+                                  #   データ品質チェッカー (6種のチェック実装)
+                                  #   レイクハウス (Delta Lake / Iceberg / Hudi)
+                                  #   ストリーム処理 (Tumbling/Sliding/Session Window 実装)
+                                  #   面接: ライドシェアの1M events/sec パイプライン設計
+```
+
+### Phase 8 - Go（並行処理 + マイクロサービス）
 ```bash
 cd phase8_go_service
-go mod init knowledge-ai-search
-go run main.go
-curl "http://localhost:8001/search?q=Python"
+go run main.go                    # 転置インデックス検索サービス
+go run go_concurrency_patterns.go # ★Go並行処理パターン:
+                                  #   Fan-out/Fan-in, select, context.Context
+                                  #   sync (Mutex/RWMutex/WaitGroup/Once/Pool)
+                                  #   Worker Pool, Pipeline パターン
+                                  #   Rate Limiter (Token Bucket)
+                                  #   Circuit Breaker (状態遷移: Closed→Open→Half-Open)
+                                  #   Graceful Shutdown (SIGTERM/SIGINT)
+```
+
+### Phase 9 - セキュリティ（OWASP + 暗号 + ゼロトラスト）
+```bash
+cd phase9_security
+python security_deep_dive.py      # ★セキュリティ工学:
+                                  #   OWASP Top 10 (脆弱 vs 安全コード比較)
+                                  #   暗号学基礎 (HMAC API認証 実装)
+                                  #   JWT をスクラッチ実装 + 4つの攻撃デモ
+                                  #   OAuth2/OIDC (PKCE 実装)
+                                  #   脅威モデリング (STRIDE 分析ツール実装)
+                                  #   ゼロトラスト (BeyondCorp, mTLS)
+                                  #   面接: マルチテナントSaaSの認証認可設計
 ```
 
 ### Phase 10（フロントエンド）
@@ -198,6 +284,21 @@ npm run dev
 | SYS | FAISS で 100万ベクトルの ANN 検索を実装 | ★★★ |
 | SYS | Feast で Feature Store をローカル構築 | ★★★ |
 | SYS | BentoML でモデルを本番サービングする | ★★☆ |
+| Phase 1 | GraphQL API を FastAPI + Strawberry で実装 | ★★★ |
+| Phase 1 | Redis でレート制限ミドルウェアを実装 | ★★☆ |
+| Phase 3 | minikube でアプリをデプロイして HPA を設定 | ★★★ |
+| Phase 3 | Trivy でイメージスキャンを CI に組み込む | ★★☆ |
+| Phase 4 | GitHub Actions で Canary デプロイを実装 | ★★★ |
+| Phase 5 | Terraform で VPC + ECS Fargate を構築 | ★★★ |
+| Phase 5 | Lambda + API Gateway のサーバーレスAPIを構築 | ★★☆ |
+| Phase 6 | Prometheus + Grafana でダッシュボードを作成 | ★★☆ |
+| Phase 6 | SLO ベースのアラートルールを設計 | ★★★ |
+| Phase 7 | dbt で Star Schema のモデルを実装 | ★★☆ |
+| Phase 7 | Kafka + Flink で簡易ストリーム処理を構築 | ★★★ |
+| Phase 8 | gRPC サーバーを Go で実装 | ★★★ |
+| Phase 8 | Go で REST API テストを table-driven で書く | ★★☆ |
+| Phase 9 | OWASP ZAP でアプリのセキュリティスキャン | ★★☆ |
+| Phase 9 | mTLS でサービス間認証を実装 | ★★★ |
 
 ## 言語・技術選定の理由
 
