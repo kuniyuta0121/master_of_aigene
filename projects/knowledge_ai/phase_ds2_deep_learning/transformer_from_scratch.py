@@ -532,7 +532,7 @@ class TransformerEncoder:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def demo_positional_encoding() -> None:
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("📍 Positional Encoding の可視化")
     print("━" * 60)
 
@@ -556,7 +556,7 @@ def demo_positional_encoding() -> None:
 
 
 def demo_attention_visualization() -> None:
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("👁️  Attention の可視化")
     print("━" * 60)
 
@@ -594,7 +594,7 @@ def demo_attention_visualization() -> None:
 
 
 def demo_complexity_analysis() -> None:
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("⚡ 計算量の分析")
     print("━" * 60)
     print("""
@@ -636,7 +636,7 @@ def demo_complexity_analysis() -> None:
 
 
 def demo_full_encoder() -> None:
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("🤖 Transformer Encoder の動作確認")
     print("━" * 60)
 

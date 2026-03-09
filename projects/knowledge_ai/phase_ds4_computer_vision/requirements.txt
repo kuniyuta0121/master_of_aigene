@@ -1,0 +1,8 @@
+torch>=2.2.0
+torchvision>=0.17.0
+matplotlib>=3.8.0
+numpy>=1.26.0
+# 物体検出（実装してみようタスク用）
+# ultralytics>=8.1.0     # YOLOv8
+# transformers>=4.40.0   # ViT (HuggingFace)
+# grad-cam>=1.5.0        # Grad-CAM 可視化

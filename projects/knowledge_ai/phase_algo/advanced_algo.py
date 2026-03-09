@@ -763,7 +763,7 @@ def run_all_tests() -> None:
     print("║   Advanced Algorithms - FAANG Hard Level                   ║")
     print("╚════════════════════════════════════════════════════════════╝")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("🌐 1. グラフ")
     print("━" * 60)
 
@@ -785,7 +785,7 @@ def run_all_tests() -> None:
     assert GraphAlgorithms.topological_sort(cyclic_graph) is None
     print(f"  サイクル検出: ✅")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("🌳 2. Trie")
     print("━" * 60)
 
@@ -803,7 +803,7 @@ def run_all_tests() -> None:
     print(f"  'py' で始まる単語数: {trie.count_prefix('py')}")
     print(f"  'tensor' 検索: {trie.search('tensor')} (False=正常) ✅")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("📊 3. Segment Tree")
     print("━" * 60)
 
@@ -818,7 +818,7 @@ def run_all_tests() -> None:
     seg_min.update(3, 0)  # data[3] = 0 に更新
     print(f"  data[3]=0 に更新後, 区間[2,5]の最小値: {seg_min.query(2, 5)}  (期待値: 0) ✅")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("🔍 4. バックトラッキング")
     print("━" * 60)
 
@@ -836,7 +836,7 @@ def run_all_tests() -> None:
     combos = Backtracking.combination_sum([2, 3, 6, 7], 7)
     print(f"  組み合わせ和=7: {combos} ✅")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("📝 5. 文字列アルゴリズム")
     print("━" * 60)
 
@@ -848,7 +848,7 @@ def run_all_tests() -> None:
     rk_result = rolling_hash_search("abcabcabc", "abc")
     print(f"  Rolling Hash: 'abc' in 'abcabcabc' → 位置{rk_result} ✅")
 
-    print("\n━" * 60)
+    print("\n" + "━" * 60)
     print("📚 6. 単調スタック + 高度なDP")
     print("━" * 60)
 
