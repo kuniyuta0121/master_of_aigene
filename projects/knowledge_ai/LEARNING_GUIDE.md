@@ -9,6 +9,7 @@
 ■ FAANG通過に必要な基礎（★最優先）
   Phase DS0: 統計・確率の基礎       → ベイズ定理・仮説検定・A/Bテスト・因果推論・情報理論
   Phase ALGO: アルゴリズム&DS       → Two Pointers・DP・Graph・Trie・Segment Tree・Bitmask DP
+  Phase CS: CS基盤                  → OS(スケジューラ/仮想メモリ)・TCP/IP・DB内部(B-Tree/LSM/MVCC)・GC・並行処理
 
 ■ データサイエンス基盤（スクラッチ実装 + フレームワーク）
   Phase DS1: ML Foundation          → ML from scratch (NumPy) + scikit-learn パイプライン
@@ -19,26 +20,43 @@
 
 ■ API・バックエンド
   Phase 1: FastAPI + API設計パターン  → CRUD + ページネーション・レート制限・CQRS・冪等性・Circuit Breaker
-  Phase 2: LLM + RAG 統合           → LLMを使う側・RAG・ベクターDB
+  Phase 2: LLM + RAG 統合           → Advanced RAG・AIエージェント・プロンプトエンジニアリング・ベクターDB
 
 ■ インフラ・DevOps
   Phase 3: Docker + K8s 深掘り       → namespaces/cgroups・K8sアーキテクチャ・HPA/KEDA・GPU・GitOps
   Phase 4: CI/CD パターン            → テスト戦略・5デプロイ戦略・Progressive Delivery・ML CI/CD
   Phase 5: クラウドアーキテクチャ      → Well-Architected・DR4戦略・サーバーレス・AWS/GCP対応表
   Phase 6: SRE + 可観測性            → SLI/SLO/SLA・Burn Rate・インシデント対応・カオスエンジニアリング
+  Phase DEVOPS: DevOpsハンズオン      → Docker実践・K8s Day-2・Terraform・CI/CD・FinOps・クラウドセキュリティ
 
 ■ データエンジニアリング
   Phase 7: データエンジニアリング      → Star Schema・DAG実装・データ品質・ストリーム処理・レイクハウス
+  Phase 7+: SQL上級 + NoSQL          → Window関数・CTE・インデックス・DynamoDB/MongoDB/Redis設計
+
+■ アーキテクチャ設計
+  Phase ARCH: システム設計パターン     → マイクロサービス・DDD・Event Sourcing・分散システム・面接設計問題
+  Phase DIST: 分散システム深掘り       → Raft合意・CRDT・2PC/Saga・Quorum・HLC・Snowflake ID・Phi Accrual
 
 ■ プログラミング言語（ポリグロット）
   Phase LANG: 言語比較 + 選定        → Python弱点・TS/Go/Rust/Java比較・PM選定フレームワーク
   Phase LANG-TS: TypeScript Backend  → Hono REST API・型システム・Generics・Discriminated Unions
   Phase LANG-RS: Rust 基礎           → 所有権・パターンマッチ・trait・並行処理・HTTP自作
+  Phase PY+: Python上級              → async/await・メタクラス・型システム・パフォーマンス・テスト技法
+  Phase PATTERN: デザインパターン      → GoF 23パターン・SOLID・並行処理パターン・アンチパターン
+  Phase PERF: パフォーマンス工学       → CPU cache・Bloom Filter・HyperLogLog・Tail Latency・ベンチマーク
+
+■ PM・リーダーシップ
+  Phase PM: テクニカルPM             → アジャイル・OKR・RICE・ADR・ステークホルダー・戦略・面接対応
+  Phase STAFF+: Staff+リーダーシップ   → 技術戦略・組織設計・DORA/SPACE・Staff+面接・Build vs Buy
 
 ■ 応用・専門領域
   Phase 8: Go 並行処理パターン       → goroutine/channel・Worker Pool・Circuit Breaker・Graceful Shutdown
   Phase 9: セキュリティ工学           → OWASP Top10・JWT自作・STRIDE・ゼロトラスト・暗号学
   Phase 10: Next.js フロントエンド    → TypeScript・React・Next.js
+  Phase FRONT: フロントエンド工学      → Virtual DOM・Next.js SSR/SSG/ISR・Core Web Vitals・CSS・状態管理・テスト
+
+■ リファレンス
+  用語集 (glossary.py)               → 50+専門用語・カテゴリ別・検索機能付き
 ```
 
 ## 推奨学習順序（Google/Tesla/IBM レベル志向）
@@ -61,9 +79,20 @@ DS0 → ALGO → DS1 → DS2 → DS4 → DS3 → SYS → Phase 1 → Phase 2 →
 | システム設計 | 億ユーザースケールのML基盤・推薦システム | SYS, DS3, Phase 1,5,7 |
 | インフラ設計 | K8s・CI/CD・DR戦略・SRE | Phase 3,4,5,6 |
 | セキュリティ | OWASP・認証認可・脅威モデリング | Phase 9 |
-| データ基盤 | バッチ/ストリーム・データ品質・パイプライン設計 | Phase 7 |
+| データ基盤 | バッチ/ストリーム・データ品質・パイプライン設計 | Phase 7, 7+ |
+| SQL/NoSQL | Window関数・DynamoDB設計・「なぜこのDBを選んだ」 | Phase 7+ |
+| 汎用システム設計 | URL Shortener, Chat, News Feed, Rate Limiter | ARCH |
+| マイクロサービス | Saga, Event Sourcing, CQRS, DDD | ARCH |
+| デザインパターン | GoF, SOLID, 「このシステムにどのパターンを適用するか」 | PATTERN |
 | 言語選定 | 「なぜその言語を選んだ？」技術的トレードオフ | LANG |
-| 行動面接 | 技術的意思決定・チームリード | techcorp_sim シナリオ5 |
+| AI/LLM | RAGアーキテクチャ・エージェント設計・プロンプト | Phase 2 |
+| PM面接 | Product Sense, Execution, メトリクス | PM |
+| 行動面接 | STAR, 技術的意思決定・チームリード | PM, techcorp_sim |
+| CS基盤 | OS, ネットワーク, DB内部, GC の「なぜ」 | CS |
+| 分散システム | Raft, CRDT, Saga, Quorum の設計と実装 | DIST |
+| パフォーマンス | ボトルネック特定, Tail Latency, 計測手法 | PERF |
+| Staff+設計 | プラットフォーム設計, 移行計画, 組織影響 | STAFF+ |
+| Staff+行動 | Influence without authority, 曖昧さの対処 | STAFF+ |
 
 ## 各フェーズの始め方
 
@@ -160,10 +189,23 @@ python api_design_patterns.py     # ★上級API設計パターン:
                                   #   CQRS / API Gateway / Circuit Breaker
 ```
 
-### Phase 2（LLM + RAG）
+### Phase 2 - AI/LLM（エージェント + Advanced RAG）
 ```bash
+cd phase2_ai
+python ai_agents_and_rag.py          # ★AI エージェント & RAG (stdlib のみ):
+                                      #   プロンプトエンジニアリング (テンプレートエンジン実装)
+                                      #   チャンキング戦略 (Fixed/Recursive/Semantic)
+                                      #   BM25 検索エンジン実装
+                                      #   Hybrid Retrieval (BM25 + Vector)
+                                      #   RAGAS 評価指標 (Faithfulness/Relevancy/Precision)
+                                      #   ReAct エージェント (Thought→Action→Observation)
+                                      #   Multi-Agent (Supervisor/Debate/Swarm)
+                                      #   HNSW ベクトル検索アルゴリズム実装
+                                      #   LLMOps (コスト追跡, トレーシング)
+                                      #   面接: 100万ドキュメントRAG設計
+# RAG を実際の LLM で動かす場合:
 export ANTHROPIC_API_KEY="your-key"
-pip install langchain langchain-anthropic langchain-community chromadb
+pip install langchain langchain-anthropic chromadb
 # phase2_ai/rag_service.py を読んで RAGService を使ってみる
 ```
 
@@ -201,6 +243,13 @@ python cloud_architecture.py      # ★クラウドアーキテクチャ:
                                   #   災害復旧4戦略 (Backup→Multi-Site)
                                   #   AWS vs GCP サービス対応表 (35+サービス)
                                   #   面接: 100K QPS ML推論基盤の設計
+python cloud_services_catalog.py  # ★クラウドサービスカタログ (100+サービス):
+                                  #   10カテゴリ別 AWS/GCP サービス一覧
+                                  #   各サービス: 用途・使うべき場面・使うべきでない場面・料金・代替
+                                  #   メッセージング比較: SQS vs SNS vs EventBridge vs Kinesis vs Kafka
+                                  #   DynamoDB Streams / Kinesis Data Firehose 詳細解説
+                                  #   7つのアーキテクチャパターン (ASCII図付き)
+                                  #   面接: ECサイト設計 / リアルタイム不正検知設計
 ```
 
 ### Phase 6 - SRE/可観測性（本番運用の技術）
@@ -226,6 +275,26 @@ python data_engineering.py        # ★データエンジニアリング:
                                   #   レイクハウス (Delta Lake / Iceberg / Hudi)
                                   #   ストリーム処理 (Tumbling/Sliding/Session Window 実装)
                                   #   面接: ライドシェアの1M events/sec パイプライン設計
+python sql_nosql_deep_dive.py    # ★SQL上級 + NoSQL (sqlite3):
+                                  #   Window Functions (ROW_NUMBER/RANK/LAG/LEAD)
+                                  #   CTE (再帰CTE でツリー構造走査)
+                                  #   インデックス戦略 (B-Tree, 複合, カバリング)
+                                  #   DynamoDB Single-Table Design (GSI設計)
+                                  #   MongoDB Aggregation Pipeline シミュレーション
+                                  #   Redis パターン (Cache-Aside, Sorted Set, Pub/Sub)
+                                  #   面接SQL: 連続ログイン日数, 中央値, ファネル分析
+```
+
+### Phase ARCH - アーキテクチャ設計（システム設計面接の核心）
+```bash
+cd phase_architecture
+python system_design_patterns.py # ★システム設計パターン:
+                                  #   マイクロサービス (Saga, Circuit Breaker, API Gateway)
+                                  #   DDD (Aggregate, Value Object, Bounded Context)
+                                  #   Event Sourcing + CQRS (実装付き)
+                                  #   分散システム (Consistent Hashing, Vector Clock, Gossip)
+                                  #   面接設計問題 (URL Shortener, Rate Limiter, Chat, News Feed)
+                                  #   スケーラビリティ (Sharding, Cache戦略, Back-pressure)
 ```
 
 ### Phase 8 - Go（並行処理 + マイクロサービス）
@@ -274,14 +343,145 @@ cd ../rust_basics && cargo run        # Rust 基礎 (std のみ):
                                       #   trait (Pythonの Protocol/ABC の上位互換)
                                       #   fearless concurrency (GILなし並列処理)
                                       #   HTTP サーバーを std のみで自作
+python python_advanced.py            # ★Python上級 (stdlib のみ):
+                                      #   async/await (イベントループ, Semaphore, async generator)
+                                      #   メタプログラミング (@retry/@cache, メタクラス, descriptor)
+                                      #   型システム (TypeVar, Generic, Protocol, overload, mypy)
+                                      #   パフォーマンス (__slots__, generator, lru_cache, struct)
+                                      #   テスト技法 (Mock, patch, Stub/Fake/Spy, Property-based)
+                                      #   Pythonic イディオム (walrus, match-case, EAFP)
+python design_patterns.py            # ★デザインパターン (stdlib のみ):
+                                      #   生成 (Singleton, Factory, Builder, Prototype)
+                                      #   構造 (Adapter, Decorator, Proxy, Facade, Composite)
+                                      #   振る舞い (Strategy, Observer, Command, State, Chain of Resp.)
+                                      #   モダン (Repository, Unit of Work, DI, Specification)
+                                      #   並行処理 (Producer-Consumer, Thread Pool, Actor Model)
+                                      #   SOLID原則とパターンの対応マッピング
 ```
 
-### Phase 10（フロントエンド）
+### Phase PM - テクニカルPM・リーダーシップ
+```bash
+cd phase_pm
+python tech_pm_leadership.py         # ★PM/Tech Lead 完全ガイド:
+                                      #   アジャイル (Sprint計画, Burndown, WIPシミュレーション)
+                                      #   プロダクトディスカバリー (RICE, Impact Mapping, JTBD)
+                                      #   OKR・メトリクス (AARRR, LTV/CAC, Retention Curve)
+                                      #   ステークホルダー (RACI, Power/Interest Grid, SBI)
+                                      #   テクニカルPM (ADR, Tech Debt, トレードオフ分析)
+                                      #   プロダクト戦略 (TAM/SAM/SOM, Porter, PMF, Chasm)
+                                      #   リーダーシップ (1:1, Health Check, スキルマトリクス)
+                                      #   面接 (STAR, Product Sense, Execution問題)
+```
+
+### Phase CS - CS基盤（Staff+面接の必須知識）
+```bash
+cd phase_cs_fundamentals
+python cs_internals.py              # ★CS基盤 (stdlib のみ):
+                                      #   OS: プロセススケジューラ (Round Robin 実装)
+                                      #   OS: 仮想メモリ (ページテーブル + TLB + LRU 実装)
+                                      #   OS: Buddy System メモリアロケータ実装
+                                      #   OS: I/Oモデル5種比較, デッドロック検出
+                                      #   Net: TCP ステートマシン + 輻輳制御シミュレーション
+                                      #   Net: HTTP/1.1 vs 2 vs 3, DNS解決, ロードバランシング
+                                      #   DB: B-Tree 実装 (挿入・検索・分割)
+                                      #   DB: LSM-Tree 実装 (MemTable→SSTable→Compaction)
+                                      #   DB: MVCC + Snapshot Isolation 実装
+                                      #   Concurrency: Lock-Free Stack (CAS), Work Stealing
+                                      #   Runtime: Lexer→Parser→AST→評価器, Mark-Sweep GC
+```
+
+### Phase DIST - 分散システム深掘り（DDIA の実装版）
+```bash
+cd phase_architecture
+python distributed_systems_deep.py  # ★分散システム (stdlib のみ):
+                                      #   Raft 合意: Leader選出 + ログ複製 + 障害回復
+                                      #   Vector Clock: 因果関係追跡
+                                      #   CRDT: G-Counter, PN-Counter, OR-Set (収束保証)
+                                      #   2PC: Prepare→Commit/Abort
+                                      #   Saga: Orchestration + 補償トランザクション
+                                      #   Outbox Pattern: DB+メッセージのアトミック性
+                                      #   Quorum: R+W>N, Sloppy Quorum, Read Repair
+                                      #   Consistent Hashing: Virtual Nodes + 再分散計測
+                                      #   HLC: ハイブリッド論理時計
+                                      #   Snowflake ID: 64-bit 分散ID生成
+                                      #   Phi Accrual: 適応的障害検出
+```
+
+### Phase PERF - パフォーマンス工学（計測→最適化→検証）
+```bash
+cd phase_programming
+python performance_engineering.py   # ★パフォーマンス工学 (stdlib のみ):
+                                      #   CPU cache: Row-major vs Column-major ベンチマーク
+                                      #   メモリ: Python オブジェクトサイズ, __slots__
+                                      #   Bloom Filter: 確率的メンバーシップテスト実装
+                                      #   Count-Min Sketch: ストリーム頻度推定実装
+                                      #   HyperLogLog: カーディナリティ推定実装
+                                      #   キャッシュ: LRU vs LFU 比較, Cache Stampede 対策
+                                      #   N+1 問題: デモ + バッチ解決
+                                      #   Rate Limiting: Token Bucket, Sliding Window
+                                      #   ベンチマークハーネス: warmup, P95/P99, stddev
+                                      #   Tail Latency: Fan-out amplification シミュレーション
+                                      #   Apdex Score: SLO設計の基礎
+```
+
+### Phase STAFF+ - Staff+リーダーシップ（Senior→Staffの壁を越える）
+```bash
+cd phase_pm
+python staff_plus_leadership.py     # ★Staff+リーダーシップ (stdlib のみ):
+                                      #   Technology Radar (Adopt/Trial/Assess/Hold)
+                                      #   Build vs Buy フレームワーク + TCO計算
+                                      #   Technical Vision ドキュメントテンプレート
+                                      #   Team Topologies + 認知負荷アセスメント
+                                      #   Engineering Levels (IC3→IC7) + Senior→Staff差
+                                      #   DACI 意思決定, Pre-mortem 分析
+                                      #   技術的負債四象限, 投資配分 (70-20-10)
+                                      #   DORA メトリクス (Elite/High/Medium/Low)
+                                      #   SPACE Framework, OKR カスケード
+                                      #   技術→ビジネスインパクト変換
+                                      #   BLUF, RFC テンプレート, Pyramid Principle
+                                      #   Staff+ 面接: プラットフォーム設計, Behavioral
+```
+
+### Phase DEVOPS - DevOpsハンズオン（実践的インフラスキル）
+```bash
+cd phase_devops
+python devops_hands_on.py           # ★DevOps実践ガイド (stdlib のみ):
+                                      #   Docker パターン (マルチステージ, Compose, セキュリティ)
+                                      #   K8s Day-2 (Pod lifecycle, デプロイ戦略, RBAC, トラブルシュート)
+                                      #   Terraform IaC (HCL, State管理, モジュール, ライフサイクル)
+                                      #   CI/CD パイプライン (GitHub Actions, キャッシュ, GitOps)
+                                      #   FinOps (コストモデル, Right-sizing, コスト配賦)
+                                      #   クラウドセキュリティ (共有責任, IAM, VPC, 暗号化, コンプライアンス)
+```
+
+### Phase FRONT - フロントエンド工学（React/Next.js/パフォーマンス）
+```bash
+cd phase10_frontend
+python frontend_engineering.py      # ★フロントエンド工学 (stdlib のみ):
+                                      #   React (Virtual DOM diff実装, Hooks, Reconciliation)
+                                      #   Next.js (SSR/SSG/ISR シミュレーション, App Router)
+                                      #   Web Performance (Core Web Vitals, Bundle最適化, Lighthouse)
+                                      #   CSS (Specificity計算機, Flexbox/Grid, CSS-in-JS比較)
+                                      #   状態管理 (Redux実装, Context API, Zustand/Jotai)
+                                      #   テスト (Testing Trophy, E2E, アクセシビリティ)
+                                      #   セキュリティ (XSS, CSRF, CSP, CORS)
+```
+
+### Phase 10（フロントエンド - Next.js実装）
 ```bash
 cd phase10_frontend
 npm install
 npm run dev
 # http://localhost:3000 でUIが開く
+```
+
+### 用語集（専門用語リファレンス）
+```bash
+python glossary.py                   # 全用語一覧表示
+python glossary.py search Sidecar    # 用語を検索
+python glossary.py category ARCH     # カテゴリ別表示
+# → 50+用語: Sidecar, Ambassador, Saga, CQRS, Gossip Protocol 等
+# → 各用語: 日本語名・一行説明・詳細・関連ファイル・関連用語
 ```
 
 ## 学習の進め方
@@ -319,6 +519,7 @@ npm run dev
 | Phase 4 | GitHub Actions で Canary デプロイを実装 | ★★★ |
 | Phase 5 | Terraform で VPC + ECS Fargate を構築 | ★★★ |
 | Phase 5 | Lambda + API Gateway のサーバーレスAPIを構築 | ★★☆ |
+| Phase 5 | AWS Free Tier でサーバーレス Web パターンを構築しコスト監視 | ★★☆ |
 | Phase 6 | Prometheus + Grafana でダッシュボードを作成 | ★★☆ |
 | Phase 6 | SLO ベースのアラートルールを設計 | ★★★ |
 | Phase 7 | dbt で Star Schema のモデルを実装 | ★★☆ |
@@ -331,6 +532,41 @@ npm run dev
 | LANG | Rust で Axum フレームワークを使った API を実装 | ★★★ |
 | LANG | Go + Rust + Python で同じ処理のベンチマーク比較 | ★★☆ |
 | LANG | Kotlin で Spring Boot REST API を実装 | ★★★ |
+| Phase 2 | LangChain で Hybrid RAG パイプラインを構築 | ★★★ |
+| Phase 2 | ReAct エージェントに Web 検索ツールを追加 | ★★☆ |
+| Phase 2 | RAGAS で RAG パイプラインの品質を定量評価 | ★★★ |
+| Phase 7+ | LeetCode Database 問題を30問解く | ★★☆ |
+| Phase 7+ | DynamoDB Single-Table Design で自分のアプリを設計 | ★★★ |
+| ARCH | Saga パターンで注文→在庫→決済の連携を実装 | ★★★ |
+| ARCH | Event Sourcing + CQRS でブログシステムを実装 | ★★★ |
+| ARCH | Consistent Hashing でキャッシュ分散を実装 | ★★☆ |
+| PATTERN | 自分のプロジェクトに適用可能なパターンを3つ特定する | ★★☆ |
+| PATTERN | Command パターンで Undo/Redo 付きエディタを作る | ★★★ |
+| PY+ | asyncio で並行 HTTP クライアントを実装 | ★★☆ |
+| PY+ | mypy --strict で既存コードを型チェックする | ★★☆ |
+| PM | 自分のプロジェクトの RICE スコアリングを実施 | ★★☆ |
+| PM | ADR を1つ書いて技術選定の理由を記録する | ★★☆ |
+| PM | STAR メソッドで面接回答を3つ準備する | ★★★ |
+| DEVOPS | LocalStack で Terraform apply → plan → destroy を実践 | ★★☆ |
+| DEVOPS | minikube で Rolling Update → Canary デプロイを実行 | ★★★ |
+| DEVOPS | GitHub Actions で Docker build + test + push パイプラインを構築 | ★★☆ |
+| DEVOPS | AWS Cost Explorer で月次コストレポートを自動生成 | ★★☆ |
+| FRONT | React で Virtual DOM diff の可視化ツールを作る | ★★★ |
+| FRONT | Lighthouse CI を GitHub Actions に組み込む | ★★☆ |
+| FRONT | Next.js App Router で ISR ブログを実装 | ★★☆ |
+| FRONT | Playwright で E2E テストを書いて CI に組み込む | ★★★ |
+| CS | プロセススケジューラに MLFQ を追加実装 | ★★★ |
+| CS | B+ Tree (リーフ連結リスト付き) を実装 | ★★★ |
+| CS | epoll のイベントループを Python で実装 | ★★☆ |
+| DIST | Raft に membership change を追加実装 | ★★★ |
+| DIST | CRDT で共同編集テキスト (RGA) を実装 | ★★★ |
+| DIST | Merkle Tree で2レプリカの差分同期を実装 | ★★☆ |
+| PERF | cProfile + snakeviz で既存コードをプロファイリング | ★★☆ |
+| PERF | Redis で Bloom Filter + Count-Min Sketch を実践 | ★★☆ |
+| PERF | locust で負荷テストを実施し Tail Latency を計測 | ★★★ |
+| STAFF+ | 自分のプロジェクトの Technical Vision を書く | ★★★ |
+| STAFF+ | DORA メトリクスを計測して改善計画を立てる | ★★☆ |
+| STAFF+ | RFC を1つ書いて技術提案する | ★★★ |
 
 ## 言語・技術選定の理由
 
