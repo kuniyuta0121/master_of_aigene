@@ -30,6 +30,11 @@
 ■ データエンジニアリング
   Phase 7: データエンジニアリング      → Star Schema・DAG実装・データ品質・ストリーム処理・レイクハウス
 
+■ プログラミング言語（ポリグロット）
+  Phase LANG: 言語比較 + 選定        → Python弱点・TS/Go/Rust/Java比較・PM選定フレームワーク
+  Phase LANG-TS: TypeScript Backend  → Hono REST API・型システム・Generics・Discriminated Unions
+  Phase LANG-RS: Rust 基礎           → 所有権・パターンマッチ・trait・並行処理・HTTP自作
+
 ■ 応用・専門領域
   Phase 8: Go 並行処理パターン       → goroutine/channel・Worker Pool・Circuit Breaker・Graceful Shutdown
   Phase 9: セキュリティ工学           → OWASP Top10・JWT自作・STRIDE・ゼロトラスト・暗号学
@@ -57,6 +62,7 @@ DS0 → ALGO → DS1 → DS2 → DS4 → DS3 → SYS → Phase 1 → Phase 2 →
 | インフラ設計 | K8s・CI/CD・DR戦略・SRE | Phase 3,4,5,6 |
 | セキュリティ | OWASP・認証認可・脅威モデリング | Phase 9 |
 | データ基盤 | バッチ/ストリーム・データ品質・パイプライン設計 | Phase 7 |
+| 言語選定 | 「なぜその言語を選んだ？」技術的トレードオフ | LANG |
 | 行動面接 | 技術的意思決定・チームリード | techcorp_sim シナリオ5 |
 
 ## 各フェーズの始め方
@@ -248,6 +254,28 @@ python security_deep_dive.py      # ★セキュリティ工学:
                                   #   面接: マルチテナントSaaSの認証認可設計
 ```
 
+### Phase LANG - ポリグロットプログラミング（言語選定力）
+```bash
+cd phase_programming
+python polyglot_guide.py              # ★5言語比較ガイド (stdlib のみ):
+                                      #   Pythonの弱点 (GIL, 速度, 型安全性, デプロイサイズ)
+                                      #   TypeScript: フルスタック・型安全・npm エコシステム
+                                      #   Go: goroutine・シングルバイナリ・クラウドネイティブ
+                                      #   Rust: 所有権・ゼロコスト抽象化・WebAssembly
+                                      #   Java/Kotlin: JVM・Spring Boot・Android
+                                      #   同じ TODO API を5言語で比較
+                                      #   PM/テックリード向け言語選定フレームワーク
+cd ts_backend && npm install && npm run dev  # TypeScript バックエンド (Hono):
+                                      #   interface vs type, Generics, Discriminated Unions
+                                      #   strictNullChecks, ミドルウェアパターン
+cd ../rust_basics && cargo run        # Rust 基礎 (std のみ):
+                                      #   所有権 (move/borrow/lifetime)
+                                      #   Option<T> / Result<T,E> (null/例外を排除)
+                                      #   trait (Pythonの Protocol/ABC の上位互換)
+                                      #   fearless concurrency (GILなし並列処理)
+                                      #   HTTP サーバーを std のみで自作
+```
+
 ### Phase 10（フロントエンド）
 ```bash
 cd phase10_frontend
@@ -299,16 +327,20 @@ npm run dev
 | Phase 8 | Go で REST API テストを table-driven で書く | ★★☆ |
 | Phase 9 | OWASP ZAP でアプリのセキュリティスキャン | ★★☆ |
 | Phase 9 | mTLS でサービス間認証を実装 | ★★★ |
+| LANG | TypeScript で Zod バリデーション付き API を実装 | ★★☆ |
+| LANG | Rust で Axum フレームワークを使った API を実装 | ★★★ |
+| LANG | Go + Rust + Python で同じ処理のベンチマーク比較 | ★★☆ |
+| LANG | Kotlin で Spring Boot REST API を実装 | ★★★ |
 
 ## 言語・技術選定の理由
 
-| 技術 | 選定理由 |
-|---|---|
-| Python / scikit-learn | ML の事実上の標準ライブラリ |
-| Python / PyTorch | Meta 発・研究〜本番まで使われるDLフレームワーク |
-| MLflow | OSS の実験管理・モデルレジストリのデファクト |
-| Python / FastAPI | 既存スキルの延長・AI/MLの主要言語 |
-| TypeScript / Next.js | フロントエンド経験を型安全に発展させる |
-| Go | クラウドネイティブのデファクト・並行処理学習 |
-| Terraform | AWS/GCPをまたいで使えるデファクトIaCツール |
-| Docker / Kubernetes | コンテナ技術の基礎から運用まで |
+| 技術 | 選定理由 | Pythonにない強み |
+|---|---|---|
+| Python / FastAPI | ML/DSの標準言語・既存スキル活用 | ― (基軸言語) |
+| Python / PyTorch | 研究〜本番まで使われるDLフレームワーク | ― |
+| TypeScript / Hono | フルスタック・フロントはJSのみ | コンパイル時型安全・Discriminated Unions |
+| Go | クラウドネイティブのデファクト | goroutine 並行処理・10MBバイナリ |
+| Rust | システムプログラミング・ML基盤 (Ruff, Polars) | 所有権でGCなしメモリ安全・C並速度 |
+| Java / Kotlin | エンタープライズ・Android | JVM 20年の最適化・大規模リファクタリング |
+| Terraform | AWS/GCPをまたいで使えるデファクトIaCツール | ― |
+| Docker / Kubernetes | コンテナ技術の基礎から運用まで | ― |

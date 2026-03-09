@@ -1,0 +1,1215 @@
+#!/usr/bin/env python3
+"""
+polyglot_guide.py - なぜ複数言語を学ぶべきか：Python使いのための完全ガイド
+
+「Pythonで全部できるじゃん」── その考えが、あなたのキャリアの天井になる。
+
+実行方法:
+    python polyglot_guide.py
+
+標準ライブラリのみ使用。
+"""
+
+import textwrap
+import time
+import sys
+
+# ============================================================
+# ユーティリティ
+# ============================================================
+
+def section(title: str) -> None:
+    """セクション区切り"""
+    print()
+    print("━" * 60)
+    print(f"  {title}")
+    print("━" * 60)
+    print()
+
+
+def subsection(title: str) -> None:
+    print()
+    print(f"  ── {title} ──")
+    print()
+
+
+def question(text: str) -> None:
+    """考えてほしい疑問"""
+    print(f"  ❓ 考えてほしい疑問: {text}")
+    print()
+
+
+def task(text: str) -> None:
+    """実装タスク"""
+    print(f"  [実装してみよう] {text}")
+    print()
+
+
+def point(text: str) -> None:
+    print(f"    ▸ {text}")
+
+
+def code_block(title: str, code: str) -> None:
+    print(f"    --- {title} ---")
+    for line in code.strip().split("\n"):
+        print(f"    {line}")
+    print()
+
+
+def table_row(cols: list, widths: list) -> str:
+    parts = []
+    for col, w in zip(cols, widths):
+        parts.append(str(col).ljust(w))
+    return "  | " + " | ".join(parts) + " |"
+
+
+def table_sep(widths: list) -> str:
+    return "  +-" + "-+-".join("-" * w for w in widths) + "-+"
+
+
+# ============================================================
+# 1. なぜポリグロットか
+# ============================================================
+
+def chapter_1_why_polyglot():
+    section("1. なぜポリグロットか ── \"Pythonで全部できる\" の罠")
+
+    print(textwrap.dedent("""\
+    まず結論から言う。
+
+    「Pythonで全部できる」は技術的には正しい。
+    Turing完全な言語なら、理論上は何でもできる。
+
+    しかし「できる」と「適している」は全く違う。
+
+    包丁で木を切ることは「できる」。
+    だが大工はノコギリを使う。なぜか？ 効率が桁違いだからだ。
+
+    プログラミング言語も同じだ。
+    """))
+
+    subsection("FAANG面接で聞かれる質問")
+    print(textwrap.dedent("""\
+    Google、Meta、Amazonのシステムデザイン面接では必ず聞かれる:
+
+      「このコンポーネントにはどの言語を選びますか？ なぜですか？」
+
+    "Pythonしか知りません" は即レッドフラグ。
+    言語選定ができない = アーキテクチャ判断ができない、と見なされる。
+    """))
+
+    subsection("PM/テックリードの責務")
+    print(textwrap.dedent("""\
+    PM・テックリードになると「言語選定」は避けられない意思決定になる。
+
+    チームが次のプロジェクトで使う言語を決めるとき:
+      - 採用コスト (その言語のエンジニアは市場に何人いる？)
+      - 学習コスト (チームの既存スキルからの距離は？)
+      - 運用コスト (デプロイ・監視・障害対応の難易度は？)
+      - パフォーマンス要件 (レイテンシ、スループットの制約は？)
+
+    これらを判断するには、各言語の強み・弱みを肌感覚で知っている必要がある。
+    「聞いたことがある」レベルでは判断を誤る。
+    """))
+
+    question("あなたが今のチームのテックリードだとして、\n"
+             "    新サービスの言語選定を任されたら、どう判断する？")
+
+    print(textwrap.dedent("""\
+    ポリグロット (多言語習得者) になる理由は3つ:
+
+      1. 適材適所: 各言語の得意領域で最大のパフォーマンスを出す
+      2. キャリア: 上位ポジションは言語横断の視点を要求する
+      3. 思考の幅: 異なるパラダイムが問題解決能力を根本から拡張する
+
+    「Pythonが得意」は武器だ。だが武器が1つしかない戦士は、戦場を選べない。
+    """))
+
+
+# ============================================================
+# 2. Python の弱点を正直に
+# ============================================================
+
+def chapter_2_python_weaknesses():
+    section("2. Pythonの弱点を正直に ── 愛する言語だからこそ直視する")
+
+    # --- GIL ---
+    subsection("2-1. GIL (Global Interpreter Lock)")
+    print(textwrap.dedent("""\
+    CPython には GIL がある。これはインタプリタ全体をロックする仕組みで、
+    マルチスレッドでCPUバウンドな処理を並列実行できない。
+
+    つまり: 8コアCPUがあっても、Pythonのスレッドは1コアしか使えない。
+    """))
+
+    code_block("Python: マルチスレッドでもCPU処理は並列にならない",
+    """\
+import threading, time
+
+def cpu_heavy():
+    total = 0
+    for i in range(10_000_000):
+        total += i
+
+# シングルスレッド: 約 0.8 秒
+# 4スレッド:       約 0.8 秒 (速くならない！GILのせい)
+# Go の goroutine:  約 0.05 秒 (16倍速い)
+""")
+
+    print("    ※ Python 3.13 で実験的に GIL-free モードが導入されたが、")
+    print("      エコシステムの対応は数年かかる見込み。")
+    print()
+
+    # --- 実行速度 ---
+    subsection("2-2. 実行速度ベンチマーク")
+    print("    各言語で同じ計算処理を実行した場合の相対速度:")
+    print()
+
+    widths = [14, 12, 12, 30]
+    print(table_sep(widths))
+    print(table_row(["言語", "実行時間", "相対速度", "備考"], widths))
+    print(table_sep(widths))
+
+    benchmarks = [
+        ["C",           "0.03s",  "1x (基準)",    "手動メモリ管理"],
+        ["Rust",        "0.03s",  "1x",           "C並み + 安全性"],
+        ["Go",          "0.05s",  "1.7x",         "GC付きでもこの速度"],
+        ["Java (JIT)",  "0.07s",  "2.3x",         "JIT最適化後"],
+        ["TypeScript",  "0.15s",  "5x",           "V8エンジン (JIT)"],
+        ["Python",      "1.50s",  "50x",          "インタプリタ"],
+        ["Python+GIL",  "3.00s",  "100x",         "マルチスレッド時"],
+    ]
+    for row in benchmarks:
+        print(table_row(row, widths))
+    print(table_sep(widths))
+    print()
+    print("    出典: The Computer Language Benchmarks Game, 2024-2025 各種ベンチマーク")
+    print("    ※ 処理内容により変動するが、桁の差は概ねこの通り。")
+    print()
+
+    # --- 型安全性 ---
+    subsection("2-3. 型安全性の欠如")
+    code_block("Python: 実行時に爆発する型エラー",
+    """\
+def calculate_total(items: list[dict]) -> float:
+    return sum(item["price"] * item["quantity"] for item in items)
+
+# 型ヒントはあるが、強制力がない
+# 3ヶ月後に誰かがこう呼ぶ:
+calculate_total("not a list")  # 実行時 TypeError!
+
+# TypeScript なら: コンパイル時にエラー (本番に到達しない)
+# Go なら:         コンパイル時にエラー
+# Rust なら:       コンパイル時にエラー
+# Java なら:       コンパイル時にエラー
+""")
+
+    print("    50万行のPythonコードベースで型エラーを追うコスト vs")
+    print("    コンパイラが全部検出してくれるコスト。どちらが安い？")
+    print()
+
+    # --- デプロイサイズ ---
+    subsection("2-4. Dockerイメージサイズ比較")
+    print()
+    widths2 = [14, 18, 14, 22]
+    print(table_sep(widths2))
+    print(table_row(["言語", "ベースイメージ", "最終サイズ", "起動時間"], widths2))
+    print(table_sep(widths2))
+    deploy_data = [
+        ["Rust",       "scratch",       "5-10 MB",   "< 10ms"],
+        ["Go",         "scratch",       "10-15 MB",  "< 10ms"],
+        ["Java (GraalVM)", "distroless", "30-50 MB", "< 50ms"],
+        ["TypeScript", "node:alpine",   "50-80 MB",  "< 100ms"],
+        ["Java (JVM)", "eclipse-temurin","200-300 MB","1-3s (JIT warm-up)"],
+        ["Python",     "python:slim",   "150-250 MB","200-500ms"],
+        ["Python+ML",  "python:3.11",   "1-3 GB",    "2-10s (import)"],
+    ]
+    for row in deploy_data:
+        print(table_row(row, widths2))
+    print(table_sep(widths2))
+    print()
+    print("    Kubernetes で Pod をスケールアウトするとき、")
+    print("    5MB のイメージと 1GB のイメージでは pull 時間が桁違い。")
+    print("    レイテンシ要件が厳しいサービスでは致命的な差になる。")
+    print()
+
+    # --- メモリ ---
+    subsection("2-5. メモリ使用量とGCの予測不能性")
+    print(textwrap.dedent("""\
+    Python のオブジェクトは非常にメモリを食う:
+      - int 型 1つ: 28 bytes (C なら 4 bytes)
+      - 空の dict:  64 bytes
+      - 空の list:  56 bytes
+
+    100万個の整数:
+      Python: 約 28 MB
+      Go:     約  8 MB
+      Rust:   約  4 MB (Vec<i32>)
+
+    GC (Garbage Collection) のタイミングも予測困難で、
+    リアルタイム性が求められるシステムでは問題になる。
+    """))
+
+    question("あなたの Python プロジェクトで、\n"
+             "    「なぜか時々レスポンスが遅くなる」経験はないか？\n"
+             "    それは GC が走っている瞬間かもしれない。")
+
+
+# ============================================================
+# 3. TypeScript / Node.js
+# ============================================================
+
+def chapter_3_typescript():
+    section("3. TypeScript / Node.js ── フルスタックの切り札")
+
+    print(textwrap.dedent("""\
+    「Python でバックエンドを書いて、フロントは...？」
+
+    この質問に答えられない時点で、Pythonだけでは不十分だと分かる。
+    ブラウザで動く言語は JavaScript しかない。これは選択ではなく事実だ。
+    TypeScript はその JavaScript に型安全性を加えた上位互換。
+    """))
+
+    subsection("3-1. なぜ TypeScript が必要か")
+    point("フロントエンドは JS/TS 以外の選択肢がない (ブラウザの制約)")
+    point("フロント + バックエンドを同一言語で書ける = フルスタック")
+    point("npm: 世界最大のパッケージレジストリ (200万+ パッケージ)")
+    point("非同期I/O: Node.js のイベントループは10年以上の実績")
+    point("型安全性: 大規模開発でコンパイル時にバグを検出")
+    point("リアルタイム通信: WebSocket / Server-Sent Events が得意")
+    print()
+
+    subsection("3-2. Python の asyncio vs Node.js のイベントループ")
+    print(textwrap.dedent("""\
+    Python の asyncio は後付け (Python 3.5, 2015年)。
+    Node.js のイベントループは設計の根幹 (2009年の初日から)。
+
+    結果:
+      - Node.js: ほぼ全てのライブラリが非同期対応
+      - Python:  requests, psycopg2 など主要ライブラリが同期のみ
+                 非同期版 (aiohttp, asyncpg) を別途探す必要がある
+
+    1万同時接続の WebSocket サーバー:
+      Node.js: 標準的なユースケース。ws ライブラリ1つで完結。
+      Python:  asyncio + websockets だが、GILがボトルネックに。
+    """))
+
+    subsection("3-3. TypeScript の型システム")
+    code_block("TypeScript: コンパイル時に型エラーを検出",
+    """\
+// 型定義
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "user" | "guest";  // Union型
+}
+
+// この関数は User 型しか受け付けない
+function greetUser(user: User): string {
+  return `Hello, ${user.name}!`;
+}
+
+// コンパイルエラー! role が不正
+greetUser({ id: 1, name: "Yuta", email: "y@x.com", role: "superadmin" });
+// → Type '"superadmin"' is not assignable to type '"admin" | "user" | "guest"'
+""")
+
+    print("    Python の型ヒント (typing) は「お願い」。無視してもコードは動く。")
+    print("    TypeScript の型は「法律」。違反するとコンパイルが通らない。")
+    print()
+
+    subsection("3-4. エコシステムと採用企業")
+    point("Next.js: SSR/SSG/ISR を統合した React フレームワーク (Vercel)")
+    point("Bun: Node.js の3倍速いランタイム (2023年 v1.0)")
+    point("Deno: Node.js 作者が「やり直した」セキュアなランタイム")
+    point("採用企業: Netflix (Node), Airbnb (TypeScript), Slack, PayPal, LinkedIn")
+    print()
+
+    question("フロントエンドとバックエンドで別の言語を使うと、\n"
+             "    型定義の二重管理が発生する。その保守コストを考えたことはあるか？\n"
+             "    TypeScript なら型定義を共有できる。")
+
+    task("Express.js (または Hono) で簡単な REST API を作り、\n"
+         "    Python の FastAPI と開発体験を比較してみよう。\n"
+         "    特に: 型の補完、エラーメッセージ、ホットリロードの速度。")
+
+
+# ============================================================
+# 4. Go
+# ============================================================
+
+def chapter_4_go():
+    section("4. Go ── クラウドネイティブ時代の共通語")
+
+    print(textwrap.dedent("""\
+    あなたが使っている Docker、Kubernetes、Terraform、Prometheus──
+    これらは全て Go で書かれている。
+
+    クラウドインフラの世界で Go は空気のような存在だ。
+    「インフラに関わるなら Go を知らないのは不利」ではなく
+    「Go を知らないとインフラの仕事ができない」レベルに近い。
+    """))
+
+    subsection("4-1. goroutine ── 並行処理の革命")
+    code_block("Go: 10万の goroutine を起動 (使用メモリ: 約200MB)",
+    """\
+package main
+
+import (
+    "fmt"
+    "sync"
+)
+
+func main() {
+    var wg sync.WaitGroup
+    for i := 0; i < 100_000; i++ {
+        wg.Add(1)
+        go func(id int) {  // goroutine: 約2KBのスタック
+            defer wg.Done()
+            // 何か処理
+            _ = id * id
+        }(i)
+    }
+    wg.Wait()
+    fmt.Println("10万の goroutine 完了")
+}
+""")
+
+    print(textwrap.dedent("""\
+    比較:
+      Go goroutine:      10万個 → 約 200MB, 起動 < 1ms/個
+      Python threading:  10万個 → メモリ不足でクラッシュ (1スレッド 8MB)
+      Python asyncio:    10万個 → 可能だが GIL がボトルネック
+      Java Thread:       10万個 → 約 800MB (Virtual Thread で改善中)
+
+    goroutine が軽量な理由:
+      - OSスレッドではなくユーザー空間のグリーンスレッド
+      - スタックサイズ 2KB (OSスレッドは 1-8MB)
+      - Go ランタイムがスケジューリング (M:N モデル)
+    """))
+
+    subsection("4-2. シングルバイナリとデプロイの簡潔さ")
+    print(textwrap.dedent("""\
+    Go のビルド:
+      $ go build -o myapp main.go    # 数秒で完了
+      $ ls -lh myapp
+      -rwxr-xr-x  1 user  staff  8.2M  myapp
+
+    デプロイ:
+      $ scp myapp server:/usr/local/bin/    # これだけ
+
+    Python のデプロイ:
+      1. Python ランタイムをインストール
+      2. venv を作成
+      3. pip install -r requirements.txt (依存関係の解決で数分)
+      4. 環境変数を設定
+      5. gunicorn や uvicorn を設定
+      6. 祈る (依存関係が壊れていないことを)
+
+    Dockerfile の比較:
+      Go:     FROM scratch / COPY myapp / CMD ["/myapp"]  → 10MB
+      Python: FROM python:3.11 / COPY . . / RUN pip install / ... → 300MB+
+    """))
+
+    subsection("4-3. Go が支配する領域")
+    point("コンテナ: Docker, containerd, Podman")
+    point("オーケストレーション: Kubernetes, Nomad")
+    point("IaC: Terraform, Pulumi")
+    point("監視: Prometheus, Grafana Agent, Jaeger")
+    point("ネットワーク: Caddy, Traefik, CoreDNS")
+    point("セキュリティ: Trivy, Cosign, Falco")
+    point("CI/CD: Drone, GoCD, Woodpecker")
+    print()
+    print("    これらのソースコードを読む = Go を読む。")
+    print("    コントリビュートする = Go を書く。")
+    print("    カスタマイズする = Go のプラグインを作る。")
+    print()
+
+    subsection("4-4. 採用企業")
+    point("Google: 社内標準言語の1つ (Go の開発元)")
+    point("Uber: 高スループットのマイクロサービス群")
+    point("Twitch: 低レイテンシのライブストリーミング基盤")
+    point("Cloudflare: エッジコンピューティング")
+    point("メルカリ: マイクロサービス移行で Go を全面採用")
+    print()
+
+    question("Kubernetes の Operator を Python で書くことは可能だが、\n"
+             "    Go の client-go ライブラリが公式。\n"
+             "    Python の kubernetes クライアントは薄いラッパーで機能が限定的。\n"
+             "    あなたがインフラ自動化を深めるなら、Go を避けられるか？")
+
+    task("Go の Tour (https://go.dev/tour/) を完走してみよう。\n"
+         "    特に goroutine と channel のセクション。\n"
+         "    Python の threading とどう違うか、体感で理解できる。")
+
+
+# ============================================================
+# 5. Rust
+# ============================================================
+
+def chapter_5_rust():
+    section("5. Rust ── なぜ今学ぶべきか")
+
+    print(textwrap.dedent("""\
+    Rust は「C++ を書き直すなら、こうあるべきだった」という言語だ。
+
+    Stack Overflow の「最も愛されている言語」で8年連続1位。
+    開発者が好んで使い続ける = 生産性と安全性のバランスが優れている証拠。
+    """))
+
+    subsection("5-1. 所有権システム ── GCなしでメモリ安全")
+    print(textwrap.dedent("""\
+    全ての言語はメモリ管理の問題を解決しなければならない:
+
+      Python/Java/Go: GC (Garbage Collector) に任せる
+        → 楽だが、GCの停止時間が予測不能
+
+      C/C++: プログラマが手動管理
+        → 高速だが、メモリリーク・ダングリングポインタ・バッファオーバーフロー
+
+      Rust: 所有権システムでコンパイル時に検証
+        → GCなしで安全。実行時のオーバーヘッドゼロ。
+    """))
+
+    print("    Pythonで所有権の概念を擬似的に理解する:")
+    print()
+    code_block("Python で「所有権」を擬似体験",
+    """\
+# --- Rust の "move" (所有権の移動) を Python で想像する ---
+
+# Rust: let s1 = String::from("hello");
+#       let s2 = s1;  // s1 の所有権が s2 に移動
+#       println!("{}", s1);  // コンパイルエラー! s1はもう使えない
+
+# Python では:
+s1 = "hello"
+s2 = s1       # Python: s1 も s2 も使える (参照コピー)
+print(s1)     # OK... だが、誰がこのメモリを解放する？ → GC任せ
+
+# --- Rust の "borrow" (借用) ---
+
+# Rust: let s1 = String::from("hello");
+#       let len = calculate_length(&s1);  // 借用 (所有権は移動しない)
+#       println!("{}", s1);  // OK! s1はまだ有効
+
+# Python にはこの概念がない。
+# 結果: 誰がどのデータを「所有」しているか不明確になり、
+#       大規模コードベースでバグの温床になる。
+""")
+
+    subsection("5-2. ゼロコスト抽象化")
+    print(textwrap.dedent("""\
+    Rust の高レベルな書き方 (イテレータ、ジェネリクス、トレイト) は
+    コンパイル後に C と同等のマシンコードになる。
+
+    つまり: 読みやすいコードを書いても速度が犠牲にならない。
+
+    Python: 読みやすさ ↑ → 速度 ↓ (list comprehension vs for loop でも差が出る)
+    Rust:   読みやすさ ↑ → 速度 = (コンパイラが最適化してくれる)
+    """))
+
+    subsection("5-3. WebAssembly (Wasm)")
+    print(textwrap.dedent("""\
+    Rust は WebAssembly のファーストクラス言語。
+
+    Wasm とは: ブラウザ内でネイティブに近い速度で動くバイナリフォーマット。
+    用途:
+      - ブラウザ内画像編集 (Figma は C++ → Wasm)
+      - ブラウザ内動画エンコーディング
+      - エッジコンピューティング (Cloudflare Workers)
+      - ブロックチェーン (Solana の BPF → Wasm)
+
+    Python → Wasm は実験段階で実用的でない。
+    Rust → Wasm は本番環境で広く使われている。
+    """))
+
+    subsection("5-4. ML 領域での Rust の台頭")
+    point("Hugging Face tokenizers: Rust 実装 → Python バインディング (100倍高速)")
+    point("Hugging Face safetensors: Rust で安全なモデル保存形式")
+    point("Polars: Rust 製 DataFrame ライブラリ (pandas の10-100倍速)")
+    point("Ruff: Rust 製 Python リンター (flake8 の100倍速)")
+    point("uv: Rust 製 Python パッケージマネージャ (pip の10-100倍速)")
+    print()
+    print("    皮肉なことに、Pythonエコシステムを高速化しているのは Rust。")
+    print("    Python の「遅い部分」を Rust で書き換える流れが加速している。")
+    print()
+
+    subsection("5-5. 採用企業")
+    point("AWS: Firecracker (Lambda/Fargate の VM), Bottlerocket OS")
+    point("Discord: メッセージ基盤を Go → Rust に移行 (レイテンシ改善)")
+    point("Cloudflare: Workers ランタイム, ネットワークプロキシ")
+    point("Meta: Buck2 (ビルドシステム), Sapling (ソース管理)")
+    point("Microsoft: Windows カーネルの一部を Rust で書き換え中")
+    point("Linux: カーネルが公式に Rust をサポート (2022年~)")
+    print()
+
+    question("あなたが使っている Ruff, uv, Polars は全て Rust 製。\n"
+             "    Python の「遅さ」を Rust が補っている現実を、どう思う？\n"
+             "    もし自分で Python の C extension を書く代わりに\n"
+             "    Rust + PyO3 で書けたら？")
+
+    task("Rust の所有権を体験するために:\n"
+         "    1. rustup でインストール (https://rustup.rs)\n"
+         "    2. Rust Book Ch.4 「所有権」を読む\n"
+         "    3. 意図的にコンパイルエラーを出して、エラーメッセージを読む\n"
+         "    Rust のコンパイラは世界一親切。エラーが教師になる。")
+
+
+# ============================================================
+# 6. Java / Kotlin
+# ============================================================
+
+def chapter_6_java_kotlin():
+    section("6. Java / Kotlin ── エンタープライズの王座")
+
+    print(textwrap.dedent("""\
+    「Java はオワコン」── これは最も広まっている誤解の1つ。
+
+    現実:
+      - TIOBE Index で常にTop 3
+      - Fortune 500 の 90% 以上が Java を使用
+      - Android アプリの公式言語は Kotlin (JVM 言語)
+      - Netflix, LinkedIn, Twitter の基盤は Java/Scala (JVM)
+
+    Java が「古い」のではなく、Java を取り巻くエコシステムが進化し続けている。
+    """))
+
+    subsection("6-1. JVM の20年の最適化")
+    print(textwrap.dedent("""\
+    JVM (Java Virtual Machine) は世界で最も最適化されたランタイムの1つ。
+
+    GC の進化:
+      - CMS (2002):        停止時間 100ms+
+      - G1 (2012):         停止時間 50ms 程度
+      - ZGC (2020):        停止時間 < 1ms (テラバイト級ヒープでも!)
+      - Shenandoah (2020): 同上
+
+    JIT (Just-In-Time) コンパイラ:
+      - 実行中にホットスポットを検出
+      - ネイティブコードにコンパイル
+      - 実行パターンに基づいて投機的最適化
+      - 結果: 長時間実行するとC並の速度に近づく
+
+    GraalVM Native Image:
+      - AOTコンパイルでネイティブバイナリを生成
+      - 起動時間: 数秒 → 数ミリ秒
+      - メモリ: 数百MB → 数十MB
+      - サーバーレス/コンテナ環境での Java の弱点を克服
+    """))
+
+    subsection("6-2. Spring Boot ── エンタープライズのデファクト")
+    point("依存性注入 (DI): 大規模アプリのモジュール管理")
+    point("Spring Security: 認証・認可の包括的フレームワーク")
+    point("Spring Data: DB アクセスの抽象化 (JPA, MongoDB, Redis...)")
+    point("Spring Cloud: マイクロサービス (Service Discovery, Circuit Breaker)")
+    point("Actuator: 本番監視 (ヘルスチェック, メトリクス) がゼロ設定")
+    print()
+    print("    Python の FastAPI は素晴らしいが、Spring Boot の「全部入り」感は")
+    print("    エンタープライズ規模で本領を発揮する。")
+    print()
+
+    subsection("6-3. Kotlin ── Java のモダンな進化形")
+    code_block("Kotlin: Java の冗長さを排除",
+    """\
+// Java (冗長)
+public class User {
+    private String name;
+    private int age;
+    public User(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    // + getter, setter, equals, hashCode, toString...
+}
+
+// Kotlin (1行で同等)
+data class User(val name: String, val age: Int)
+
+// Null安全 (NullPointerException を構造的に排除)
+val name: String? = null   // nullable
+val len = name?.length     // null なら null を返す (例外なし)
+    ?: 0                   // null の場合のデフォルト値
+""")
+
+    subsection("6-4. Pythonにない強み")
+    point("型安全 + リフレクション: 動的な振る舞いと静的な安全性の両立")
+    point("IDEサポート: IntelliJ の補完・リファクタリングは他言語を圧倒")
+    point("100万行超のコードベース: 型があるからリファクタリングが安全")
+    point("Android 開発: Kotlin が唯一の公式推奨言語")
+    print()
+
+    subsection("6-5. 採用企業")
+    point("Google: Android OS, GCP 内部サービス")
+    point("Netflix: Spring Boot + Kotlin で数百のマイクロサービス")
+    point("LinkedIn: Java ベースの大規模分散システム")
+    point("LINE: Kotlin を積極採用")
+    point("メガバンク・保険: ほぼ全て Java (20年の資産)")
+    print()
+
+    question("エンタープライズの世界に入ると、Java/Kotlin は避けられない。\n"
+             "    銀行、保険、通信、物流... 日本の基幹システムの大半が JVM。\n"
+             "    PM として「Java 分かりません」は選択肢を大幅に狭める。")
+
+
+# ============================================================
+# 7. 言語選択マトリックス
+# ============================================================
+
+def chapter_7_language_matrix():
+    section("7. 言語選択マトリックス ── 用途で選ぶ早見表")
+
+    widths = [28, 18, 35]
+    print(table_sep(widths))
+    print(table_row(["ユースケース", "最適言語", "理由"], widths))
+    print(table_sep(widths))
+
+    matrix = [
+        ["ML/DS パイプライン",         "Python",        "ライブラリ資産が圧倒的"],
+        ["ML推論 (本番高速化)",         "Rust / C++",    "レイテンシ要件"],
+        ["Web API (高スループット)",    "Go / Rust",     "並行処理 + 低レイテンシ"],
+        ["フルスタック Web",            "TypeScript",    "フロント+バック統一"],
+        ["エンタープライズ業務",        "Java / Kotlin", "Spring + 長期保守"],
+        ["システム/インフラツール",     "Rust / Go",     "シングルバイナリ + 速度"],
+        ["データパイプライン",          "Python / Scala","Spark/Airflow エコシステム"],
+        ["モバイル (Android)",          "Kotlin",        "Google 公式"],
+        ["モバイル (iOS)",              "Swift",         "Apple 公式"],
+        ["CLI ツール",                  "Go / Rust",     "配布の容易さ + 速度"],
+        ["ブラウザアプリ",              "TypeScript",    "唯一の選択肢"],
+        ["ゲームエンジン",              "C++ / C#",      "Unity / Unreal"],
+        ["組み込み/IoT",                "Rust / C",      "メモリ制約"],
+        ["ブロックチェーン",            "Rust / Solidity","Solana / Ethereum"],
+    ]
+    for row in matrix:
+        print(table_row(row, widths))
+    print(table_sep(widths))
+    print()
+
+    print("    重要: 「最適」は「唯一」ではない。")
+    print("    しかし「最適でない言語を選ぶ」なら、その理由を説明できるべきだ。")
+    print("    PM/テックリードはその説明責任を負う。")
+    print()
+
+    question("あなたが関わるプロジェクトの各コンポーネントは、\n"
+             "    この表のどこに位置する？ 今使っている言語は「最適」か？")
+
+
+# ============================================================
+# 8. 同じ TODO API を5言語で比較
+# ============================================================
+
+def chapter_8_todo_api_comparison():
+    section("8. 同じ TODO API を5言語で比較")
+
+    print(textwrap.dedent("""\
+    百聞は一見にしかず。同じ「TODOリストAPI」を5言語で書くと、
+    各言語の哲学・構造・エラーハンドリングの違いが浮き彫りになる。
+
+    エンドポイント: GET /todos, POST /todos
+    """))
+
+    # --- Python ---
+    subsection("8-1. Python (FastAPI)")
+    code_block("Python: 最も簡潔。プロトタイプ最速。",
+    """\
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+todos: list[dict] = []
+
+class TodoCreate(BaseModel):
+    title: str
+    done: bool = False
+
+@app.get("/todos")
+def list_todos():
+    return todos
+
+@app.post("/todos", status_code=201)
+def create_todo(todo: TodoCreate):
+    new = {"id": len(todos) + 1, **todo.model_dump()}
+    todos.append(new)
+    return new
+
+# 良い点: 4行でAPI完成。型バリデーション付き。
+# 弱い点: 本番では gunicorn + workers が必要。GILの制約。
+""")
+
+    # --- TypeScript ---
+    subsection("8-2. TypeScript (Hono)")
+    code_block("TypeScript: 型安全 + フルスタック。",
+    """\
+import { Hono } from 'hono';
+
+interface Todo {
+  id: number;
+  title: string;
+  done: boolean;
+}
+
+const app = new Hono();
+const todos: Todo[] = [];
+
+app.get('/todos', (c) => c.json(todos));
+
+app.post('/todos', async (c) => {
+  const body = await c.req.json<{ title: string; done?: boolean }>();
+  const todo: Todo = {
+    id: todos.length + 1,
+    title: body.title,
+    done: body.done ?? false,
+  };
+  todos.push(todo);
+  return c.json(todo, 201);
+});
+
+export default app;
+
+// 良い点: interface で型定義。フロントと型を共有可能。
+// 弱い点: ランタイム型検証は zod 等が別途必要。
+""")
+
+    # --- Go ---
+    subsection("8-3. Go (net/http 標準ライブラリ)")
+    code_block("Go: フレームワーク不要。標準ライブラリだけで本番品質。",
+    """\
+package main
+
+import (
+    "encoding/json"
+    "net/http"
+    "sync"
+)
+
+type Todo struct {
+    ID    int    `json:"id"`
+    Title string `json:"title"`
+    Done  bool   `json:"done"`
+}
+
+var (
+    todos []Todo
+    mu    sync.Mutex
+)
+
+func listTodos(w http.ResponseWriter, r *http.Request) {
+    mu.Lock()
+    defer mu.Unlock()
+    json.NewEncoder(w).Encode(todos)
+}
+
+func createTodo(w http.ResponseWriter, r *http.Request) {
+    var t Todo
+    if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return  // エラーは明示的に処理。例外は飛ばない。
+    }
+    mu.Lock()
+    t.ID = len(todos) + 1
+    todos = append(todos, t)
+    mu.Unlock()
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(t)
+}
+
+func main() {
+    http.HandleFunc("GET /todos", listTodos)
+    http.HandleFunc("POST /todos", createTodo)
+    http.ListenAndServe(":8080", nil)
+}
+
+// 良い点: 外部依存ゼロ。sync.Mutex で並行安全。ビルド3秒。
+// 特徴的: if err != nil パターン。冗長だが見逃さない。
+""")
+
+    # --- Rust ---
+    subsection("8-4. Rust (Axum)")
+    code_block("Rust: コンパイル時安全性。最高のパフォーマンス。",
+    """\
+use axum::{Json, Router, routing::{get, post}};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Todo {
+    id: usize,
+    title: String,
+    done: bool,
+}
+
+type AppState = Arc<Mutex<Vec<Todo>>>;
+
+async fn list_todos(
+    state: axum::extract::State<AppState>,
+) -> Json<Vec<Todo>> {
+    let todos = state.lock().unwrap();
+    Json(todos.clone())
+}
+
+async fn create_todo(
+    state: axum::extract::State<AppState>,
+    Json(mut todo): Json<Todo>,
+) -> (axum::http::StatusCode, Json<Todo>) {
+    let mut todos = state.lock().unwrap();
+    todo.id = todos.len() + 1;
+    todos.push(todo.clone());
+    (axum::http::StatusCode::CREATED, Json(todo))
+}
+
+#[tokio::main]
+async fn main() {
+    let state: AppState = Arc::new(Mutex::new(vec![]));
+    let app = Router::new()
+        .route("/todos", get(list_todos).post(create_todo))
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
+        .await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+// 良い点: Arc<Mutex<>> で並行安全をコンパイル時保証。最速。
+// 学習コスト: 所有権・ライフタイム・トレイトの理解が必要。
+""")
+
+    # --- Java ---
+    subsection("8-5. Java (Spring Boot)")
+    code_block("Java: アノテーション駆動。エンタープライズ標準。",
+    """\
+@RestController
+@RequestMapping("/todos")
+public class TodoController {
+
+    record Todo(int id, String title, boolean done) {}
+    record TodoRequest(String title, boolean done) {}
+
+    private final List<Todo> todos =
+        Collections.synchronizedList(new ArrayList<>());
+
+    @GetMapping
+    public List<Todo> list() {
+        return todos;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Todo create(@RequestBody TodoRequest req) {
+        var todo = new Todo(
+            todos.size() + 1, req.title(), req.done()
+        );
+        todos.add(todo);
+        return todo;
+    }
+}
+
+// 良い点: @アノテーションで宣言的。DI, Security, DB統合が強力。
+// 特徴的: record でイミュータブルDTO。Spring の豊富なエコシステム。
+""")
+
+    print()
+    print("━" * 60)
+    print("  5言語比較まとめ")
+    print("━" * 60)
+    print()
+
+    widths = [14, 12, 12, 12, 14]
+    print(table_sep(widths))
+    print(table_row(["特性", "Python", "TypeScript", "Go", "Rust"], widths))
+    print(table_sep(widths))
+    compare_data = [
+        ["コード量",     "最少",   "少",     "中",    "多"],
+        ["型安全性",     "弱",     "強",     "強",    "最強"],
+        ["実行速度",     "遅",     "中",     "速",    "最速"],
+        ["並行処理",     "弱",     "中",     "最強",  "強"],
+        ["学習コスト",   "低",     "低-中",  "低-中", "高"],
+        ["エコシステム", "ML最強",  "Web最強", "Infra", "Systems"],
+        ["デプロイ",     "重",     "中",     "軽",    "最軽"],
+    ]
+    for row in compare_data:
+        print(table_row(row, widths))
+    print(table_sep(widths))
+    print()
+
+    task("上の5つの TODO API のうち1つを実際に動かしてみよう。\n"
+         "    Python 以外を選ぶこと。\n"
+         "    curl でリクエストを送り、動作を確認。\n"
+         "    開発体験の違い (補完、エラーメッセージ、ビルド時間) を記録する。")
+
+
+# ============================================================
+# 9. PM/テックリードとしての言語選定フレームワーク
+# ============================================================
+
+def chapter_9_language_selection_framework():
+    section("9. PM/テックリードとしての言語選定フレームワーク")
+
+    print(textwrap.dedent("""\
+    言語選定は技術的判断であると同時に、ビジネス判断でもある。
+    「好きな言語」で選ぶのは趣味。プロは以下の軸で評価する。
+    """))
+
+    subsection("9-1. 評価の5軸")
+
+    print("    1. チームのスキルセット")
+    print("       → チームが書ける言語か？ 学習コストは許容範囲か？")
+    print("       → 既存メンバーの再教育 vs 新規採用、どちらが安い？")
+    print()
+    print("    2. 採用市場 (人材の入手性)")
+    print("       → その言語のエンジニアは日本市場に何人いる？")
+    print("       → 給与水準はどの程度か？")
+    print()
+
+    widths = [14, 12, 14, 14]
+    print(table_sep(widths))
+    print(table_row(["言語", "求人数(相対)", "平均年収", "人材供給"], widths))
+    print(table_sep(widths))
+    market = [
+        ["Python",     "多い",   "600-900万", "豊富"],
+        ["TypeScript", "非常に多","550-850万", "豊富"],
+        ["Java",       "最多",   "500-800万", "最も豊富"],
+        ["Go",         "中程度", "650-1000万","やや不足"],
+        ["Rust",       "少ない", "700-1100万","不足"],
+        ["Kotlin",     "中程度", "600-950万", "やや不足"],
+    ]
+    for row in market:
+        print(table_row(row, widths))
+    print(table_sep(widths))
+    print("    ※ 2025年 日本市場の概算。地域・ドメインにより変動。")
+    print()
+
+    print("    3. エコシステムの成熟度")
+    print("       → 必要なライブラリは揃っているか？")
+    print("       → ドキュメント、StackOverflow の回答数は十分か？")
+    print("       → セキュリティパッチの提供速度は？")
+    print()
+    print("    4. パフォーマンス要件")
+    print("       → レイテンシ制約: p99 < 10ms なら Python は厳しい")
+    print("       → スループット: 10万 QPS なら Go / Rust")
+    print("       → メモリ制約: 組み込みなら Rust / C")
+    print()
+    print("    5. 長期メンテナンスコスト")
+    print("       → 5年後もサポートされている言語か？")
+    print("       → 型安全性がリファクタリングコストを下げるか？")
+    print("       → CI/CD パイプラインの構築コストは？")
+    print()
+
+    subsection("9-2. 具体シナリオで判断する")
+
+    print("    シナリオ A: スタートアップで ML プロダクトを作る")
+    print("    ─────────────────────────────────────")
+    print("    推奨: Python (ML) + TypeScript (Web)")
+    print("    理由:")
+    point("ML パイプラインは Python 一択 (PyTorch, HuggingFace)")
+    point("Web UI は TypeScript + Next.js (SSR で SEO 対応)")
+    point("少人数チームなので言語を絞る (2言語が限界)")
+    point("スピード優先: 型安全性よりも市場投入速度")
+    print()
+
+    print("    シナリオ B: 10万 QPS の決済 API")
+    print("    ─────────────────────────────────────")
+    print("    推奨: Go (メイン) or Rust (レイテンシ最重要時)")
+    print("    理由:")
+    point("p99レイテンシ < 5ms が要件 → Python は GC で不可")
+    point("goroutine で数万の同時接続を処理")
+    point("シングルバイナリで Blue-Green デプロイが容易")
+    point("Rust: レイテンシのジッターが許容できない場合 (GCなし)")
+    print()
+
+    print("    シナリオ C: 既存 Java 資産のモダナイゼーション")
+    print("    ─────────────────────────────────────")
+    print("    推奨: Kotlin (段階的移行)")
+    print("    理由:")
+    point("Kotlin は Java と 100% 相互運用可能")
+    point("既存の Spring Boot / JVM 資産をそのまま活用")
+    point("Java → Kotlin は1ファイルずつ段階的に移行可能")
+    point("チームの再教育コストが低い (Java経験者は1-2週間で習得)")
+    print()
+
+    question("あなたのチームの次のプロジェクトで、\n"
+             "    この5軸フレームワークを適用したら、どの言語が選ばれる？\n"
+             "    「Python で」と即答する前に、本当にそれが最適か検証しよう。")
+
+
+# ============================================================
+# 10. 学習ロードマップ
+# ============================================================
+
+def chapter_10_roadmap():
+    section("10. 学習ロードマップ ── Pythonista の最効率ルート")
+
+    print(textwrap.dedent("""\
+    全部を同時に学ぶ必要はない。
+    Python が得意なあなたが、最も効率よくポリグロットになるための順序:
+    """))
+
+    print("    ┌─────────────────────────────────────────────────┐")
+    print("    │  Phase 1: TypeScript (1-2ヶ月)                  │")
+    print("    │  Python → TS は最も距離が近い                   │")
+    print("    │  ・動的型付け → 静的型付けの概念転換             │")
+    print("    │  ・async/await は Python と似ている              │")
+    print("    │  ・フロントエンド開発能力の獲得                  │")
+    print("    │  目標: Next.js で簡単な Web アプリを作る         │")
+    print("    └──────────────────────┬──────────────────────────┘")
+    print("                           │")
+    print("                           ▼")
+    print("    ┌─────────────────────────────────────────────────┐")
+    print("    │  Phase 2: Go (2-3ヶ月)                          │")
+    print("    │  並行処理の概念が根本から変わる                 │")
+    print("    │  ・goroutine / channel で並行処理を学ぶ         │")
+    print("    │  ・コンパイル言語の開発体験を知る               │")
+    print("    │  ・クラウドネイティブツールのソース読解          │")
+    print("    │  目標: CLI ツール or HTTP サーバーを作る         │")
+    print("    └──────────────────────┬──────────────────────────┘")
+    print("                           │")
+    print("                           ▼")
+    print("    ┌─────────────────────────────────────────────────┐")
+    print("    │  Phase 3: Rust (3-6ヶ月)                        │")
+    print("    │  所有権の概念が最大の転換点                     │")
+    print("    │  ・メモリモデルの理解が全言語の理解を深める     │")
+    print("    │  ・GCに頼らない設計思考                         │")
+    print("    │  ・PyO3 で Python から Rust を呼ぶ              │")
+    print("    │  目標: Python の遅い処理を Rust で高速化する    │")
+    print("    └──────────────────────┬──────────────────────────┘")
+    print("                           │")
+    print("                           ▼")
+    print("    ┌─────────────────────────────────────────────────┐")
+    print("    │  Phase 4: Kotlin (1-2ヶ月)                      │")
+    print("    │  JVM エコシステムへの入口                       │")
+    print("    │  ・エンタープライズ Java 資産の理解              │")
+    print("    │  ・Spring Boot でのAPI開発                       │")
+    print("    │  ・Android 開発の選択肢                          │")
+    print("    │  目標: Spring Boot で REST API を作る            │")
+    print("    └─────────────────────────────────────────────────┘")
+    print()
+
+    subsection("各 Phase で得られるもの")
+
+    widths = [14, 20, 25]
+    print(table_sep(widths))
+    print(table_row(["Phase", "言語", "獲得する概念"], widths))
+    print(table_sep(widths))
+    phases = [
+        ["Phase 1", "TypeScript",  "型システム, Web開発全体像"],
+        ["Phase 2", "Go",          "並行処理, システム思考"],
+        ["Phase 3", "Rust",        "メモリ管理, ゼロコスト抽象化"],
+        ["Phase 4", "Kotlin/Java", "JVM, エンタープライズ設計"],
+    ]
+    for row in phases:
+        print(table_row(row, widths))
+    print(table_sep(widths))
+    print()
+
+    subsection("学習の原則")
+    print(textwrap.dedent("""\
+    1. 「チュートリアル地獄」に陥るな
+       → 各言語で1つ、実際に動くものを作ること。読むだけでは身につかない。
+
+    2. Python との差分に注目する
+       → 「Pythonならこう書くけど、この言語ではなぜこう書く？」
+       → その「なぜ」が言語設計の哲学の理解につながる。
+
+    3. 完璧を目指さない
+       → 各言語で「基本的なAPIが書ける」レベルで十分。
+       → PM/テックリードに必要なのは「深い専門性」ではなく「広い判断力」。
+
+    4. 既存のPythonプロジェクトで試す
+       → 遅い処理を Rust (PyO3) で書き換えてみる
+       → フロントエンドを TypeScript で追加してみる
+       → CLI ツールを Go で書き直してみる
+    """))
+
+    task("まず今日: TypeScript の環境を作ろう。\n"
+         "    $ npm init -y && npm install typescript tsx\n"
+         "    $ echo 'const greeting: string = \"Hello\"; console.log(greeting);'"
+         " > hello.ts\n"
+         "    $ npx tsx hello.ts\n"
+         "    たった3コマンドで TypeScript が動く。最初の一歩はこれでいい。")
+
+
+# ============================================================
+# まとめ
+# ============================================================
+
+def conclusion():
+    section("結論: 言語は道具、あなたはエンジニア")
+
+    print(textwrap.dedent("""\
+    「Pythonで全部できる」は事実だ。
+    だが「Python"だけ"で全部やる」は、自分のキャリアに天井を設けることだ。
+
+    包丁しか持たない料理人は、どんなに包丁が上手くても
+    オーブン料理は作れない。
+
+    あなたが Python を極めたのは素晴らしい実績だ。
+    その上に TypeScript、Go、Rust、Kotlin を積み上げれば、
+    あなたは「問題に応じて最適な道具を選べるエンジニア」になれる。
+
+    それは単なるコーダーではなく、
+    アーキテクト、テックリード、PM として判断を下せる人材だ。
+
+    10年後、AIがコードを書く時代になっても
+    「どの言語で、どう設計するか」を判断する人間は必要だ。
+    その判断力は、複数言語を実際に触った経験からしか生まれない。
+    """))
+
+    print("    ┌─────────────────────────────────────────────┐")
+    print("    │  Python は出発点であって、終着点ではない。   │")
+    print("    │                                             │")
+    print("    │  今日から、2つ目の言語の1行目を書こう。     │")
+    print("    └─────────────────────────────────────────────┘")
+    print()
+
+    print("━" * 60)
+    print("  参考リソース")
+    print("━" * 60)
+    print()
+    print("    TypeScript: https://www.typescriptlang.org/docs/")
+    print("    Go:         https://go.dev/tour/")
+    print("    Rust:       https://doc.rust-lang.org/book/")
+    print("    Kotlin:     https://kotlinlang.org/docs/getting-started.html")
+    print()
+    print("    The Computer Language Benchmarks Game:")
+    print("      https://benchmarksgame-team.pages.debian.net/benchmarksgame/")
+    print()
+    print("    Stack Overflow Developer Survey 2024:")
+    print("      https://survey.stackoverflow.co/2024/")
+    print()
+
+
+# ============================================================
+# メイン
+# ============================================================
+
+def main():
+    print()
+    print("=" * 60)
+    print("  ポリグロットプログラマーへの道")
+    print("  ── Pythonが得意なあなたが、次に学ぶべき言語と理由")
+    print("=" * 60)
+    print()
+    print("  「Pythonで全部できるじゃん」")
+    print("  ── その考えが、あなたのキャリアの天井になる。")
+    print()
+    print("  このガイドを読み終えたとき、あなたは")
+    print("  「なぜ他の言語が必要か」を論理的に説明できるようになる。")
+    print()
+
+    chapter_1_why_polyglot()
+    chapter_2_python_weaknesses()
+    chapter_3_typescript()
+    chapter_4_go()
+    chapter_5_rust()
+    chapter_6_java_kotlin()
+    chapter_7_language_matrix()
+    chapter_8_todo_api_comparison()
+    chapter_9_language_selection_framework()
+    chapter_10_roadmap()
+    conclusion()
+
+    print("  完了。全10章を読破。")
+    print("  次のステップ: [実装してみよう] タスクを1つ選んで、今日始める。")
+    print()
+
+
+if __name__ == "__main__":
+    main()
