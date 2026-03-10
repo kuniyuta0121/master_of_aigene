@@ -568,6 +568,32 @@ python glossary.py category ARCH     # カテゴリ別表示
 | STAFF+ | DORA メトリクスを計測して改善計画を立てる | ★★☆ |
 | STAFF+ | RFC を1つ書いて技術提案する | ★★★ |
 
+### 言語別ミニアプリ（ポリグロット実践）
+```bash
+# TypeScript — Task Manager CLI (型システム深掘り)
+cd lang_typescript && npm install && npx tsx src/main.ts
+#   Branded Types, Template Literal Types, Discriminated Unions
+#   Type Guards, Result<T,E>, Utility Types, Generic Repository
+#   satisfies operator, Mini Validator (Zod-like)
+
+# Go — Concurrent URL Health Checker (並行処理深掘り)
+cd lang_go && go run main.go
+#   goroutine, channel (fan-out/fan-in), select, context
+#   interfaces, error handling, sync primitives, generics
+
+# Rust — Key-Value Store CLI (所有権深掘り)
+cd lang_rust && cargo run
+#   ownership, borrowing, pattern matching, Result/Option
+#   traits, generics, iterators, closures
+
+# Java 17+ — Event Sourced KV Store (モダンJava深掘り)
+cd lang_java && javac -d out src/main/java/kvstore/Main.java && java -cp out kvstore.Main
+#   Records, Sealed Interfaces, Pattern Matching (switch式)
+#   Generics (Result<T>), Optional, Stream API
+#   CompletableFuture, Text Blocks, var型推論
+#   Python vs Java 比較表付き
+```
+
 ## 言語・技術選定の理由
 
 | 技術 | 選定理由 | Pythonにない強み |

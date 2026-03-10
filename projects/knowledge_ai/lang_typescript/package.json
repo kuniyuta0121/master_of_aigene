@@ -1,0 +1,11 @@
+{
+  "name": "ts-task-manager",
+  "type": "module",
+  "scripts": {
+    "start": "npx tsx src/main.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.4",
+    "tsx": "^4.7"
+  }
+}

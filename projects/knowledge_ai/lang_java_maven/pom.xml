@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  pom.xml — Maven プロジェクトの心臓部                         ║
+  ║                                                              ║
+  ║  Python対比:                                                  ║
+  ║    pom.xml     ≒ pyproject.toml + requirements.txt            ║
+  ║    groupId     ≒ PyPI のパッケージ名 (組織の逆ドメイン)         ║
+  ║    artifactId  ≒ プロジェクト名                                ║
+  ║    version     ≒ version = "0.1.0"                            ║
+  ║    dependency  ≒ pip install <package>                        ║
+  ║    plugin      ≒ build-backend (setuptools, hatch等)          ║
+  ║    repository  ≒ PyPI (Maven Central が Java の PyPI)         ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- ━━━ 1. POM モデルバージョン (常に 4.0.0) ━━━ -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ━━━ 2. GAV座標 (Group:Artifact:Version) ━━━
+         Python: name = "my-package", version = "0.1.0"
+         Java:   groupId + artifactId + version で世界中で一意に識別
+
+         Maven Central で検索: https://search.maven.org/
+         Python の PyPI 検索と同じ感覚
+    -->
+    <groupId>com.example</groupId>
+    <artifactId>maven-demo</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <!-- packaging の種類:
+         jar  — ライブラリ or CLIアプリ (Python の .whl)
+         war  — Webアプリ (Servlet, Spring MVCの旧式)
+         pom  — 親POM (設定の継承用、コードなし)
+    -->
+
+    <name>Maven Demo</name>
+    <description>Maven + Repository の学習用プロジェクト</description>
+
+    <!-- ━━━ 3. プロパティ (変数定義) ━━━
+         Python: [tool.black] の設定に近い
+    -->
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 依存バージョンを一箇所で管理 (Python: constraints.txt) -->
+        <gson.version>2.12.1</gson.version>
+        <junit.version>5.11.4</junit.version>
+        <slf4j.version>2.0.16</slf4j.version>
+    </properties>
+
+    <!-- ━━━ 4. 依存関係 (dependencies) ━━━
+         Python: pip install requests → requirements.txt に追記
+         Java:   <dependency> を追加 → Maven が自動ダウンロード
+
+         ★重要な違い: pip は「フラット」、Maven は「推移的依存」を自動解決
+           A が B に依存、B が C に依存 → A は自動で C も取得
+    -->
+    <dependencies>
+        <!-- ── 本番用ライブラリ ── -->
+
+        <!-- Gson: JSON ライブラリ (Python の json モジュール相当だが高機能) -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
+            <!-- scope を省略 = "compile" (デフォルト)
+                 → 本番コードでもテストでも使える
+            -->
+        </dependency>
+
+        <!-- SLF4J: ロギングファサード (Python の logging モジュール相当) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <!-- SLF4J Simple: コンソール出力用の実装 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
+            <!-- scope="runtime":
+                 コンパイル時は不要、実行時のみ必要
+                 Python: ランタイム時だけ import されるプラグイン的存在
+            -->
+        </dependency>
+
+        <!-- ── テスト用ライブラリ ── -->
+
+        <!-- JUnit 5: テストフレームワーク (Python の pytest 相当) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+            <!-- scope="test":
+                 テスト時のみ使える。本番 JAR には含まれない
+                 Python: pip install pytest → dev dependencies
+            -->
+        </dependency>
+
+        <!--
+        ★ scope まとめ (Python にない概念):
+        ┌──────────┬───────────┬───────────┬────────────────────────┐
+        │ scope    │ compile時 │ runtime時  │ Python 対比            │
+        ├──────────┼───────────┼───────────┼────────────────────────┤
+        │ compile  │ ✅        │ ✅        │ pip install (通常)      │
+        │ runtime  │ ❌        │ ✅        │ プラグイン的存在         │
+        │ test     │ テストのみ │ テストのみ │ dev-dependencies       │
+        │ provided │ ✅        │ ❌        │ サーバーが提供する前提    │
+        │ system   │ ✅        │ ✅        │ ローカルJAR直指定 (非推奨)│
+        └──────────┴───────────┴───────────┴────────────────────────┘
+        -->
+    </dependencies>
+
+    <!-- ━━━ 5. ビルド設定 ━━━ -->
+    <build>
+        <plugins>
+            <!-- Maven Compiler Plugin: Java バージョンを指定 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Surefire Plugin: テスト実行 (pytest 相当) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+            </plugin>
+
+            <!-- Maven JAR Plugin: 実行可能 JAR を作る -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <!-- Python: if __name__ == "__main__" のエントリポイント -->
+                            <mainClass>demo.Main</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Shade Plugin: Fat JAR (全依存を1つのJARに)
+                 Python: PyInstaller / zipapp 相当
+                 → java -jar で単体実行可能になる
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>demo.Main</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- ━━━ 6. リポジトリ設定 ━━━
+         Python: pip は PyPI (https://pypi.org) がデフォルト
+         Java:   Maven Central (https://repo.maven.apache.org) がデフォルト
+
+         社内リポジトリや追加リポジトリがある場合にここに書く
+    -->
+    <!--
+    <repositories>
+        <repository>
+            <id>company-nexus</id>
+            <url>https://nexus.example.com/repository/maven-public/</url>
+            Python 対比: pip install -i https://pypi.example.com/simple/
+        </repository>
+    </repositories>
+    -->
+
+    <!-- ━━━ 7. プロファイル (環境別設定) ━━━
+         Python: 環境変数や tox.ini で環境を切り替える
+         Java:   mvn -Pdev / mvn -Pprod でプロファイル切り替え
+    -->
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <app.env>development</app.env>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <app.env>production</app.env>
+            </properties>
+        </profile>
+    </profiles>
+
+</project>
