@@ -1367,6 +1367,32 @@ def main():
     print("  4. 最初のカオス実験を計画する")
     print(SEP)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - SLI/SLO/SLA定義
+    - アラート設計
+    - インシデント対応フロー
+    - ログ集約
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Error Budget
+    - Burn Rate アラート
+    - 分散トレーシング
+    - PromQL基礎
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - カオスエンジニアリング
+    - Postmortem テンプレート
+    - SLO based alerting
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - GameDay計画
+    - Multi-Window Burn Rate
+    - カスタムSLI設計
+""")
+
 
 if __name__ == "__main__":
     main()

@@ -2136,6 +2136,33 @@ def main():
     4. 「なぜこのDBを選んだか」を STAR フレームワークで答える練習
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Window Functions(ROW_NUMBER/RANK)
+    - JOINの使い分け
+    - インデックス設計
+    - 基本CTE
+
+  【Tier 2: 重要 — 実務で頻出】
+    - 再帰CTE
+    - DynamoDB Single-Table Design
+    - Redis Cache-Aside
+    - EXPLAIN解読
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - カバリングインデックス
+    - MongoDB Aggregation
+    - Sorted Set
+    - ファネル分析SQL
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - パーティショニング戦略
+    - Multi-model DB設計
+    - 連続ログイン日数SQL
+""")
+
 
 if __name__ == "__main__":
     main()

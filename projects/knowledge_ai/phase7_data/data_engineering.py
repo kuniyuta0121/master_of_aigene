@@ -1220,6 +1220,31 @@ def main():
     - Kafka / Flink のローカル環境構築 (Docker Compose)
 """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Star Schema
+    - バッチ vs ストリーム
+    - データ品質チェック
+    - DAG設計
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Data Vault 2.0
+    - Tumbling/Sliding Window
+    - レイクハウス(Delta/Iceberg)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Lambda vs Kappa Architecture
+    - Session Window
+    - Schema Evolution
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Data Mesh
+    - Data Contract
+    - Slowly Changing Dimension Type 2
+""")
+
 
 if __name__ == "__main__":
     main()

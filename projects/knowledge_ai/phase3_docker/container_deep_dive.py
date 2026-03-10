@@ -1091,6 +1091,32 @@ def main() -> None:
     # 学習ロードマップ
     learning_roadmap()
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Dockerfile書き方
+    - docker build/run/logs/exec
+    - docker compose基礎
+
+  【Tier 2: 重要 — 実務で頻出】
+    - マルチステージビルド
+    - ネットワーク設計
+    - ボリューム管理
+    - ヘルスチェック
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - namespaces/cgroups理解
+    - K8sアーキテクチャ
+    - Pod設計
+    - HPA
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - CNI, CSI, CRI
+    - カスタムコントローラー
+    - Operator パターン
+""")
+
     print(f"\n{SEP}")
     print("  学習完了！次のステップ:")
     print("  1. minikube install → ローカルクラスタで実践")

@@ -1367,6 +1367,30 @@ def main():
     chapter_6_llmops()
     chapter_7_interview()
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - プロンプトエンジニアリング
+    - RAG基礎(チャンキング+検索)
+    - LLM API活用
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Advanced RAG(Hybrid検索/Re-ranking)
+    - ReActエージェント
+    - ベクターDB選定
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Multi-Agent(Supervisor/Debate)
+    - RAGAS評価
+    - HNSW実装理解
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - LLMOps(コスト追跡/トレーシング)
+    - Fine-tuning戦略
+    - 100万ドキュメントRAG設計
+""")
+
     print("\n" + "=" * 70)
     print("  全チャプター完了!")
     print("")

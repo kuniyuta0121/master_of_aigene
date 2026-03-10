@@ -753,6 +753,30 @@ def main():
     print("  2. ミニバッチ SGD で LinearRegression を拡張")
     print("  3. SVM（サポートベクターマシン）のヒンジ損失を実装")
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - 線形回帰(勾配降下法)
+    - ロジスティック回帰
+    - 決定木
+
+  【Tier 2: 重要 — 実務で頻出】
+    - K-Means(K-Means++初期化)
+    - PCA(次元削減)
+    - 交差検証
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Naive Bayes
+    - L1/L2正則化の数学的理解
+    - バイアス-バリアンス
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - カーネルSVM
+    - EM Algorithm
+    - ガウス過程
+""")
+
 
 if __name__ == "__main__":
     main()

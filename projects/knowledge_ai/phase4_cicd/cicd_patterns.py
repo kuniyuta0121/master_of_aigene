@@ -1143,3 +1143,31 @@ sep("END")
 print("  実行完了: CI/CD & デプロイメントパターン")
 print("  次のステップ: phase5_cloud/ でクラウドアーキテクチャを学習")
 print("━" * 60)
+
+print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - テストピラミッド
+    - GitHub Actions基礎
+    - Rolling Deploy
+    - 基本CI パイプライン
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Blue/Green Deploy
+    - Canary Deploy
+    - DB マイグレーション戦略
+    - シークレット管理
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Feature Flags
+    - Progressive Delivery
+    - ML CI/CD
+    - テスト並列化
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Shadow Deploy
+    - GitOps(ArgoCD)
+    - Trunk-Based Development
+    - カスタムランナー
+""")

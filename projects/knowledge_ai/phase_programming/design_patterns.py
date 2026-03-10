@@ -2612,6 +2612,40 @@ def main() -> None:
     print("=" * 70)
     print("  完了！全パターンのデモが正常に実行されました。")
     print("=" * 70)
+
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・Strategy (アルゴリズム切替, if-else爆発の解消)
+    ・Observer (イベント駆動, Pub/Sub, 疎結合な通知)
+    ・Factory (生成ロジックの隠蔽, DI との組み合わせ)
+    ・Singleton (設定管理, コネクションプール, スレッドセーフ)
+    ・Repository (データアクセスの抽象化, テスタビリティ)
+    ・DI / Dependency Injection (テスト容易性, 疎結合設計)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・Builder (複雑なオブジェクト構築, Fluent API)
+    ・Decorator (機能の動的追加, ミドルウェアチェーン)
+    ・Adapter (レガシー/外部ライブラリの統合)
+    ・Command (Undo/Redo, タスクキュー, 操作のオブジェクト化)
+    ・State (状態遷移の明示化, if-else状態管理の排除)
+    ・Proxy (遅延ロード, アクセス制御, キャッシュ)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・Chain of Responsibility (ミドルウェア, バリデーションチェーン)
+    ・Composite (ツリー構造, ファイルシステム, UIコンポーネント)
+    ・Facade (複雑なサブシステムの簡素化, API Gateway)
+    ・Template Method (アルゴリズムの骨格定義, フレームワーク設計)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・Prototype (オブジェクトのクローン, 設定テンプレート)
+    ・Flyweight (大量の類似オブジェクトのメモリ削減)
+    ・Memento (スナップショット保存/復元, エディタのUndo)
+    ・Visitor (構造と操作の分離, AST走査)
+    ・Mediator (多対多の通信を1対多に集約, チャットルーム)
+    ・Interpreter (DSL設計, ルールエンジン, 数式評価)
+""")
     print()
 
 

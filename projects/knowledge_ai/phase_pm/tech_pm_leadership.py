@@ -1426,6 +1426,35 @@ def main():
     print("    5. Lean Canvas で自分のプロダクトを整理する")
     print("=" * 70)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - アジャイル/スクラム基礎
+    - STAR面接対応
+    - ステークホルダー管理(RACI)
+    - OKR設計
+
+  【Tier 2: 重要 — 実務で頻出】
+    - RICE優先度
+    - Product Sense面接
+    - ADR(技術意思決定記録)
+    - Burndown/Velocity
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Impact Mapping
+    - JTBD
+    - TAM/SAM/SOM
+    - Porter戦略
+    - スキルマトリクス
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - PMF判定
+    - Chasm理論
+    - プロダクト戦略文書
+    - LTV/CAC最適化
+""")
+
 
 if __name__ == "__main__":
     main()

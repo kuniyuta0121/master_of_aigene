@@ -1352,6 +1352,33 @@ def main():
   4. AWS Security Specialty 認定を取得する
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - OWASP Top 10(XSS/SQLi/CSRF)
+    - JWT/OAuth2基礎
+    - HTTPS/TLS
+
+  【Tier 2: 重要 — 実務で頻出】
+    - STRIDE脅威モデリング
+    - RBAC/ABAC
+    - シークレット管理
+    - CSP
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - mTLS
+    - ゼロトラスト(BeyondCorp)
+    - PKCE
+    - 暗号学基礎(HMAC)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - HSM
+    - 量子耐性暗号
+    - FIDO2/WebAuthn
+    - SOC2準拠
+""")
+
 
 if __name__ == "__main__":
     main()

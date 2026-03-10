@@ -877,6 +877,29 @@ def run_all_tests() -> None:
     print("  3. Word Ladder を双方向 BFS で高速化する")
     print("  4. Dijkstra に負の辺対応（Bellman-Ford）を追加")
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Graph (BFS/DFS/Dijkstra — 最短経路・連結性)
+    - Backtracking (N-Queens, Permutations, Subsets)
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Trie (Prefix Tree — 文字列検索・オートコンプリート)
+    - KMP文字列検索 (パターンマッチング・failure関数)
+    - Matrix Chain DP (区間DP入門)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Segment Tree (区間クエリ・RMQ・Lazy Propagation)
+    - Bitmask DP (TSP・部分集合列挙)
+    - Topological Sort応用 (依存関係解析・ビルド順序)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Suffix Array (文字列の全接尾辞ソート)
+    - Heavy-Light Decomposition (木のパスクエリ)
+    - Centroid Decomposition (木の分割統治)
+""")
+
 
 if __name__ == "__main__":
     run_all_tests()

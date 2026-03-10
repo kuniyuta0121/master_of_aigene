@@ -1612,6 +1612,33 @@ def main():
     - "Crafting Interpreters" by Robert Nystrom — 無料オンライン
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・TCP/IP基礎 (3-way handshake, 輻輳ウィンドウの概念)
+    ・プロセス/スレッド (違い, コンテキストスイッチ, スケジューリング基礎)
+    ・B-Tree/インデックス (B+ Tree, なぜDBで使われるか)
+    ・メモリ管理基礎 (仮想メモリ, ページング, スタック vs ヒープ)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・HTTP/1.1 vs 2 vs 3 (多重化, QUIC, ヘッド・オブ・ライン・ブロッキング)
+    ・MVCC/トランザクション分離レベル (Snapshot Isolation, Write Skew)
+    ・デッドロック検出 (Wait-for Graph, タイムアウト, 予防戦略)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・LSM-Tree (Write最適化, Compaction戦略, B-Treeとの比較)
+    ・輻輳制御 (CUBIC/BBR) (なぜBBRが優れるか, 帯域推定)
+    ・Lock-Free データ構造 (CAS, ABA問題, Tagged Pointer)
+    ・Work Stealing (ForkJoinPool, デキューベースの負荷分散)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・Buddy System (メモリアロケータ, 断片化管理)
+    ・Lexer/Parser/AST (コンパイラフロントエンド, DSL設計)
+    ・GC実装 (Mark-Sweep, Generational, ZGC/Shenandoah)
+    ・epoll/io_uring (非同期I/O, イベント駆動サーバーの内部)
+""")
+
 
 if __name__ == "__main__":
     main()

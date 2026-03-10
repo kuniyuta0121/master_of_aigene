@@ -1210,6 +1210,29 @@ def main():
     print("  次のステップ: [実装してみよう] タスクを1つ選んで、今日始める。")
     print()
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Python弱点の理解(GIL/速度/型)
+    - 言語選定フレームワーク
+    - TypeScript基礎
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Go基礎(goroutine/channel)
+    - 5言語TODO API比較
+    - エコシステム理解
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Rust基礎(所有権/借用)
+    - Java/Kotlin(JVM理解)
+    - WASM
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - 言語実装の違い(GC戦略/メモリモデル)
+    - 新言語評価プロセス
+""")
+
 
 if __name__ == "__main__":
     main()

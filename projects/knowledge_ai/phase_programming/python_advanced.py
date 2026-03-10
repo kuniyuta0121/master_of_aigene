@@ -2251,6 +2251,33 @@ def main():
     print("    4. polyglot_guide.py で他言語との比較を学ぶ")
     print("=" * 64)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - async/await基礎 (asyncio.gather, イベントループ)
+    - 型ヒント (TypeVar, Generic, Protocol)
+    - pytest / Mock (テスト設計・依存注入)
+    - リスト内包表記・Pythonic idioms
+
+  【Tier 2: 重要 — 実務で頻出】
+    - デコレータ (@retry, @cache, functools.wraps)
+    - contextmanager (with文カスタム)
+    - __slots__ (メモリ最適化)
+    - generator / yield (遅延評価)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - メタクラス (__init_subclass__, ABCMeta)
+    - descriptor (__get__/__set__)
+    - @overload (型の条件分岐)
+    - Property-based testing (Hypothesis的発想)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - match-case (構造的パターンマッチング)
+    - walrus operator (:=)
+    - メタプログラミング応用 (動的クラス生成, exec/eval)
+""")
+
 
 if __name__ == "__main__":
     main()

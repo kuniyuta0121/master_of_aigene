@@ -719,6 +719,31 @@ def main():
     print("  → NeetCode 150: 頻出パターンを体系的に網羅")
     print("  → [実装してみよう] Trie, Segment Tree, Topological Sort を追加実装")
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Two Pointers (対向・同方向・fast/slow)
+    - Binary Search (基本・答えへのBS・lower/upper bound)
+    - HashMap活用 (Two Sum系・頻度カウント・grouping)
+    - BFS/DFS基礎 (グラフ探索・木の走査・連結成分)
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Sliding Window (固定長・可変長・最大/最小部分配列)
+    - Heap / Priority Queue (Top-K・マージK個のソート済みリスト)
+    - 基本DP (Fibonacci型・Knapsack・最長部分列)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Union-Find (連結成分・サイクル検出・Kruskal)
+    - Topological Sort (DAG・タスクスケジューリング)
+    - Interval問題 (マージ・挿入・最小会議室数)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Monotonic Stack (Next Greater Element・ヒストグラム最大矩形)
+    - 座標圧縮 (大きな座標空間の効率的処理)
+    - Mo's Algorithm (オフラインクエリ処理)
+""")
+
 
 if __name__ == "__main__":
     main()

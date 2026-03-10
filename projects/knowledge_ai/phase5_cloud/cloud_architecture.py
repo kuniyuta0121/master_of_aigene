@@ -1364,6 +1364,32 @@ def main():
     demo_interview_design()
     demo_summary()
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Well-Architected 6本柱
+    - VPC設計
+    - IAM最小権限
+    - RDS vs DynamoDB選定
+
+  【Tier 2: 重要 — 実務で頻出】
+    - マルチAZ/マルチリージョン
+    - サーバーレス(Lambda+API GW)
+    - DR戦略(RPO/RTO)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Transit Gateway
+    - FinOps/コスト最適化
+    - CloudFront+WAF
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Outposts
+    - Control Tower
+    - Landing Zone
+    - マルチアカウント戦略
+""")
+
     print("\n" + "━" * 60)
     print("  学習完了！")
     print("  次のステップ: 実際にAWSコンソールで手を動かしてみよう")

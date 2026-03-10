@@ -1010,6 +1010,32 @@ def main():
     必読: "Designing Data-Intensive Applications" by Martin Kleppmann
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・Consistent Hashing (Virtual Nodes, ノード追加/削除時の再配置)
+    ・Quorum (R+W>N) (強い一貫性の条件, N=3,W=2,R=2 が推奨)
+    ・Saga パターン (補償トランザクション, Orchestration vs Choreography)
+    ・2PC (Two-Phase Commit) (Prepare/Commit, ブロッキング問題)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・Raft 合意アルゴリズム (Leader選出, ログ複製, 過半数の意味)
+    ・Vector Clock (因果関係の追跡, concurrent の検出)
+    ・Outbox Pattern (DB更新+メッセージ送信のアトミック性, CDC/Debezium)
+    ・Snowflake ID (64-bit構造, UUID v4 のB-Tree問題, UUID v7/ULID)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・CRDT (G-Counter, OR-Set) (衝突なし結果整合, Yjs/Automerge)
+    ・HLC (Hybrid Logical Clock) (物理時計+論理時計, TrueTime)
+    ・Sloppy Quorum + Hinted Handoff (可用性と一貫性のトレードオフ)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・Phi Accrual Failure Detector (適応的障害検出, Cassandra)
+    ・Raft membership change (ノード追加/削除の安全な方法)
+    ・Merkle Tree (レプリカ間の差分検出, Anti-Entropy)
+""")
+
 
 if __name__ == "__main__":
     main()

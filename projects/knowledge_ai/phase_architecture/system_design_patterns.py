@@ -2696,6 +2696,34 @@ def main() -> None:
     print("  Complete! 全パターンの実行が完了しました。")
     print("=" * 68)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - URL Shortener設計 (ハッシュ, Base62, DB選定)
+    - Rate Limiter設計 (Token Bucket, Sliding Window)
+    - マイクロサービス基礎 (サービス分割, 通信パターン)
+    - API Gateway (認証・ルーティング・負荷分散)
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Event Sourcing / CQRS (イベント駆動設計)
+    - DDD (Aggregate, Bounded Context, Ubiquitous Language)
+    - Circuit Breaker (障害伝搬防止)
+    - Sharding (水平分割, パーティションキー選定)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Saga Orchestration (分散トランザクション)
+    - Consistent Hashing (ノード追加/削除の影響最小化)
+    - Back-pressure (過負荷制御)
+    - Gossip Protocol (分散ノード間の情報伝搬)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Vector Clock実装 (因果関係の追跡)
+    - CRDT (Conflict-free Replicated Data Types)
+    - Phi Accrual Failure Detector (障害検知)
+    - Cell-Based Architecture (障害分離アーキテクチャ)
+""")
+
 
 if __name__ == "__main__":
     main()

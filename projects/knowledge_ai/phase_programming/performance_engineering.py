@@ -862,6 +862,33 @@ def main():
     - "The Art of Capacity Planning" by John Allspaw
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・N+1問題 (ORMの罠, eager loading, DataLoader, IN句バッチ)
+    ・キャッシュ戦略 LRU (Cache-Aside, Read-Through, Write-Through)
+    ・Rate Limiting (Token Bucket, Sliding Window, 429レスポンス)
+    ・ベンチマーク基礎 (warmup, P50/P95/P99, 統計的に正しい計測)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・Bloom Filter (偽陽性あり偽陰性なし, DB/CDNでの活用)
+    ・Tail Latency (Fan-out amplification, Hedged Requests)
+    ・Apdex Score (SLO設計, Satisfied/Tolerating/Frustrated)
+    ・CPU cache効果 (Row-major vs Column-major, Cache Line 64B)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・HyperLogLog (12KBで数十億のユニーク推定, Redis PFCOUNT)
+    ・Count-Min Sketch (頻度推定, Top-K/Heavy Hitter検出)
+    ・LFU キャッシュ (頻度ベース置換, LRUとの使い分け)
+    ・Cache Stampede対策 (Probabilistic Early Expiration, Lock, Stale-while-revalidate)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・__slots__最適化 (100万オブジェクトで63%メモリ削減)
+    ・メモリプロファイリング (tracemalloc, SoA vs AoS レイアウト)
+    ・Fan-out amplification (100台fan-outでP50≈P99, Jeff Dean論文)
+""")
+
 
 if __name__ == "__main__":
     main()

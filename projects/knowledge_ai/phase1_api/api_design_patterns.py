@@ -945,6 +945,33 @@ def main() -> None:
   ・「Rate Limiter を設計せよ」
 """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - REST基礎(HTTPメソッド/ステータスコード)
+    - ページネーション
+    - エラーハンドリング
+
+  【Tier 2: 重要 — 実務で頻出】
+    - レート制限
+    - 冪等性(Idempotency Key)
+    - API バージョニング
+    - OpenAPI/Swagger
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - CQRS
+    - API Gateway パターン
+    - Circuit Breaker
+    - GraphQL基礎
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - gRPC
+    - AsyncAPI
+    - HATEOAS
+    - Richardson Maturity Model Level 3
+""")
+
 
 if __name__ == "__main__":
     main()

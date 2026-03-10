@@ -2049,6 +2049,31 @@ def main():
         -> CSS architecture -> State management -> Testing -> Security
     """)
 
+    print("""
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - React基礎(JSX/Props/State/Hooks)
+    - TypeScript型定義
+    - CSS Flexbox/Grid
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Next.js(SSR/SSG/ISR/App Router)
+    - 状態管理(Redux/Zustand)
+    - コンポーネント設計
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Core Web Vitals最適化
+    - Virtual DOM diff理解
+    - アクセシビリティ
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - CSS-in-JS比較
+    - Micro Frontends
+    - Web Workers
+    - Service Worker
+""")
+
 
 if __name__ == "__main__":
     main()
