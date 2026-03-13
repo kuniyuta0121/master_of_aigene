@@ -1,7 +1,17 @@
 # KnowledgeAI - 全体目次 (Table of Contents)
 
-**総ファイル数: 45ファイル / 約56,000行**
+**総ファイル数: 54ファイル / 約75,300行**
 **対象: データサイエンティスト → テックリード/PM (Google/Tesla/IBM レベル)**
+
+---
+
+## 統合ストーリー (まずここから)
+
+| ファイル | 行数 | 内容 |
+|---------|------|------|
+| [unified_system_story.py](unified_system_story.py) | 3,612 | 「TechPulse」構築物語 - 全54ファイルの知識を1つのシステムで串刺し (13 Chapter) |
+
+> 全体像を掴みたいなら、まずこのファイルを読んでから各詳細ファイルに進むのがおすすめ。
 
 ---
 
@@ -30,13 +40,16 @@ Phase 1 (基礎固め)        Phase 2 (実装力)          Phase 3 (設計力)  
 
 | 5 | [networking_deep.py](phase_cs_fundamentals/networking_deep.py) | 1,351 | TCP Sliding Window・HTTP/2-3/QUIC・DNS解決・CDN・WebSocket・gRPC・LB・TLS 1.3 | Tier1 |
 | 6 | [concurrency_deep.py](phase_cs_fundamentals/concurrency_deep.py) | 1,418 | メモリモデル・同期プリミティブ全種・Lock-Free・Actor/CSP・デッドロック検出・async vs thread | Tier2 |
+| 7 | [os_hardware_deep.py](phase_cs_fundamentals/os_hardware_deep.py) | 1,670 | CPUパイプライン・MESI・仮想記憶ページテーブル・CFS・epoll/Reactor・NUMA・DMA | Tier1 |
+| 8 | [storage_engine_internals.py](phase_cs_fundamentals/storage_engine_internals.py) | 2,547 | SSD/FTL・ファイルシステムinode・バッファプール・B+Tree on disk・LSM Compaction・RAID | Tier1 |
+| 9 | [compiler_runtime.py](phase_cs_fundamentals/compiler_runtime.py) | 2,310 | Lexer/Parser/AST・型推論(HM)・SSA最適化・レジスタ割当・GC全種(Mark-Sweep〜ZGC)・JIT | Tier2 |
 
 **面接での重要度: ★★★★★**
 ```
-Tier 1: Two Pointers, Binary Search, B-Tree, TCP/IP, 仮説検定, HTTP/2, DNS, LB
-Tier 2: DP, Trie, MVCC, Producer-Consumer, Mutex/Semaphore, WebSocket, CDN
-Tier 3: Segment Tree, LSM-Tree, Lock-Free, 輻輳制御(BBR), gRPC, Actor Model
-Tier 4: Bitmask DP, Buddy System, Lexer/Parser, GC実装, Memory Barrier, TLS内部
+Tier 1: Two Pointers, Binary Search, B-Tree, TCP/IP, 仮説検定, CPUパイプライン, キャッシュMESI, 仮想記憶, SSD/WAF
+Tier 2: DP, Trie, MVCC, epoll/Reactor, CFS, バッファプール, B+Tree on disk, GC(世代別)
+Tier 3: Segment Tree, LSM-Tree, Lock-Free, RAID, Lexer/Parser, 型推論, レジスタ割当
+Tier 4: Bitmask DP, NUMA, DMA, JIT/OSR, ZGC, FTL内部, コンパイラ最適化
 ```
 
 ---
@@ -70,13 +83,14 @@ Tier 4: ViT, GAN, 強化学習, 連合学習, INT4量子化
 |---|---------|------|------|--------|
 | 12 | [api_design_patterns.py](phase1_api/api_design_patterns.py) | 977 | REST・ページネーション・レート制限・冪等性・CQRS・Circuit Breaker | Tier1 |
 | 13 | [ai_agents_and_rag.py](phase2_ai/ai_agents_and_rag.py) | 1,407 | Advanced RAG・ReActエージェント・Multi-Agent・HNSW・BM25・LLMOps | Tier1 |
+| 13b | [llm_eval_and_guardrails.py](phase2_ai/llm_eval_and_guardrails.py) | 2,181 | RAGAS全メトリクス・DeepEval・Agent評価6軸・NeMo Guardrails・Presidio PII・Prompt Injection多層防御 | Tier1 |
 
 **面接での重要度: ★★★★☆**
 ```
-Tier 1: REST基礎, ページネーション, プロンプトエンジニアリング, RAG
-Tier 2: レート制限, 冪等性, ReActエージェント, Hybrid検索
-Tier 3: CQRS, GraphQL, Multi-Agent, RAGAS評価
-Tier 4: gRPC, HATEOAS, Fine-tuning, 100万ドキュメントRAG
+Tier 1: REST基礎, ページネーション, プロンプトエンジニアリング, RAG, RAGAS評価, ガードレール設計
+Tier 2: レート制限, 冪等性, ReActエージェント, Hybrid検索, PII マスキング, Prompt Injection対策
+Tier 3: CQRS, GraphQL, Multi-Agent, DeepEval, LLM-as-Judge バイアス
+Tier 4: gRPC, HATEOAS, Fine-tuning, 100万ドキュメントRAG, Agent評価ベンチマーク
 ```
 
 ---
@@ -89,6 +103,7 @@ Tier 4: gRPC, HATEOAS, Fine-tuning, 100万ドキュメントRAG
 | 15 | [cicd_patterns.py](phase4_cicd/cicd_patterns.py) | 1,173 | テスト戦略・5デプロイ戦略・Progressive Delivery・ML CI/CD | Tier2 |
 | 16 | [cloud_architecture.py](phase5_cloud/cloud_architecture.py) | 1,400 | Well-Architected・マルチリージョン・サーバーレス・DR戦略 | Tier1 |
 | 17 | [cloud_services_catalog.py](phase5_cloud/cloud_services_catalog.py) | 1,585 | AWS/GCP 100+サービスカタログ・7アーキテクチャパターン | Tier2 |
+| 17b | [azure_services_catalog.py](phase5_cloud/azure_services_catalog.py) | 1,492 | Azure 全サービスカタログ・Cosmos DB整合性・3クラウド比較・認定ロードマップ | Tier2 |
 | 18 | [sre_practices.py](phase6_observability/sre_practices.py) | 1,398 | SLI/SLO/SLA・Error Budget・Burn Rate・カオスエンジニアリング | Tier2 |
 | 19 | [devops_hands_on.py](phase_devops/devops_hands_on.py) | 1,930 | Docker実践・K8s Day-2・Terraform・CI/CD・FinOps・クラウドセキュリティ | Tier2 |
 | 20 | [command_reference.py](phase_devops/command_reference.py) | 1,143 | UNIX/Docker/K8s/Git/AWS コマンド一覧 (Tier1-4付き) | Tier1 |
@@ -129,13 +144,15 @@ Tier 4: Data Mesh, パーティショニング戦略, SCD Type 2, ARIES Recovery
 | 23 | [system_design_patterns.py](phase_architecture/system_design_patterns.py) | 2,729 | マイクロサービス・DDD・Event Sourcing・面接設計問題(URL Shortener等) | Tier1 |
 | 24 | [distributed_systems_deep.py](phase_architecture/distributed_systems_deep.py) | 1,041 | Raft合意・CRDT・2PC/Saga・Quorum・Consistent Hashing・HLC・Snowflake ID | Tier2 |
 | 25 | [system_design_interview.py](phase_architecture/system_design_interview.py) | 1,365 | 5ステップ面接フレームワーク・スケール見積もり・10設計問題(URL短縮/Rate Limiter/Chat/News Feed等) | Tier1 |
+| 26 | [reliability_math.py](phase_architecture/reliability_math.py) | 2,403 | M/M/1待ち行列・Little's Law・テールレイテンシ数学・Amdahl/USL・可用性マルコフ連鎖・負荷試験統計 | Tier1 |
+| 27 | [distributed_systems_theory.py](phase_architecture/distributed_systems_theory.py) | 1,727 | FLP不可能性・Paxos・線形化可能性・ビザンチンBFT・レプリケーション理論・TLA+概念 | Tier2 |
 
 **面接での重要度: ★★★★★**
 ```
-Tier 1: URL Shortener/Rate Limiter設計, API Gateway, Consistent Hashing, 5ステップ面接法, スケール見積もり
-Tier 2: Event Sourcing/CQRS, DDD, Raft合意, Saga, Chat/News Feed設計
-Tier 3: CRDT, Gossip, Back-pressure, HLC, Web Crawler/Autocomplete設計
-Tier 4: Cell-Based Architecture, Phi Accrual, Merkle Tree, Distributed Cache設計
+Tier 1: URL Shortener/Rate Limiter設計, Consistent Hashing, Little's Law, M/M/1, Amdahl's Law, 可用性計算
+Tier 2: Event Sourcing/CQRS, DDD, Raft/Paxos, Saga, テールレイテンシ, USL, 線形化可能性
+Tier 3: CRDT, Gossip, HLC, FLP不可能性, ビザンチンBFT, 負荷試験統計
+Tier 4: Cell-Based Architecture, Phi Accrual, Merkle Tree, TLA+, 形式検証
 ```
 
 ---
@@ -165,13 +182,14 @@ Tier 4: Visitor/Interpreter, match-case, Fan-out amplification, Contract Testing
 | # | ファイル | 行数 | 内容 | 優先度 |
 |---|---------|------|------|--------|
 | 29 | [security_deep_dive.py](phase9_security/security_deep_dive.py) | 1,384 | OWASP Top 10・JWT自作・STRIDE・OAuth2/PKCE・ゼロトラスト | Tier2 |
+| 30 | [cryptography_fundamentals.py](phase9_security/cryptography_fundamentals.py) | 1,514 | RSA数学証明・AES/Feistel・SHA-256・ECDSA・DH鍵交換・TLS 1.3・PKI | Tier2 |
 
 **面接での重要度: ★★★☆☆**
 ```
-Tier 1: OWASP Top 10, JWT/OAuth2, HTTPS/TLS
-Tier 2: STRIDE, RBAC/ABAC, シークレット管理
-Tier 3: mTLS, ゼロトラスト, PKCE
-Tier 4: HSM, FIDO2/WebAuthn, SOC2
+Tier 1: OWASP Top 10, JWT/OAuth2, HTTPS/TLS, RSA/AES概念
+Tier 2: STRIDE, RBAC/ABAC, シークレット管理, DH鍵交換, ECDSA, ハッシュ関数
+Tier 3: mTLS, ゼロトラスト, PKCE, PKI/証明書チェーン, TLS 1.3内部
+Tier 4: HSM, FIDO2/WebAuthn, SOC2, 楕円曲線数学, ゼロ知識証明
 ```
 
 ---
@@ -251,18 +269,19 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 
 ```
 【最優先 — 今すぐやる】
-  algo_foundations.py → cs_internals.py → ml_from_scratch.py → sql_nosql_deep_dive.py
-  → system_design_patterns.py → system_design_interview.py → api_design_patterns.py
-  → command_reference.py → testing_engineering.py → database_internals.py
+  algo_foundations.py → cs_internals.py → os_hardware_deep.py → ml_from_scratch.py
+  → sql_nosql_deep_dive.py → system_design_patterns.py → system_design_interview.py
+  → reliability_math.py → api_design_patterns.py → testing_engineering.py
 
 【重要 — 1〜2ヶ月で】
-  advanced_algo.py → python_advanced.py → design_patterns.py → cloud_architecture.py
-  → container_deep_dive.py → ai_agents_and_rag.py → transformer_from_scratch.py
-  → llm_engineering.py → networking_deep.py → production_engineering.py
+  advanced_algo.py → storage_engine_internals.py → python_advanced.py → design_patterns.py
+  → cloud_architecture.py → container_deep_dive.py → database_internals.py
+  → llm_engineering.py → networking_deep.py → production_engineering.py → command_reference.py
 
 【上級 — 3〜6ヶ月で】
-  distributed_systems_deep.py → concurrency_deep.py → performance_engineering.py
-  → security_deep_dive.py → sre_practices.py → devops_hands_on.py
+  distributed_systems_theory.py → distributed_systems_deep.py → concurrency_deep.py
+  → compiler_runtime.py → cryptography_fundamentals.py → performance_engineering.py
+  → security_deep_dive.py → sre_practices.py → ai_agents_and_rag.py
   → data_engineering.py → tech_pm_leadership.py
 
 【専門 — 必要に応じて】
@@ -299,3 +318,12 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 「Window Function で解け」 | [sql_nosql_deep_dive.py](phase7_data/sql_nosql_deep_dive.py) |
 | 「デザインパターンを適用せよ」 | [design_patterns.py](phase_programming/design_patterns.py) |
 | 「Well-Architected の柱は？」 | [cloud_architecture.py](phase5_cloud/cloud_architecture.py) |
+| 「CPUパイプラインを説明せよ」 | [os_hardware_deep.py](phase_cs_fundamentals/os_hardware_deep.py) |
+| 「SSD vs HDD の内部構造は？」 | [storage_engine_internals.py](phase_cs_fundamentals/storage_engine_internals.py) |
+| 「GCアルゴリズムの違いは？」 | [compiler_runtime.py](phase_cs_fundamentals/compiler_runtime.py) |
+| 「RSAの仕組みを数学的に」 | [cryptography_fundamentals.py](phase9_security/cryptography_fundamentals.py) |
+| 「Little's Law を適用せよ」 | [reliability_math.py](phase_architecture/reliability_math.py) |
+| 「Paxos vs Raft の違いは？」 | [distributed_systems_theory.py](phase_architecture/distributed_systems_theory.py) |
+| 「Cosmos DB の整合性レベルは？」 | [azure_services_catalog.py](phase5_cloud/azure_services_catalog.py) |
+| 「RAGの品質をどう評価する？」 | [llm_eval_and_guardrails.py](phase2_ai/llm_eval_and_guardrails.py) |
+| 「Prompt Injectionの多層防御は？」 | [llm_eval_and_guardrails.py](phase2_ai/llm_eval_and_guardrails.py) |
