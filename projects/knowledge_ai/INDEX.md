@@ -339,6 +339,15 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 『データ指向アプリケーションデザイン (DDIA)』 | Martin Kleppmann | DB・分散・ストリーム処理の理論と実践。全エンジニア必読 |
 | 『達人に学ぶDB設計 徹底指南書 第2版』 | ミック | 正規化・インデックス・パフォーマンスを日本語で体系解説 |
 | 『SQL実践入門 — パフォーマンスを最適化する思考法』 | ミック | EXPLAIN・実行計画・Window関数を実例で学ぶ |
+| 『Fundamentals of Data Engineering』 | Joe Reis, Matt Housley | データエンジニアリングのライフサイクル全体を俯瞰。ETL/dbt/レイクハウス |
+| 『Streaming Systems』 | Tyler Akidau 他 | Watermark・Window・Trigger の決定版。Kafka/Flink理論背景 |
+
+### ストレージエンジン・DB内部
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『Database Internals』 | Alex Petrov | B-Tree/LSM-Tree・レプリケーション・分散ストレージの内部構造 |
+| 『詳解 システム・パフォーマンス 第2版』 | Brendan Gregg | ファイルシステム・ディスクI/O・SSD特性・RAID・カーネルI/Oスタック |
 
 ### システム設計・分散システム
 
@@ -346,6 +355,13 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 |------|------|---------|
 | 『System Design Interview Vol.1 & Vol.2』 | Alex Xu | 設計面接の定番。URL短縮〜決済システムまで20+問題 |
 | 『Building Microservices 第2版』邦訳:『マイクロサービスアーキテクチャ 第2版』 | Sam Newman | Saga・Circuit Breaker・Service Mesh の実践 |
+
+### API・バックエンド設計
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『Web API: The Good Parts』 | 水野 貴明 | REST API設計の日本語決定版。URI/ページネーション/バージョニング/エラー設計 |
+| 『マイクロサービスパターン』 | Chris Richardson | CQRS・Event Sourcing・Saga・Circuit Breaker を実装パターンで解説 |
 
 ### AI・機械学習・LLM
 
@@ -362,6 +378,7 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 |------|------|---------|
 | 『暗号技術入門 第3版 — 秘密の国のアリス』 | 結城 浩 | AES/RSA/TLS を物語形式で解説。数学苦手でもOK |
 | 『体系的に学ぶ 安全なWebアプリケーションの作り方 第2版』 | 徳丸 浩 | 通称「徳丸本」。OWASP Top 10 を手を動かして理解 |
+| 『Zero Trust Networks 2nd Ed.』 | Gilman, Barth | ゼロトラスト理論と実装。BeyondCorp・mTLS・SPIFFE |
 
 ### インフラ・DevOps・SRE・クラウド
 
@@ -385,6 +402,8 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 書籍 | 著者 | ひとこと |
 |------|------|---------|
 | 『プロを目指す人のための TypeScript 入門』 | 鈴木 僚太 | TS型システムを体系解説。日本語TS本の決定版 |
+| 『Learning React 2nd Ed.』 | Banks, Porcello | React Hooks/Context/Suspense を基礎から。入門に最適 |
+| 『Web Performance in Action』 | Jeremy Wagner | Core Web Vitals・Code Splitting・画像最適化をハンズオン |
 | 『ハイパフォーマンス ブラウザ ネットワーキング』 | Ilya Grigorik | ブラウザ通信層を深掘り。無料Web版あり |
 
 ### PM・リーダーシップ
@@ -392,6 +411,7 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 書籍 | 著者 | ひとこと |
 |------|------|---------|
 | 『INSPIRED 熱狂させる製品を生み出すプロダクトマネジメント』 | Marty Cagan | PM必読。プロダクトディスカバリー・ロードマップ |
+| 『Staff Engineer』 | Will Larson | Staff+の4アーキタイプ・Technical Vision・影響力行使 |
 | 『チームトポロジー』 | Skelton, Pais | 4チーム型・認知負荷ベースの組織設計 |
 | 『アジャイルサムライ』 | Jonathan Rasmusson | アジャイル/スクラムの入門書。日本語で読みやすい |
 
@@ -400,14 +420,19 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 書籍 | 著者 | ひとこと |
 |------|------|---------|
 | 『Crafting Interpreters』 | Robert Nystrom | Lexer→VM→GCをハンズオン実装。無料Web版あり |
+| 『Engineering a Compiler 3rd Ed.』 | Cooper, Torczon | 大学コンパイラ講義の教科書。SSA・レジスタ割当 |
+| 『The Garbage Collection Handbook 2nd Ed.』 | Jones, Hosking, Moss | GCアルゴリズム決定版。Mark-Sweep〜ZGCまで |
 | 『Go言語による並行処理』 | Katherine Cox-Buday | goroutine/channel/contextを体系的に。邦訳あり |
 | 『Java Concurrency in Practice』 | Brian Goetz 他 | 並行プログラミングの本質。Java以外にも応用可 |
+| 『Is Parallel Programming Hard, And, If So, What Can You Do About It?』 | Paul McKenney | Linuxカーネル開発者の実践書。**無料PDF公開** |
 
 ### QA・品質保証
 
 | 書籍 | 著者 | ひとこと |
 |------|------|---------|
 | 『ソフトウェアテストの教科書』 | 石原一宏・田中英和 | テスト設計技法の入門書。JSTQB対策にも |
+| 『Lessons Learned in Software Testing』 | Kaner, Bach, Pettichord | 293のテスト教訓集。実践的洞察が満載。中級以上 |
+| 『Agile Testing』 | Lisa Crispin, Janet Gregory | アジャイルチームのQA実践ガイド。四象限モデル |
 
 ### PMO・プロジェクトマネジメント
 
@@ -415,13 +440,117 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 |------|------|---------|
 | 『プロジェクトマネジメントの基本』 | 好川 哲人 | PMBOKを日本の文脈で噛み砕いた入門書 |
 | 『PMBOK ガイド 第7版』 | PMI | PM の聖典。12原則ベースに転換 |
+| 『The Standard for Portfolio Management 4th Ed.』 | PMI | ポートフォリオ管理の国際標準。戦略整合・投資最適化 |
 
 ### ITIL・ITSM
 
 | 書籍 | 著者 | ひとこと |
 |------|------|---------|
+| 『ITIL 4 ファンデーション』公式テキスト | Axelos | ITIL資格入門。SVS・SVC・34プラクティスを体系学習 |
 | 『The Phoenix Project』 | Gene Kim 他 | DevOps小説。ITIL→DevOps変革を物語で理解 |
 | 『情報処理教科書 ITサービスマネージャ』 | 翔泳社 | ITIL+日本の情シス実務をカバー |
+
+### クラウドサービス
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『AWS認定ソリューションアーキテクト[アソシエイト]教科書』 | NRIネットコム | AWS主要サービスを体系的に。認定対策にも最適 |
+| 『Google Cloudではじめる実践データエンジニアリング入門』 | 下田倫大 他 | GCPサービスをデータ基盤構築で実践的に学ぶ |
+| 『Azure定番システム設計・実装・運用ガイド 改訂新版』 | 日本マイクロソフト | Azureの主要サービスを設計パターンで解説 |
+
+### ネットワーク実務
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『CCNA完全合格テキスト&問題集』 | — | Cisco資格定番。資格を取らなくてもリファレンスとして有用 |
+
+---
+
+## 読書ロードマップ（並行2〜3冊 × 6フェーズで全網羅）
+
+> 異なる分野を並行して読み、飽きずに幅広くカバーする戦略。
+> ★ = 通読必須　☆ = 辞書引き/必要章のみ
+
+### Phase 1: 土台固め（CS + DB + アルゴ）── 目安 2〜3ヶ月
+
+| Track A (CS基礎) | Track B (DB) | Track C (アルゴ) |
+|-------------------|--------------|-------------------|
+| ★ プログラムはなぜ動くのか 第3版 | ★ 達人に学ぶDB設計 第2版 | ★ 問題解決力を鍛える! アルゴリズムとデータ構造 |
+| ★ ネットワークはなぜつながるのか 第2版 | ★ SQL実践入門 | |
+
+- カバー: Cat 1 (アルゴ), 2 (OS), 3 (NW), 7 (DB基礎)
+- 並行サイト: AtCoder ABC + SQLZOO
+
+### Phase 2: 設計力 + AI深化（設計 + ML + セキュリティ）── 2〜3ヶ月
+
+| Track A (システム設計) | Track B (AI/ML) | Track C (セキュリティ) |
+|------------------------|-----------------|------------------------|
+| ★ System Design Interview Vol.1 | ★ ゼロから作るDL 1巻→2巻 | ★ 暗号技術入門 第3版 (結城浩) |
+| ☆ SDI Vol.2 (興味ある問題だけ) | ★ Build a LLM From Scratch | ★ 徳丸本 |
+
+- カバー: Cat 9 (AI/ML), 10 (設計面接), 12 (セキュリティ)
+- 並行サイト: NeetCode 150 + LeetCode
+
+### Phase 3: 実装力 + インフラ（コード品質 + DevOps + API）── 2〜3ヶ月
+
+| Track A (プログラミング) | Track B (インフラ) | Track C (API/バックエンド) |
+|--------------------------|---------------------|----------------------------|
+| ★ テスト駆動開発 (Kent Beck) | ★ Docker/K8s 実践コンテナ開発入門 | ★ Web API: The Good Parts |
+| ★ Head First デザインパターン | ☆ SRE サイトリライアビリティエンジニアリング | ★ DDIA (データ指向アプリケーションデザイン) |
+
+- カバー: Cat 4 (ストレージ), 7 (DB深化), 8 (API), 11 (インフラ), 13 (プログラミング)
+- 並行サイト: AWS Skill Builder + Play with Docker
+- **DDIA は全書籍中で最重要。Phase 1 の DB知識の上に積むためこの位置がベスト**
+
+### Phase 4: 上級 + PM（分散 + リーダーシップ + フロントエンド）── 2〜3ヶ月
+
+| Track A (分散/アーキ) | Track B (PM/リーダー) | Track C (フロントエンド) |
+|-----------------------|-----------------------|--------------------------|
+| ★ Building Microservices 第2版 | ★ INSPIRED (Cagan) | ★ プロを目指す人のための TS入門 |
+| ★ マイクロサービスパターン | ★ アジャイルサムライ | ☆ Learning React 2nd Ed. |
+
+- カバー: Cat 8 (CQRS/Saga), 10 (マイクロサービス), 14 (フロントエンド), 15 (PM)
+- 並行サイト: React公式(ja) + Scrum Guide
+
+### Phase 5: 専門深化（クラウド + QA/PMO + ネットワーク）── 2〜3ヶ月
+
+| Track A (クラウド) | Track B (QA/PMO/ITIL) | Track C (ネットワーク) |
+|--------------------|------------------------|-----------------------|
+| ★ AWS認定SAA教科書 | ★ ソフトウェアテストの教科書 | ★ マスタリングTCP/IP 入門編 第6版 |
+| ☆ GCP or Azure本 (必要な方) | ★ PMの基本 (好川) | |
+| | ☆ Phoenix Project | |
+
+- カバー: Cat 16 (クラウド), 17 (QA), 18 (PMO), 19 (ITIL), 20 (NW実務)
+- 並行サイト: AWS Skill Builder + IPA過去問 + 3分間ネットワーキング
+
+### Phase 6: 仕上げ — キャリア方向に応じて選択
+
+| 方向性 | 書籍 | カテゴリ |
+|--------|------|----------|
+| Python上級者 | ★ Fluent Python 第2版 | Cat 13 |
+| ML理論深化 | ☆ PRML / Hands-On ML | Cat 9 |
+| Staff+目指す | ★ Staff Engineer + チームトポロジー | Cat 15 |
+| コンパイラ興味 | ★ Crafting Interpreters (無料Web版) | Cat 5 |
+| 並行処理を極める | ★ Go言語による並行処理 or JCiP | Cat 6 |
+| ストレージ内部 | ★ Database Internals | Cat 4 |
+| データ基盤構築 | ★ Fundamentals of Data Engineering | Cat 7 |
+| Web性能 | ☆ Web Performance in Action | Cat 14 |
+| PM認定 | ☆ PMBOK 第7版 | Cat 18 |
+
+### フェーズ別サマリ
+
+```
+Phase  期間目安     冊数   カバーカテゴリ
+─────  ──────────  ─────  ────────────────────────────────────
+  1    2〜3ヶ月    5冊    Cat 1, 2, 3, 7(基礎)
+  2    2〜3ヶ月    5冊    Cat 9, 10, 12
+  3    2〜3ヶ月    6冊    Cat 4, 7(深化), 8, 11, 13
+  4    2〜3ヶ月    5冊    Cat 8(残), 10(残), 14, 15
+  5    2〜3ヶ月    5冊    Cat 16, 17, 18, 19, 20
+  6    随時        選択    Cat 5, 6 + 各カテゴリ深化
+─────  ──────────  ─────  ────────────────────────────────────
+合計   10〜15ヶ月  26冊(必須) + 選択で全20カテゴリ網羅
+```
 
 ---
 
