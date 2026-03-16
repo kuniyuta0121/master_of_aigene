@@ -952,6 +952,28 @@ def main():
     chapter7_container_security()
     chapter8_incident_response()
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『暗号技術入門 第3版 — 秘密の国のアリス』 結城 浩
+      暗号学を数学が苦手な人にも分かるように解説する名著。
+      AES・RSA・DH・ハッシュ・デジタル署名・PKI・TLS を
+      アリスとボブの物語で段階的に学べる。
+      Chapter 1-2 の全てがこの1冊で理解できる。
+      日本語で暗号を学ぶなら最初に読むべき本。
+
+    ■ 『体系的に学ぶ 安全なWebアプリケーションの作り方 第2版』
+      徳丸 浩 (通称「徳丸本」)
+      OWASP Top 10 の脆弱性を実際に手を動かしながら理解する。
+      SQL Injection、XSS、CSRF、SSRF の仕組みと対策を
+      実際の攻撃コードとともに解説。Chapter 3-4 に直結。
+
+    ■ 『Zero Trust Networks (2nd Ed.)』
+      Evan Gilman, Doug Barth (O'Reilly)
+      ゼロトラストアーキテクチャの理論と実装。
+      BeyondCorp・mTLS・SPIFFE/SPIRE を深く理解できる。
+      Chapter 5-6 を実践レベルで学びたい人向け。
+    """)
+
     print(f"\n{SEP}")
     print("  全8章の解説が完了しました")
     print(SEP)

@@ -2718,6 +2718,27 @@ def main():
     chapter_12_explained()
     epilogue_explained()
 
+    heading("おすすめ書籍")
+    p("""
+    本ファイルは13章にわたり幅広い分野を横断しています。
+    1冊で全体を俯瞰するなら:
+
+    ■ 『Designing Data-Intensive Applications』 Martin Kleppmann (O'Reilly)
+      通称 "DDIA"。データベース・分散システム・ストリーム処理・
+      一貫性モデルなどを理論と実践の両面から解説。
+      本ファイルの Chapter 2-5, 7-9 の基盤知識がこの1冊に凝縮されている。
+      邦訳:『データ指向アプリケーションデザイン』
+
+    ■ 『Software Engineering at Google』 Titus Winters 他 (O'Reilly)
+      テスト・CI/CD・コードレビュー・技術的負債・チーム文化など、
+      大規模組織でのソフトウェア開発の知見を網羅。
+      Chapter 6 (コード品質), 10-11 (SRE/セキュリティ), 12 (組織) に対応。
+
+    ■ 『System Design Interview』 Alex Xu
+      システム設計面接の定番。Chapter 3-5 (API/DB/分散) の
+      実践的な設計問題を多数カバー。Vol.1 と Vol.2 がある。
+    """)
+
     print(f"\n{SEP}")
     print("  深掘り解説 全13章 完了")
     print(SEP)

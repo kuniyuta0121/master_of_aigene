@@ -1053,6 +1053,25 @@ def main():
     - Partition Evolution (Iceberg)
     """)
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『Designing Data-Intensive Applications』 Martin Kleppmann (O'Reilly)
+      通称 "DDIA"。データモデリング・インデックス・レプリケーション・
+      パーティショニング・トランザクション・ストリーム処理を
+      理論と実践の両面から解説。Chapter 1-4, 6 の全ての土台。
+      データエンジニアなら必読の1冊。
+      邦訳:『データ指向アプリケーションデザイン』
+
+    ■ 『Fundamentals of Data Engineering』 Joe Reis, Matt Housley (O'Reilly)
+      データエンジニアリングのライフサイクル全体を俯瞰する入門〜中級書。
+      ETL/ELT、Airflow、dbt、レイクハウス、データ品質など
+      Chapter 5-8 の実務的な内容をカバー。2022年刊で内容が新しい。
+
+    ■ 『Streaming Systems』 Tyler Akidau 他 (O'Reilly)
+      Apache Beam の開発者による Watermark・Window・Trigger の
+      決定版解説。Chapter 6 (Kafka/Flink) の理論的背景を深めたい場合。
+    """)
+
 
 if __name__ == "__main__":
     main()

@@ -1283,6 +1283,25 @@ def main():
     chapter8_runtime()
     chapter_summary()
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『Crafting Interpreters』 Robert Nystrom (無料Web版あり)
+      Lexer → Parser → AST → バイトコードVM → GC を
+      2つの言語実装 (Tree-Walk / Bytecode) を通じて段階的に学ぶ。
+      本ファイルの Chapter 1-5, 8 をハンズオンで体験できる唯一の本。
+      Java編 (jlox) と C編 (clox) の両方があり、GC実装まで含む。
+
+    ■ 『The Garbage Collection Handbook (2nd Ed.)』
+      Richard Jones, Antony Hosking, Eliot Moss
+      GCアルゴリズムの決定版。Mark-Sweep から G1/ZGC/Shenandoah まで
+      理論と実装の両面をカバー。Chapter 6 を極めたい人向け。
+
+    ■ 『Engineering a Compiler (3rd Ed.)』 Keith Cooper, Linda Torczon
+      大学のコンパイラ講義で使われる教科書。
+      SSA・レジスタ割り当て・命令選択など Chapter 4-5 の理論的背景。
+      Crafting Interpreters の次に読むとよい。
+    """)
+
     print()
     print(SEP)
     print("  END - コンパイラ & ランタイムの深掘り解説 完了")

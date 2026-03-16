@@ -2553,6 +2553,32 @@ def main():
        これら3つは言語やフレームワークに依存しない普遍的なスキルです。
     """)
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『リファクタリング 第2版』 Martin Fowler
+      コードの品質改善の決定版。Chapter 7 (クリーンコード) の
+      リファクタリングパターンをカタログ的に網羅。
+      具体的なコード変換例が豊富で、即実務に使える。
+      第2版は JavaScript で書き直されており読みやすい。
+
+    ■ 『テスト駆動開発』 Kent Beck (オーム社)
+      TDD の生みの親による原典。Red-Green-Refactor の
+      思想と実践を最も正確に理解できる。
+      Chapter 1-2 (テスト戦略・技法) の根幹思想がここにある。
+      薄い本なので1日で読める。
+
+    ■ 『Head First デザインパターン 第2版』
+      Eric Freeman, Elisabeth Robson (O'Reilly)
+      GoF 23パターンをストーリー形式で分かりやすく解説。
+      Chapter 5 (デザインパターン) を初めて学ぶならこの本がベスト。
+      GoF 原典は難解なので、こちらから入ることを推奨。
+
+    ■ 『Fluent Python 第2版』 Luciano Ramalho (O'Reilly)
+      Python の深い仕組み (デスクリプタ、メタクラス、asyncio内部、
+      型ヒント) を解説。Chapter 4 (Python Advanced) の全てをカバー。
+      Python 中級→上級のブレイクスルーに最適な1冊。
+    """)
+
     print(f"\n{SEP}")
     print("  以上で Programming Practices 深掘り解説を終わります。")
     print(f"{SEP}")

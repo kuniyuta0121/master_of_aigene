@@ -1245,10 +1245,26 @@ def main():
       - 「なぜその選択をしたか」を声に出して説明する
       - 他人に説明してフィードバックをもらう
 
-    推薦書籍:
-      - 「System Design Interview」 Alex Xu
-      - 「Designing Data-Intensive Applications」 Martin Kleppmann
-      - 「Building Microservices」 Sam Newman
+    """)
+
+    heading("おすすめ書籍")
+    p("""
+    ■ 『System Design Interview Vol.1 & Vol.2』 Alex Xu
+      システム設計面接の決定版。Vol.1 は URL Shortener、Rate Limiter、
+      Chat System など基本問題、Vol.2 は Payment System、Hotel Reservation
+      など応用問題をカバー。Chapter 1-6 の全てに直結する。
+      まず Vol.1 を通読し、Vol.2 で応用力を鍛えるのがベスト。
+
+    ■ 『Designing Data-Intensive Applications』 Martin Kleppmann (O'Reilly)
+      通称 "DDIA"。データベース・レプリケーション・パーティショニング・
+      トランザクション・ストリーム処理を理論的に解説。
+      Chapter 2, 7 (共通パターン・DB選定) の理論的基盤。
+      「なぜそう設計するのか」の "Why" を理解するならこの本。
+
+    ■ 『Building Microservices (2nd Ed.)』 Sam Newman (O'Reilly)
+      マイクロサービスの設計・分割・通信・デプロイを体系的に解説。
+      Chapter 8 (マイクロサービス) の全てをカバー。
+      Saga、Circuit Breaker、Service Mesh の実践的な使い方が分かる。
     """)
 
 

@@ -1319,6 +1319,29 @@ def main():
        完璧な決定を待つより、Disagree and Commit で前に進む。
     """)
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『Staff Engineer: Leadership beyond the management track』
+      Will Larson
+      Staff+ エンジニアの役割・4アーキタイプ・Technical Vision の
+      書き方・組織への影響力の行使を実例で解説。
+      Chapter 1 (テクニカルリーダーシップ) の全てがこの1冊に凝縮。
+      エンジニアとして「マネージャーにならず」昇進したい人の必読書。
+
+    ■ 『Team Topologies』 Matthew Skelton, Manuel Pais
+      4つのチーム型・3つのインタラクションモード・認知負荷に基づく
+      チーム設計の理論と実践。Chapter 2, 6 の基盤。
+      組織設計とアーキテクチャの関係を理解する決定版。
+      邦訳:『チームトポロジー』
+
+    ■ 『INSPIRED 熱狂させる製品を生み出すプロダクトマネジメント』
+      Marty Cagan
+      プロダクトディスカバリー・PMF・ロードマップ・
+      ステークホルダー管理を体系的に解説。
+      Chapter 5 (プロダクトマネジメント) の全てをカバー。
+      PM を目指す人なら真っ先に読むべき1冊。
+    """)
+
 
 if __name__ == "__main__":
     main()

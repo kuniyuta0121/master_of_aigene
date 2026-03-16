@@ -1013,6 +1013,26 @@ def main():
     5. 分散では「失敗は必ず起きる」前提で設計
     """)
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『Java Concurrency in Practice』 Brian Goetz 他
+      通称 "JCiP"。Java に限らず並行プログラミングの本質を学べる名著。
+      メモリモデル (happens-before)、同期プリミティブ、ロックフリー、
+      スレッドプールの設計など Chapter 1-5 の全てがこの1冊に凝縮されている。
+      言語が Java でも概念は Python/Go/Rust に直接応用できる。
+
+    ■ 『Is Parallel Programming Hard, And, If So, What Can You Do About It?』
+      Paul E. McKenney (無料PDF)
+      Linux カーネル開発者が書いた並行プログラミングの実践書。
+      メモリバリア、RCU、ロックフリーの実装まで深掘り。
+      Chapter 2-4 を実装レベルで理解したい上級者向け。
+
+    ■ 『Go言語による並行処理』 Katherine Cox-Buday (O'Reilly)
+      goroutine、channel、select、context を体系的に学ぶ。
+      Chapter 7 の Go/CSP 部分を実践的に深めたい場合に最適。
+      邦訳あり。
+    """)
+
     print(f"\n{'=' * 70}")
     print("  学習完了！ 各章の面接Q&Aを復習しよう。")
     print(f"{'=' * 70}\n")

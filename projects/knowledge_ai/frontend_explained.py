@@ -1726,6 +1726,29 @@ def main():
           5. ツール選定はトレードオフを理解した上で
     """)
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『プロを目指す人のための TypeScript 入門』 鈴木 僚太 (技術評論社)
+      TypeScript の型システムを体系的に解説する日本語書籍。
+      Conditional Types, Mapped Types, Template Literal Types など
+      Chapter 6 の内容を実例豊富に学べる。
+
+    ■ 『Learning React, 2nd Edition』 Alex Banks, Eve Porcello (O'Reilly)
+      React の Hooks・Context・Suspense を基礎から解説。
+      Chapter 3 (React 深掘り) の入門として最適。
+
+    ■ 『Web Performance in Action』 Jeremy Wagner (Manning)
+      Core Web Vitals、Code Splitting、Service Worker、
+      画像最適化などをハンズオンで学ぶ。
+      Chapter 7 (Webパフォーマンス) を実践的に深められる。
+
+    ■ 『ハイパフォーマンス ブラウザ ネットワーキング』
+      Ilya Grigorik (O'Reilly / 無料Web版あり)
+      ブラウザのネットワーク層 (TCP, TLS, HTTP/2, WebSocket) を
+      深く解説。Chapter 1 (ブラウザレンダリング) の通信部分と
+      Chapter 11 (Web API) の背景理解に不可欠。
+    """)
+
 
 if __name__ == "__main__":
     main()

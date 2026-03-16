@@ -1479,6 +1479,30 @@ def main():
     chapter_10_eval_and_guardrails()
     chapter_summary()
 
+    heading("おすすめ書籍")
+    p("""
+    ■ 『パターン認識と機械学習 (PRML)』 C.M. Bishop
+      機械学習の理論的基盤を学ぶ定番。
+      確率分布・ベイズ推論・回帰・分類・ニューラルネットを
+      数学的に厳密に解説。Chapter 1-4 の理論を深く理解したい人向け。
+      数学に自信がない場合は下記の代替書から始めるとよい。
+
+    ■ 『ゼロから作る Deep Learning』 斎藤 康毅 (O'Reilly)
+      NumPy のみで CNN・バックプロパゲーション・バッチ正規化を実装。
+      Chapter 4-5 (ニューラルネット・深層学習) をハンズオンで学べる。
+      シリーズ3巻あり、第2巻は自然言語処理 (Attention含む)。
+
+    ■ 『Build a Large Language Model (From Scratch)』
+      Sebastian Raschka (Manning, 2024)
+      GPTアーキテクチャを PyTorch でゼロから実装する。
+      Chapter 5-6 (Transformer/LLM/LoRA/RLHF) の実装理解に最適。
+
+    ■ 『Hands-On Machine Learning (3rd Ed.)』
+      Aurélien Géron (O'Reilly)
+      scikit-learn + TensorFlow/Keras で ML/DL を実践的に学ぶ。
+      Chapter 2-5 の広範囲をカバーする「1冊で全部」型の入門書。
+    """)
+
     print(f"\n{SEP}")
     print("  学習完了！各章を繰り返し読み、面接対策に活用してください。")
     print(SEP)
