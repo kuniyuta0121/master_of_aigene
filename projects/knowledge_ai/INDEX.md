@@ -1,6 +1,6 @@
 # KnowledgeAI - 全体目次 (Table of Contents)
 
-**総ファイル数: 63ファイル / 約87,600行**
+**総ファイル数: 67ファイル / 約91,500行**
 **対象: データサイエンティスト → テックリード/PM (Google/Tesla/IBM レベル)**
 
 ---
@@ -27,6 +27,10 @@
 | [leadership_explained.py](leadership_explained.py) | 1,280 | Staff+・チームトポロジー・SPACE・アジャイル・PM・組織設計・ADR・ビジネス思考 |
 | [security_explained.py](security_explained.py) | 938 | 暗号学・PKI/TLS・OWASP・OAuth/JWT・ゼロトラスト・クラウド/コンテナセキュリティ |
 | [system_design_explained.py](system_design_explained.py) | 1,213 | 面接フレームワーク・設計問題9選・概算・DB選定・マイクロサービス |
+| [qa_engineering_explained.py](qa_engineering_explained.py) | 989 | ISO 25010・IEEE 829・テスト設計技法・テスト自動化・性能テスト・品質メトリクス・CMMI・JSTQB |
+| [pmo_portfolio_explained.py](pmo_portfolio_explained.py) | 1,047 | PMO 3類型・PMBOK 7th・CPM/PERT/CCPM・EVM・リスク管理・ポートフォリオ・ガバナンス・RFP/契約 |
+| [itil_itsm_explained.py](itil_itsm_explained.py) | 934 | ITIL 4・インシデント/問題/変更管理・サービスデスク・CMDB・社内SE実務・ITSM+DevOps融合 |
+| [network_engineering_explained.py](network_engineering_explained.py) | 945 | OSI L1-L3・IPアドレス/サブネット・VLAN/STP・OSPF/BGP・Firewall/ACL・VPN/SD-WAN・無線LAN・監視 |
 
 > 各ファイルは全用語を初出で定義し、「なぜ」を必ず説明。⚠誤解と【面接向けまとめ】付き。
 
@@ -308,6 +312,218 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 
 ---
 
+## 推薦図書 (カテゴリ別・厳選)
+
+> 各カテゴリ1〜3冊に厳選。日本語書籍を優先し、定番の洋書は邦訳があれば邦題も併記。
+
+### CS基礎・OS・ネットワーク
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『プログラムはなぜ動くのか 第3版』 | 矢沢久雄 | CPU・メモリ・OS の仕組みを図解。CS基礎の入門に最適 |
+| 『ネットワークはなぜつながるのか 第2版』 | 戸根 勤 | URL入力→サーバ到達の全過程を1冊で。物理層〜アプリ層 |
+| 『マスタリングTCP/IP 入門編 第6版』 | 竹下・村山・荒井・苅田 | ネットワーク定番教科書。OSI〜TCP/IPを網羅 |
+| 『コンピュータの構成と設計 (パタヘネ) 第6版』 | Patterson, Hennessy | CPUパイプライン・キャッシュ・仮想記憶の教科書 |
+
+### アルゴリズム・データ構造
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『問題解決力を鍛える! アルゴリズムとデータ構造』 | 大槻 兼資 | 競プロ由来の実践的アルゴ本。Python/C++例付き |
+| 『プログラミングコンテストチャレンジブック 第2版』 | 秋葉・岩田・北川 | 通称「蟻本」。DP・グラフ・数学を深掘り |
+
+### データベース・データエンジニアリング
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『データ指向アプリケーションデザイン (DDIA)』 | Martin Kleppmann | DB・分散・ストリーム処理の理論と実践。全エンジニア必読 |
+| 『達人に学ぶDB設計 徹底指南書 第2版』 | ミック | 正規化・インデックス・パフォーマンスを日本語で体系解説 |
+| 『SQL実践入門 — パフォーマンスを最適化する思考法』 | ミック | EXPLAIN・実行計画・Window関数を実例で学ぶ |
+
+### システム設計・分散システム
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『System Design Interview Vol.1 & Vol.2』 | Alex Xu | 設計面接の定番。URL短縮〜決済システムまで20+問題 |
+| 『Building Microservices 第2版』邦訳:『マイクロサービスアーキテクチャ 第2版』 | Sam Newman | Saga・Circuit Breaker・Service Mesh の実践 |
+
+### AI・機械学習・LLM
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『ゼロから作る Deep Learning』シリーズ (全5巻) | 斎藤 康毅 | NumPyでCNN〜Transformer実装。DL理解の最短ルート |
+| 『Hands-On Machine Learning 第3版』邦訳:『scikit-learn、Keras、TensorFlowによる実践機械学習 第3版』 | Aurélien Géron | ML/DL全般を実践的に。scikit-learn+TF/Keras |
+| 『Build a Large Language Model (From Scratch)』 | Sebastian Raschka | GPTをPyTorchでゼロ実装。LLM内部理解に最適 (2024刊) |
+| 『パターン認識と機械学習 (PRML)』 | C.M. Bishop | ML理論の決定版。数学寄りだが深い理解には不可欠 |
+
+### セキュリティ・暗号
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『暗号技術入門 第3版 — 秘密の国のアリス』 | 結城 浩 | AES/RSA/TLS を物語形式で解説。数学苦手でもOK |
+| 『体系的に学ぶ 安全なWebアプリケーションの作り方 第2版』 | 徳丸 浩 | 通称「徳丸本」。OWASP Top 10 を手を動かして理解 |
+
+### インフラ・DevOps・SRE・クラウド
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『Docker/Kubernetes 実践コンテナ開発入門 改訂新版』 | 山田明憲 | Docker〜K8sを日本語で段階的に。ハンズオン豊富 |
+| 『Googleのソフトウェアエンジニアリング』 | Titus Winters 他 | テスト/CI-CD/レビュー/技術的負債。大規模開発の知見 |
+| 『SRE サイトリライアビリティエンジニアリング』 | Google SRE チーム | SLI/SLO/Error Budget/ポストモーテムの原典 |
+
+### プログラミング実践・設計
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『リファクタリング 第2版』 | Martin Fowler | コード改善の決定版。JS例で読みやすい |
+| 『テスト駆動開発』 | Kent Beck | TDDの原典。薄く1日で読める |
+| 『Head First デザインパターン 第2版』 | Freeman, Robson | GoF 23パターンをストーリー形式で解説 |
+| 『Fluent Python 第2版』邦訳あり | Luciano Ramalho | Python上級者向け。メタクラス・async・型ヒント |
+
+### フロントエンド
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『プロを目指す人のための TypeScript 入門』 | 鈴木 僚太 | TS型システムを体系解説。日本語TS本の決定版 |
+| 『ハイパフォーマンス ブラウザ ネットワーキング』 | Ilya Grigorik | ブラウザ通信層を深掘り。無料Web版あり |
+
+### PM・リーダーシップ
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『INSPIRED 熱狂させる製品を生み出すプロダクトマネジメント』 | Marty Cagan | PM必読。プロダクトディスカバリー・ロードマップ |
+| 『チームトポロジー』 | Skelton, Pais | 4チーム型・認知負荷ベースの組織設計 |
+| 『アジャイルサムライ』 | Jonathan Rasmusson | アジャイル/スクラムの入門書。日本語で読みやすい |
+
+### コンパイラ・並行処理 (上級)
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『Crafting Interpreters』 | Robert Nystrom | Lexer→VM→GCをハンズオン実装。無料Web版あり |
+| 『Go言語による並行処理』 | Katherine Cox-Buday | goroutine/channel/contextを体系的に。邦訳あり |
+| 『Java Concurrency in Practice』 | Brian Goetz 他 | 並行プログラミングの本質。Java以外にも応用可 |
+
+### QA・品質保証
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『ソフトウェアテストの教科書』 | 石原一宏・田中英和 | テスト設計技法の入門書。JSTQB対策にも |
+
+### PMO・プロジェクトマネジメント
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『プロジェクトマネジメントの基本』 | 好川 哲人 | PMBOKを日本の文脈で噛み砕いた入門書 |
+| 『PMBOK ガイド 第7版』 | PMI | PM の聖典。12原則ベースに転換 |
+
+### ITIL・ITSM
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『The Phoenix Project』 | Gene Kim 他 | DevOps小説。ITIL→DevOps変革を物語で理解 |
+| 『情報処理教科書 ITサービスマネージャ』 | 翔泳社 | ITIL+日本の情シス実務をカバー |
+
+---
+
+## 無料学習サイト・リソース
+
+> 書籍と併用すると効果的。日本語リソースを優先。
+
+### アルゴリズム・コーディング
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| AtCoder (atcoder.jp) | 日本語 | 競プロ。ABC(初級)→ARC(中級)→AGC(上級) |
+| AtCoder Problems (kenkoooo.com) | 日本語 | AtCoder過去問の難易度別一覧・進捗管理 |
+| LeetCode (leetcode.com) | 英語 | FAANG面接対策の定番。NeetCode 150 から |
+| NeetCode (neetcode.io) | 英語 | LeetCode厳選150問+動画解説。ロードマップ付き |
+| アルゴ式 (algo-method.com) | 日本語 | アルゴリズムを段階的に学べる日本語サイト |
+| AOJ (judge.u-aizu.ac.jp) | 日本語 | 会津大のオンラインジャッジ。教育向け問題が豊富 |
+
+### CS基礎・OS・コンピュータサイエンス
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| CS50 (cs50.harvard.edu) | 英語(字幕あり) | ハーバードCS入門。C→Python→Web。無料 |
+| MIT OCW 6.824 Distributed Systems | 英語 | MIT分散システム講義。Raft実装の演習付き |
+| teachyourselfcs.com | 英語 | CS独学カリキュラム。9科目の推薦教材一覧 |
+| Nand2Tetris (nand2tetris.org) | 英語 | NANDゲートからOS・コンパイラまで自作 |
+| Crafting Interpreters (craftinginterpreters.com) | 英語 | コンパイラ実装を無料で段階学習。書籍版と同一 |
+
+### AI・機械学習・LLM
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| 東大 松尾研 Deep Learning基礎講座 | 日本語 | 東大の無料DL講座。スライド+演習 |
+| Coursera: Machine Learning (Andrew Ng) | 英語(字幕あり) | ML入門の金字塔。リニューアル版はPython |
+| fast.ai (course.fast.ai) | 英語 | 実践ファーストのDL講座。PyTorch/fastai |
+| Hugging Face NLP Course | 英語 | Transformers/RAG/ファインチューニング実践 |
+| Google Machine Learning Crash Course | 英語(日本語版あり) | TensorFlow ベースのML速習。演習付き |
+| Kaggle Learn (kaggle.com/learn) | 英語 | Python/ML/SQL/DLの短期コース。ブラウザ完結 |
+| LLM University by Cohere (docs.cohere.com/docs/llmu) | 英語 | LLM/RAG/Embeddingを体系的に学ぶ無料コース |
+
+### データベース・SQL
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| SQLZOO (sqlzoo.net) | 英語 | SQL練習問題。ブラウザで即実行 |
+| Mode SQL Tutorial (mode.com/sql-tutorial) | 英語 | 分析SQL(Window関数含む)を段階学習 |
+| PostgreSQL公式チュートリアル (postgresql.org/docs) | 英語 | 公式ドキュメント。実行計画の読み方も |
+| DBやろうぜ (qiita.com/mochizuki875) | 日本語 | DB内部構造・インデックス設計のQiita連載 |
+
+### インフラ・DevOps・クラウド
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| AWS Skill Builder (explore.skillbuilder.aws) | 日本語あり | AWS公式の無料学習。SAA対策含む |
+| Google Cloud Skills Boost (cloudskillsboost.google) | 日本語あり | GCP公式ハンズオンラボ。Qwiklabs |
+| Microsoft Learn (learn.microsoft.com) | 日本語 | Azure全サービスの学習パス。認定対策にも |
+| KodeKloud (kodekloud.com) | 英語 | Docker/K8s/Terraformのハンズオン。一部無料 |
+| Play with Docker (labs.play-with-docker.com) | 英語 | ブラウザでDockerを試せる無料環境 |
+| Kubernetes公式チュートリアル (kubernetes.io/ja/docs) | 日本語 | K8s公式の日本語ドキュメント |
+
+### セキュリティ
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| IPA 安全なウェブサイトの作り方 (ipa.go.jp) | 日本語 | 日本政府公式のWebセキュリティガイド。無料PDF |
+| PortSwigger Web Security Academy (portswigger.net) | 英語 | OWASP Top 10 を実際に攻撃して学ぶ。無料 |
+| OWASP Juice Shop (owasp.org) | 英語 | 脆弱なWebアプリで攻撃を体験。CTF形式 |
+| CryptoHack (cryptohack.org) | 英語 | 暗号学をパズル形式で学ぶ。AES/RSA/ECC |
+
+### システム設計
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| System Design Primer (github.com/donnemartin) | 英語 | GitHubスター25万+。設計面接の総まとめ |
+| ByteByteGo (blog.bytebytego.com) | 英語 | Alex Xu のブログ。設計図解が秀逸。一部無料 |
+| Grokking System Design (educative.io) | 英語 | インタラクティブな設計面接コース。一部無料 |
+| highscalability.com | 英語 | 実企業のアーキテクチャ事例集 |
+
+### フロントエンド・TypeScript
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| TypeScript Deep Dive (basarat.gitbook.io) | 英語 | TS深掘り無料書籍。型システム詳細 |
+| React公式ドキュメント (ja.react.dev) | 日本語 | React 最新の公式チュートリアル |
+| web.dev (web.dev) | 英語(日本語一部) | Google公式。Core Web Vitals・パフォーマンス |
+| JavaScript.info (javascript.info) | 英語(日本語版あり) | JS/TS基礎〜上級を網羅した無料教材 |
+
+### PM・アジャイル・リーダーシップ
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| Scrum Guide 公式 (scrumguides.org) | 日本語 | スクラムガイド日本語版。13ページの必読文書 |
+| IPA ITSS+ (ipa.go.jp/jinzai) | 日本語 | IT人材のスキル標準。キャリアパス参考 |
+| Atlassian Agile Coach (atlassian.com/agile) | 英語 | アジャイル/スクラム/カンバンの解説。図解豊富 |
+| re:Work by Google (rework.withgoogle.com) | 英語 | Googleの人材/チーム研究。心理的安全性など |
+
+### ネットワーク・CCNA
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| 3分間ネットワーキング (3min-networking.com) | 日本語 | ネットワーク基礎を3分単位で解説 |
+| ネットワークエンジニアとして (infraexpert.com) | 日本語 | CCNA/CCNP対策の定番サイト。図解豊富 |
+| Packet Tracer (netacad.com) | 英語 | Cisco公式のネットワークシミュレータ。無料 |
+
+### ITIL・ITSM
+| サイト | 言語 | 内容 |
+|--------|------|------|
+| ITIL 4 Foundation Study Guide (各種) | 英語 | Axelos公式の学習リソース |
+| IPA ITサービスマネージャ試験 過去問 (ipa.go.jp) | 日本語 | 過去問+解答が無料公開。ITSM知識の力試し |
+
+---
+
 ## 面接カテゴリ別 クイックリファレンス
 
 | 面接で聞かれたら | 開くファイル |
@@ -344,3 +560,376 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 「Cosmos DB の整合性レベルは？」 | [azure_services_catalog.py](phase5_cloud/azure_services_catalog.py) |
 | 「RAGの品質をどう評価する？」 | [llm_eval_and_guardrails.py](phase2_ai/llm_eval_and_guardrails.py) |
 | 「Prompt Injectionの多層防御は？」 | [llm_eval_and_guardrails.py](phase2_ai/llm_eval_and_guardrails.py) |
+| 「品質保証の指標は？」 | [qa_engineering_explained.py](qa_engineering_explained.py) |
+| 「テスト設計技法を説明せよ」 | [qa_engineering_explained.py](qa_engineering_explained.py) |
+| 「PMBOK 7thの変更点は？」 | [pmo_portfolio_explained.py](pmo_portfolio_explained.py) |
+| 「EVMでプロジェクト状況を報告せよ」 | [pmo_portfolio_explained.py](pmo_portfolio_explained.py) |
+| 「ITILのインシデント管理は？」 | [itil_itsm_explained.py](itil_itsm_explained.py) |
+| 「変更管理のプロセスは？」 | [itil_itsm_explained.py](itil_itsm_explained.py) |
+| 「VLANの設計方針は？」 | [network_engineering_explained.py](network_engineering_explained.py) |
+| 「OSPF vs BGP の違いは？」 | [network_engineering_explained.py](network_engineering_explained.py) |
+
+---
+
+## 学習チェックリスト (全400+ トピック)
+
+> 学んだらチェックを入れよう。Tier 1 → 4 の順に進めるのが効率的。
+
+### 1. アルゴリズム・データ構造
+- [ ] Big-O 計算量分析
+- [ ] Two Pointers (Two Sum, 3Sum, Container)
+- [ ] Sliding Window (最大部分和, 最長部分文字列)
+- [ ] Binary Search (回転ソート配列, Koko)
+- [ ] Heap / Priority Queue (K最大, K個ソート済リスト統合)
+- [ ] Union-Find (島の数)
+- [ ] DP (LCS, コイン問題, 編集距離)
+- [ ] Dijkstra 最短経路
+- [ ] LRU Cache 設計
+- [ ] BFS / DFS
+- [ ] トポロジカルソート
+- [ ] Trie (挿入/検索/オートコンプリート)
+- [ ] セグメント木
+- [ ] バックトラッキング (順列, 部分集合, N-Queen)
+- [ ] KMP 文字列マッチング
+- [ ] Rolling Hash (Rabin-Karp)
+- [ ] 単調スタック (次に大きい要素, 最大長方形)
+- [ ] Bitmask DP (巡回セールスマン)
+
+### 2. OS・ハードウェア
+- [ ] CPUパイプライン (5段)
+- [ ] パイプラインハザード & 分岐予測
+- [ ] CPUキャッシュ & MESI プロトコル
+- [ ] キャッシュシミュレータ (L1/L2/L3, 連想度, 追出し)
+- [ ] 仮想メモリ (ページテーブル, TLB, ページフォルト)
+- [ ] プロセススケジューリング (FIFO, SJF, RR, MLFQ, CFS)
+- [ ] I/Oモデル (ブロッキング, ノンブロッキング, 多重化, 非同期)
+- [ ] 割り込み & NUMA
+
+### 3. ネットワーク
+- [ ] TCP 3-way ハンドシェイク
+- [ ] スライディングウィンドウ
+- [ ] TCP 輻輳制御 (cwnd, Slow Start, CUBIC, BBR)
+- [ ] Nagle アルゴリズム & Delayed ACK
+- [ ] HTTP/1.1 (Head-of-Line Blocking)
+- [ ] HTTP/2 (Multiplexing, Server Push)
+- [ ] HTTP/3 & QUIC
+- [ ] DNS (階層構造, キャッシュ, DNSSEC, レコード種別)
+- [ ] CDN (キャッシュ, エッジロケーション)
+- [ ] WebSocket
+- [ ] Protocol Buffers / gRPC
+- [ ] ロードバランシング (RR, 重み付き, Least Conn, Consistent Hash)
+- [ ] TLS 1.3 ハンドシェイク
+- [ ] 証明書チェーン & mTLS
+
+### 4. ストレージエンジン
+- [ ] HDD メカニクス (シーク時間, 回転遅延, IOPS)
+- [ ] SSD / FTL (ウェアレベリング, Write Amplification)
+- [ ] ファイルシステム (inode, ブロック割当, ジャーナリング)
+- [ ] Copy-on-Write ファイルシステム
+- [ ] バッファプール管理 (LRU, Clock, LRU-K)
+- [ ] B+Tree (挿入, 分割, 範囲スキャン)
+- [ ] Skip List
+- [ ] Bloom Filter
+- [ ] LSM-Tree (MemTable, SSTable, Compaction戦略)
+- [ ] WAL (先行書き込みログ, ARIES リカバリ)
+- [ ] RAID レベル (0, 1, 5, 6, 10)
+- [ ] Merkle Tree (データ整合性検証)
+
+### 5. コンパイラ・ランタイム
+- [ ] レキサー / 字句解析 (正規表現, DFA/NFA)
+- [ ] パーサー / 構文解析 (BNF, 再帰下降, Pratt)
+- [ ] LL(k) vs LR(k) 比較
+- [ ] AST (抽象構文木)
+- [ ] 型推論 (Hindley-Milner, 単一化)
+- [ ] 中間表現 (Three Address Code, SSA)
+- [ ] 最適化パス (定数畳み込み, DCE, インライン展開)
+- [ ] レジスタ割り当て (グラフ彩色, 線形スキャン)
+- [ ] GC: Mark-Sweep / Copying / Generational
+- [ ] GC: G1 / ZGC / Shenandoah / 参照カウント
+- [ ] JIT (ティアードコンパイル, トレーシングJIT)
+- [ ] ウォームアップ & 脱最適化
+- [ ] バイトコード (JVM / CPython / WASM)
+- [ ] メモリレイアウト (スタックフレーム, vtable, エスケープ解析)
+
+### 6. 並行・並列処理
+- [ ] 並行 vs 並列 (Rob Pike の定義)
+- [ ] プロセス vs スレッド vs コンテキストスイッチ
+- [ ] メモリモデル (happens-before, SC, TSO, JMM)
+- [ ] Mutex / Semaphore / RWLock / Condition Variable
+- [ ] CAS (Compare-And-Swap) & ABA問題
+- [ ] Lock-Free vs Wait-Free
+- [ ] デッドロック (Coffman 4条件, 検出/予防/回避)
+- [ ] ライブロック & スターベーション
+- [ ] C10K問題 & イベントループ (epoll/kqueue)
+- [ ] async/await & コルーチン
+- [ ] Python GIL (内部構造, PEP 703)
+- [ ] goroutine & CSP & channel
+- [ ] Actor モデル (Erlang, Supervision Tree)
+- [ ] 2PC / Saga / Raft (分散並行)
+
+### 7. データベース・データエンジニアリング
+- [ ] 正規化 (1NF〜BCNF)
+- [ ] スター/スノーフレークスキーマ
+- [ ] Data Vault 2.0
+- [ ] ウィンドウ関数 (ROW_NUMBER, RANK, LAG)
+- [ ] CTE & 再帰CTE
+- [ ] EXPLAIN 実行計画の読み方
+- [ ] インデックス戦略 (B-Tree / Hash / GIN / GiST / BRIN)
+- [ ] NoSQL 4分類 (KV / Document / Wide-column / Graph)
+- [ ] CAP定理 & Dynamo論文
+- [ ] WAL & MVCC (PostgreSQL vs MySQL)
+- [ ] B+Tree & LSM-Tree (DB内部)
+- [ ] ETL vs ELT
+- [ ] Airflow DAG 設計
+- [ ] dbt (ref / incremental / snapshot / test)
+- [ ] Kafka (Partition, Consumer Group, ISR, 配信保証)
+- [ ] Flink (Window, Watermark, State, Checkpoint)
+- [ ] レイクハウス (Delta Lake / Iceberg / Hudi)
+- [ ] ACID on Data Lake & Time Travel
+- [ ] データ品質 (Great Expectations, データ契約)
+- [ ] データガバナンス (リネージ, カタログ)
+- [ ] OLAP比較 (BigQuery / Redshift / Snowflake / ClickHouse)
+
+### 8. API・バックエンド
+- [ ] REST 原則 & Richardson Maturity Model
+- [ ] REST vs GraphQL vs gRPC
+- [ ] ページネーション (Cursor vs Offset)
+- [ ] レート制限 (Token Bucket, Sliding Window)
+- [ ] 冪等性
+- [ ] CQRS & Event Sourcing
+- [ ] Circuit Breaker
+
+### 9. AI・機械学習
+- [ ] 確率分布 (正規, ポアソン, ベルヌーイ)
+- [ ] ベイズ定理 & 中心極限定理
+- [ ] 仮説検定 (p値, 信頼区間) & A/Bテスト
+- [ ] 教師あり / 教師なし / 強化学習
+- [ ] バイアス-バリアンストレードオフ
+- [ ] 交差検証 (K-Fold)
+- [ ] 線形回帰 / ロジスティック回帰
+- [ ] 決定木 / Random Forest / XGBoost
+- [ ] SVM / k-means / PCA
+- [ ] パーセプトロン & 活性化関数
+- [ ] 勾配降下法 & バックプロパゲーション
+- [ ] CNN (畳み込み, プーリング, 特徴マップ)
+- [ ] RNN / LSTM
+- [ ] Attention 機構 & Transformer
+- [ ] GPT アーキテクチャ
+- [ ] トークナイゼーション (BPE)
+- [ ] ファインチューニング (LoRA / QLoRA)
+- [ ] RLHF & DPO
+- [ ] プロンプトエンジニアリング
+- [ ] RAG (ベクトル検索, Embedding, チャンキング)
+- [ ] AI エージェント (ReAct, Tool Use, Multi-Agent)
+- [ ] MLOps (MLflow, Feature Store, モデル監視)
+- [ ] 物体検出 (YOLO) & セグメンテーション
+- [ ] 拡散モデル (画像生成)
+- [ ] RAGAS & DeepEval (RAG/LLM評価)
+- [ ] ガードレール (NeMo, Presidio, Prompt Injection防御)
+
+### 10. アーキテクチャ・分散システム
+- [ ] システム設計面接 5ステップ
+- [ ] Back-of-Envelope 概算 (QPS, ストレージ, 帯域)
+- [ ] ロードバランサー (L4/L7, アルゴリズム)
+- [ ] キャッシュ (Cache-Aside / Write-Through / Write-Back)
+- [ ] DB スケーリング (シャーディング, レプリケーション)
+- [ ] メッセージキュー (Kafka vs RabbitMQ vs SQS)
+- [ ] CDN (Push vs Pull)
+- [ ] 設計問題: URL短縮
+- [ ] 設計問題: Twitter タイムライン (Fan-out)
+- [ ] 設計問題: チャットシステム (WebSocket)
+- [ ] 設計問題: Rate Limiter
+- [ ] 設計問題: 分散KVストア (Consistent Hashing)
+- [ ] 設計問題: 検索オートコンプリート (Trie)
+- [ ] 設計問題: Web Crawler
+- [ ] 設計問題: 通知システム
+- [ ] 設計問題: 動画配信 (トランスコード, ABR)
+- [ ] マイクロサービス (API Gateway, Saga, Circuit Breaker)
+- [ ] Consistent Hashing & Vector Clock
+- [ ] Raft 合意アルゴリズム
+- [ ] Paxos & FLP不可能性定理
+- [ ] 線形化可能性 & 因果一貫性
+- [ ] ビザンチンBFT
+- [ ] CRDT (Conflict-Free Replicated Data Types)
+- [ ] Lamport Clock / Vector Clock / HLC
+- [ ] Little's Law & Amdahl's Law
+- [ ] M/M/1 待ち行列理論
+- [ ] USL (Universal Scalability Law)
+- [ ] テールレイテンシ (P99, Hedged Requests)
+- [ ] 可用性計算 (直列/並列, MTBF/MTTR)
+
+### 11. インフラ・DevOps・SRE
+- [ ] Docker (Namespace, cgroups, OverlayFS)
+- [ ] Dockerfile 最適化 (マルチステージビルド)
+- [ ] Docker Compose
+- [ ] K8s アーキテクチャ (Control Plane, etcd)
+- [ ] K8s リソース (Deployment, StatefulSet, DaemonSet)
+- [ ] K8s ネットワーキング (Service, Ingress, Service Mesh)
+- [ ] K8s スケーリング (HPA, VPA, KEDA)
+- [ ] Helm & GitOps (ArgoCD)
+- [ ] CI/CD パイプライン
+- [ ] 5 デプロイ戦略 (Recreate/Rolling/Blue-Green/Canary/Progressive)
+- [ ] Feature Flag
+- [ ] IaC (Terraform: plan/apply/drift)
+- [ ] DB マイグレーション安全チェック
+- [ ] シークレット管理 (Vault)
+- [ ] Well-Architected Framework (6 柱)
+- [ ] マルチリージョン & DR戦略
+- [ ] サーバーレス (Cold Start, コスト見積)
+- [ ] FinOps
+- [ ] SLI / SLO / SLA & Error Budget
+- [ ] Burn Rate アラート
+- [ ] 可観測性3本柱 (Metrics, Logs, Traces)
+- [ ] インシデント対応 (OODA, 重大度分類)
+- [ ] カオスエンジニアリング
+- [ ] ポストモーテム
+- [ ] ランブック
+- [ ] USE/RED メソッド
+- [ ] キャパシティプランニング
+
+### 12. セキュリティ・暗号
+- [ ] 対称鍵暗号 (AES: ECB/CBC/GCM)
+- [ ] 非対称鍵暗号 (RSA, ECC)
+- [ ] DH鍵交換 & Forward Secrecy
+- [ ] ハッシュ (SHA-256, HMAC)
+- [ ] パスワードハッシュ (bcrypt / Argon2)
+- [ ] PKI (証明書チェーン, CA, CSR)
+- [ ] TLS 1.3 (0-RTT, cipher suite)
+- [ ] OWASP Top 10 (Injection, XSS, SSRF, Broken Access)
+- [ ] OAuth 2.0 (Authorization Code, PKCE, Client Credentials)
+- [ ] OpenID Connect & JWT (ヘッダ/ペイロード/署名)
+- [ ] SAML
+- [ ] ゼロトラスト (BeyondCorp, mTLS, SPIFFE/SPIRE)
+- [ ] クラウドセキュリティ (IAM, 最小権限, KMS)
+- [ ] コンテナセキュリティ (Trivy, OPA, Pod Security)
+- [ ] 脅威モデリング (STRIDE)
+- [ ] インシデント対応 (NIST IR, フォレンジック, SIEM/SOAR)
+
+### 13. プログラミング実践
+- [ ] テストピラミッド (Unit 70% / Integration 20% / E2E 10%)
+- [ ] TDD (Red-Green-Refactor)
+- [ ] テストダブル 5種 (Dummy, Stub, Spy, Mock, Fake)
+- [ ] Property-based Testing (Hypothesis)
+- [ ] Mutation Testing
+- [ ] Fuzzing (AFL, OSS-Fuzz)
+- [ ] Contract Testing (Pact)
+- [ ] Big-O 分析 & プロファイリング (cProfile, perf)
+- [ ] メモリリーク検出 (tracemalloc)
+- [ ] キャッシュ戦略 (LRU/LFU, Cache-Aside)
+- [ ] 接続プール (Little's Law)
+- [ ] Python: メタクラス & デスクリプタ
+- [ ] Python: GIL 内部 & asyncio 内部
+- [ ] Python: 型ヒント高度 (Protocol, TypeVar, ParamSpec)
+- [ ] GoF 23 デザインパターン (生成5/構造7/振舞11)
+- [ ] SOLID 原則 (SRP/OCP/LSP/ISP/DIP)
+- [ ] リファクタリング & コードスメル
+- [ ] 技術的負債 (4象限モデル)
+- [ ] 多言語比較 (Python/TS/Go/Rust/Java)
+
+### 14. フロントエンド
+- [ ] ブラウザレンダリング (DOM/CSSOM, CRP, Layout/Paint/Composite)
+- [ ] V8 エンジン (Ignition/TurboFan)
+- [ ] イベントループ (マイクロ/マクロタスク)
+- [ ] クロージャ & プロトタイプチェーン
+- [ ] React (仮想DOM, Fiber, Hooks内部)
+- [ ] React レンダリング最適化 (memo, useMemo, useCallback)
+- [ ] Suspense & Streaming
+- [ ] Next.js (SSR/SSG/ISR/RSC, App Router, Server Actions)
+- [ ] 状態管理 (Redux / Zustand / Jotai / React Query / SWR)
+- [ ] TypeScript 高度 (Generics, Conditional/Mapped/Template Literal Types, infer)
+- [ ] Core Web Vitals (LCP, INP, CLS)
+- [ ] Code Splitting & Tree Shaking
+- [ ] Service Worker
+- [ ] CSS 設計 (CSS-in-JS vs Tailwind vs CSS Modules, Flexbox/Grid)
+- [ ] フロントエンドテスト (Jest/Vitest, RTL, Playwright, MSW)
+- [ ] アクセシビリティ (WCAG, WAI-ARIA, セマンティックHTML)
+- [ ] Web API (WebSocket, WebRTC, Web Workers, IndexedDB)
+- [ ] ビルドツール (Webpack / Vite / Turbopack, HMR, Module Federation)
+
+### 15. PM・リーダーシップ
+- [ ] Staff+ エンジニア (4アーキタイプ, Technical Vision)
+- [ ] IC vs Manager トラック
+- [ ] チームトポロジー (4チーム型, 認知負荷, Team API)
+- [ ] SPACE フレームワーク (5軸)
+- [ ] DORA メトリクス (4+1指標)
+- [ ] Scrum / Kanban / SAFe
+- [ ] 見積もり (ストーリーポイント, Planning Poker)
+- [ ] レトロスペクティブ
+- [ ] プロダクトディスカバリー (4リスク)
+- [ ] RICE スコアリング
+- [ ] OKR (Objectives & Key Results)
+- [ ] ロードマップ (Now/Next/Later)
+- [ ] PMF (Product-Market Fit)
+- [ ] コンウェイの法則 & 逆コンウェイ戦略
+- [ ] Two-Pizza Team & Spotify Model
+- [ ] ADR (Architecture Decision Record) & RFC
+- [ ] 技術面接設計 (構造化面接, STAR形式)
+- [ ] メンタリング vs スポンサーシップ
+- [ ] ユニットエコノミクス (CAC/LTV/Churn)
+- [ ] テクニカルライティング & BLUF
+- [ ] ステークホルダー管理
+- [ ] Disagree and Commit
+
+### 16. クラウドサービス
+- [ ] AWS サービスカタログ (主要サービス)
+- [ ] GCP サービスカタログ
+- [ ] Azure サービスカタログ (57サービス)
+- [ ] Cosmos DB 整合性レベル (5段階)
+- [ ] 3クラウド比較マッピング
+- [ ] 認定ロードマップ
+
+### 17. QA・品質保証
+- [ ] ISO 25010 品質モデル (8特性)
+- [ ] IEEE 829 テスト計画書
+- [ ] テスト設計技法 (同値分割, 境界値, デシジョンテーブル, 状態遷移, ペアワイズ)
+- [ ] テストレベル (単体/結合/システム/受入)
+- [ ] テスト自動化 (テストピラミッド, Selenium/Playwright, CI統合)
+- [ ] 性能テスト (負荷/ストレス/耐久, JMeter/k6/Locust)
+- [ ] 品質メトリクス (DDP, バグ密度, テストカバレッジ)
+- [ ] CMMI 成熟度レベル (1-5)
+- [ ] ISO 9001 品質マネジメント
+- [ ] JSTQB / ISTQB (テスト技術者資格)
+- [ ] 探索的テスト (セッションベース)
+- [ ] シフトレフトテスト
+
+### 18. PMO・ポートフォリオ管理
+- [ ] PMO 3類型 (支援型/管理型/指揮型)
+- [ ] PMBOK 第7版 (12原則, 8パフォーマンス領域)
+- [ ] WBS (Work Breakdown Structure)
+- [ ] CPM (クリティカルパス法) & PERT
+- [ ] CCPM (クリティカルチェーン)
+- [ ] EVM (PV/EV/AC, SPI/CPI, EAC/ETC)
+- [ ] リスク管理 (定性/定量分析, EMV, モンテカルロ)
+- [ ] ステークホルダー分析 (権力/関心マトリクス)
+- [ ] ポートフォリオ管理 (優先順位付け, バブルチャート)
+- [ ] ガバナンス (ステージゲート, フェーズゲート)
+- [ ] RFP / 提案書評価 / 契約形態 (FP/T&M/CR)
+- [ ] プロジェクト憲章 & キックオフ
+
+### 19. ITIL / ITSM
+- [ ] ITIL 4 フレームワーク (SVS, SVC)
+- [ ] ITIL 7つの基本原則
+- [ ] インシデント管理 (分類, エスカレーション, 重大インシデント)
+- [ ] 問題管理 (根本原因分析, 既知のエラー, KEDB)
+- [ ] 変更管理 (標準/通常/緊急変更, CAB)
+- [ ] サービスデスク (SPOC, オムニチャネル)
+- [ ] CMDB (構成管理データベース, CI, 関係モデル)
+- [ ] SLA管理 & サービスカタログ
+- [ ] ITSM + DevOps 融合
+- [ ] 社内SE 実務 (ヘルプデスク, IT資産管理, BCP)
+- [ ] サービスレベル管理 (SLA/OLA/UC)
+
+### 20. ネットワーク実務
+- [ ] OSI 参照モデル (L1-L7)
+- [ ] IP アドレス & サブネット計算 (CIDR, VLSM)
+- [ ] VLAN (タグ/アクセスポート, トランク, Inter-VLAN)
+- [ ] STP (スパニングツリー, RSTP, ループ防止)
+- [ ] ルーティング (スタティック, OSPF, BGP)
+- [ ] OSPF (エリア設計, LSA, SPFアルゴリズム)
+- [ ] BGP (AS, eBGP/iBGP, 経路制御)
+- [ ] Firewall & ACL (ステートフル/ステートレス)
+- [ ] VPN (IPsec, SSL-VPN, WireGuard)
+- [ ] SD-WAN (MPLS代替, ZTP, アプリケーション認識)
+- [ ] 無線LAN (802.11ax/Wi-Fi 6, チャネル設計, WPA3)
+- [ ] ネットワーク監視 (SNMP, syslog, NetFlow, Zabbix/PRTG)
+- [ ] トラブルシューティング (ping, traceroute, tcpdump, Wireshark)
