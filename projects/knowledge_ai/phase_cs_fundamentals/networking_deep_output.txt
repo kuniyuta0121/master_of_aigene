@@ -1,0 +1,614 @@
+================================================================
+  ネットワーク & プロトコル 完全ガイド
+  TCP, HTTP, DNS, CDN, WebSocket, gRPC, LB, TLS
+================================================================
+
+================================================================
+  SECTION 1: TCP Deep Internals
+================================================================
+=== TCP 3-Way Handshake ===
+  Client → Server: [SYN] seq=2963 ack=0 win=65535 data=0B
+  Server → Client: [SYN,ACK] seq=5364 ack=2964 win=65535 data=0B
+  Client → Server: [ACK] seq=2964 ack=5365 win=65535 data=0B
+  → ESTABLISHED (接続確立)
+
+  【なぜ3-wayか】
+  - 2-way: サーバーがクライアントの到達性を確認できない
+  - 古いSYNの重複接続問題を防止 (ISNの検証)
+  - 双方向の通信路確立を保証
+=== Sliding Window (size=4) ===
+
+  --- Round 1 ---
+  送信: seq=0 data='A'
+  送信: seq=1 data='B'
+  送信: seq=2 data='C'
+  送信: seq=3 data='D'
+  ACK受信: seq=0
+  ACK受信: seq=1
+  ACK受信: seq=2
+  ACK受信: seq=3
+  Window: [0:済] [1:済] [2:済] [3:済] [4:送信可] [5:送信可] [6:送信可] [7:送信可]
+
+  --- Round 2 ---
+  送信: seq=4 data='E'
+  送信: seq=5 data='F'
+  送信: seq=6 data='G'
+  送信: seq=7 data='H'
+  ACK受信: seq=4
+  ✗ パケットロス: seq=5
+  ACK受信: seq=6
+  ACK受信: seq=7
+  Window: [0:済] [1:済] [2:済] [3:済] [4:済] [5:未ACK] [6:ACK] [7:ACK]
+
+  --- Round 3 ---
+  ACK受信: seq=5
+  Window: [0:済] [1:済] [2:済] [3:済] [4:済] [5:済] [6:済] [7:済]
+
+  全パケット送信完了 (3 rounds)
+=== TCP Congestion Control (Reno) ===
+  初期 cwnd=1.0, ssthresh=16.0
+
+  RTT  1: cwnd=   2.0 ssth= 16.0 [slow_start            ]  ##
+  RTT  2: cwnd=   3.0 ssth= 16.0 [slow_start            ]  ###
+  RTT  3: cwnd=   4.0 ssth= 16.0 [slow_start            ]  ####
+  RTT  4: cwnd=   5.0 ssth= 16.0 [slow_start            ]  #####
+  RTT  5: cwnd=   6.0 ssth= 16.0 [slow_start            ]  ######
+  RTT  6: cwnd=   3.0 ssth=  3.0 [congestion_avoidance  ] !! LOSS ###
+  RTT  7: cwnd=   3.3 ssth=  3.0 [congestion_avoidance  ]  ###
+  RTT  8: cwnd=   2.0 ssth=  2.0 [congestion_avoidance  ] !! LOSS ##
+  RTT  9: cwnd=   2.5 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 10: cwnd=   2.9 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 11: cwnd=   2.0 ssth=  2.0 [congestion_avoidance  ] !! LOSS ##
+  RTT 12: cwnd=   2.5 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 13: cwnd=   2.9 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 14: cwnd=   3.2 ssth=  2.0 [congestion_avoidance  ]  ###
+  RTT 15: cwnd=   2.0 ssth=  2.0 [congestion_avoidance  ] !! LOSS ##
+  RTT 16: cwnd=   2.5 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 17: cwnd=   2.9 ssth=  2.0 [congestion_avoidance  ]  ##
+  RTT 18: cwnd=   3.2 ssth=  2.0 [congestion_avoidance  ]  ###
+  RTT 19: cwnd=   3.6 ssth=  2.0 [congestion_avoidance  ]  ###
+  RTT 20: cwnd=   2.0 ssth=  2.0 [congestion_avoidance  ] !! LOSS ##
+
+=== TCP vs UDP 比較表 ===
+  項目             | TCP                          | UDP                         
+  ---------------+------------------------------+-----------------------------
+  接続             | コネクション型 (3-way HS)           | コネクションレス                    
+  信頼性            | 保証 (再送・順序制御)                 | 保証なし                        
+  フロー制御          | あり (Sliding Window)          | なし                          
+  輻輳制御           | あり (Slow Start等)             | なし                          
+  オーバーヘッド        | 大 (20Bヘッダ)                   | 小 (8Bヘッダ)                   
+  遅延             | 高い (HS + ACK待ち)              | 低い                          
+  用途             | HTTP, SSH, DB接続              | DNS, VoIP, ゲーム, 動画          
+  Head-of-Line   | あり (1パケロスで全停止)               | なし                          
+
+=== Nagle's Algorithm & Delayed ACK 問題 ===
+
+  【Nagle's Algorithm】
+  - 小さなパケットの大量送信を防ぐ
+  - ルール: 未ACKデータがある場合、小データはバッファして送らない
+  - 効果: ネットワーク効率向上 (Silly Window Syndrome 防止)
+
+  【Delayed ACK】
+  - ACKを即座に返さず、最大200ms待って他データとまとめて返す
+  - 効果: ACKパケット数削減
+
+  【組み合わせ問題】
+  - Nagle: 「ACK来るまで次を送らない」
+  - Delayed ACK: 「ACKを遅らせる」
+  → 結果: 最大200msの不要な遅延が発生 (Write-Write-Read パターン)
+
+  【対策】
+  - TCP_NODELAY: Nagle無効化 (低レイテンシ要求時)
+  - TCP_QUICKACK: Delayed ACK無効化 (Linux)
+  - アプリ側でバッファリングしてまとめて送信
+
+
+================================================================
+  SECTION 2: HTTP プロトコル進化
+================================================================
+=== HTTP/1.1 ===
+
+  【Keep-Alive】
+  - HTTP/1.0: リクエストごとにTCP接続 (遅い)
+  - HTTP/1.1: Connection: keep-alive でTCP再利用
+  - 同一接続で複数リクエスト/レスポンスを順次処理
+
+  【Pipelining】
+  - 複数リクエストをACK待たずに連続送信
+  - ただしレスポンスは順番通りに返す必要あり
+  - → Head-of-Line Blocking が発生
+
+  【Head-of-Line Blocking 問題】
+  Request 1 ──→ [処理中...遅い] → Response 1
+  Request 2 ──→              待機 → Response 2  ← 1が終わるまで待つ
+  Request 3 ──→              待機 → Response 3
+
+  6リクエスト送信:
+    毎回接続:  360ms (TCP接続 x 6)
+    Keep-Alive: 110ms (TCP接続 x 1)
+    → 250ms 短縮
+
+=== HTTP/2 ===
+  【Binary Framing Layer】
+  HTTP/1.1: テキストベース (改行区切り)
+  HTTP/2:   バイナリフレーム (効率的パース)
+  フレーム例: length=3B type=HEADERS flags=0x05 stream_id=1
+
+  【Multiplexing (多重化)】
+  1つのTCP接続で複数ストリームを並行処理
+  Stream   | リソース           | 時間(ms)  
+  ---------+----------------+---------
+  1        | index.html     |       30
+  3        | style.css      |       15
+  5        | app.js         |       45
+  7        | image.png      |       80
+
+  HTTP/1.1 (直列): 170ms
+  HTTP/2 (並列):   80ms  → 90ms短縮
+
+  【HPACK ヘッダ圧縮】
+  元サイズ: 117B → 圧縮後: ~46B (61%削減)
+
+  【Stream Priority】
+  CSS/JS を画像より優先 → レンダリング高速化
+  依存関係ツリーで制御 (weight: 1-256)
+=== HTTP/3 (QUIC) ===
+
+  【UDP上のHTTP】
+  - TCP + TLS の代わりに QUIC (UDP上に構築)
+  - カーネル空間でなくユーザー空間で実装 → 高速イテレーション
+
+  【0-RTT 接続確立】
+  TCP+TLS 1.3: 2-RTT (TCP HS + TLS HS)
+  QUIC:        1-RTT (初回) / 0-RTT (再接続)
+
+  接続時間比較:
+    TCP+TLS 1.3: SYN → SYN-ACK → ACK+ClientHello → ServerHello → データ
+                 |---------- 2 RTT ---------|
+    QUIC:        Initial → Handshake → データ
+                 |--- 1 RTT ---|
+    QUIC 0-RTT:  Initial(+データ) → レスポンス
+                 |-- 0 RTT --|
+
+  【Connection Migration】
+  - 接続IDベース (IPアドレス非依存)
+  - WiFi → 4G 切替時もコネクション維持
+  - モバイル環境で大きなメリット
+
+  【Stream Independence (ストリーム独立性)】
+  HTTP/2 問題: 1パケットロスで全ストリーム停止 (TCP HoL Blocking)
+  HTTP/3 解決: ストリームごとに独立 → 影響が局所化
+
+=== HTTP パフォーマンス比較 ===
+  条件: RTT=50ms, リソース数=20
+  HTTP/1.1: ~400ms (6並列TCP, 4ラウンド)
+  HTTP/2:   ~150ms (1TCP, 全多重化)
+  HTTP/3:   ~50ms (0-RTT再接続時)
+
+================================================================
+  SECTION 3: DNS 完全解説
+================================================================
+=== DNS 名前解決 シミュレーション ===
+
+  DNSレコードタイプ:
+    A     : IPv4アドレス (例: 93.184.216.34)
+    AAAA  : IPv6アドレス (例: 2606:2800:220:1::)
+    CNAME : 正規名 (エイリアス → 実ホスト名)
+    MX    : メールサーバー (優先度付き)
+    TXT   : テキスト情報 (SPF, DKIM, ドメイン認証)
+    SRV   : サービスロケーション (ポート・重み付き)
+    NS    : 権威ネームサーバー
+    SOA   : ゾーン管理情報 (シリアル番号, リフレッシュ間隔)
+
+  --- Aレコード解決 ---
+    [QUERY] example.com A
+      1. ルートDNS (.): 'example.com' → .com TLDサーバーへ
+      2. TLD DNS (.com): 'example.com' → 権威DNSサーバーへ
+      3. 権威DNS: example.com → ['93.184.216.34']
+
+  --- CNAME経由の解決 ---
+    [QUERY] www.example.com A
+      1. ルートDNS (.): 'www.example.com' → .com TLDサーバーへ
+      2. TLD DNS (.com): 'www.example.com' → 権威DNSサーバーへ
+      3. 権威DNS: NXDOMAIN (見つからない)
+
+  --- キャッシュヒット ---
+    [CACHE HIT] example.com A → 93.184.216.34 (TTL残: 3599s)
+
+  --- MXレコード ---
+    [QUERY] example.com MX
+      1. ルートDNS (.): 'example.com' → .com TLDサーバーへ
+      2. TLD DNS (.com): 'example.com' → 権威DNSサーバーへ
+      3. 権威DNS: example.com → ['mail.example.com']
+
+  総クエリ数: 4
+=== DNS ロードバランシング ===
+
+  Round Robin:
+    Request 1 → 10.0.1.1
+    Request 2 → 10.0.1.2
+    Request 3 → 10.0.2.1
+    Request 4 → 10.0.3.1
+    Request 5 → 10.0.1.1
+    Request 6 → 10.0.1.2
+
+  Weighted (5:3:4:2):
+    10.0.1.1:  332 (33.2%) ################
+    10.0.1.2:  227 (22.7%) ###########
+    10.0.2.1:  295 (29.5%) ##############
+    10.0.3.1:  146 (14.6%) #######
+
+  Geolocation:
+    Client@ap-northeast-1   → 10.0.1.2
+    Client@us-east-1        → 10.0.2.1
+    Client@eu-west-1        → 10.0.3.1
+    Client@sa-east-1        → 10.0.2.1
+
+=== DNS Security ===
+
+  【DNSSEC (DNS Security Extensions)】
+  - DNS応答にデジタル署名を付与
+  - レコード改ざん検出 (DNS Spoofing対策)
+  - 信頼の連鎖: ルート → TLD → 権威サーバー
+  - RRSIG, DNSKEY, DS レコードを使用
+
+  【DNS over HTTPS (DoH)】
+  - DNS クエリを HTTPS で暗号化
+  - ポート443 (通常のHTTPSと同じ → ブロック困難)
+  - プライバシー保護 (ISPによる監視防止)
+
+  【DNS over TLS (DoT)】
+  - DNS クエリを TLS で暗号化
+  - ポート853 (専用ポート → ファイアウォールで制御可能)
+
+  【攻撃と対策】
+  - DNS Cache Poisoning → DNSSEC
+  - DNS Amplification DDoS → Response Rate Limiting
+  - DNS Tunneling → クエリ監視・異常検知
+
+
+================================================================
+  SECTION 4: CDN
+================================================================
+=== CDN シミュレーション ===
+
+  【Push CDN vs Pull CDN】
+  Push: コンテンツ更新時にオリジンからエッジに配信 (静的サイト向き)
+  Pull: 初回リクエスト時にオリジンからフェッチ (動的コンテンツ向き)
+
+  tokyo  GET /index.html          → ORIGIN FETCH → shield + edge cached
+  tokyo  GET /api/data            → ORIGIN FETCH → shield + edge cached
+  osaka  GET /images/logo.png     → ORIGIN FETCH → shield + edge cached
+  tokyo  GET /index.html          → EDGE HIT (tokyo)
+
+  統計: Edge=4 Shield=3 Origin=3
+
+  【Cache Invalidation 戦略】
+  戦略                 | 説明                                           | 特徴
+  -------------------+----------------------------------------------+-------------------------------
+  TTL-based          | 一定時間後に自動失効 (Cache-Control: max-age=3600)     | シンプル / 更新反映が遅い
+  Purge              | APIで明示的にキャッシュ削除 (POST /purge)                | 即時反映 / 全エッジに伝搬必要
+  Versioned URL      | /app.abc123.js (ハッシュ付きURL)                   | 確実 / ビルドパイプライン必要
+  Stale-While-Rev    | 古いキャッシュを返しつつバックグラウンド更新                       | 高速 / 一瞬古いデータ
+
+  【Origin Shield パターン】
+  Client → Edge POP → Origin Shield → Origin Server
+  - 複数エッジからの同一リクエストをShieldが集約
+  - オリジンへの負荷を大幅削減 (Thunder Herd 防止)
+
+  【CDN選定 比較】
+  CloudFront  : AWS統合, Lambda@Edge, S3連携                   適: AWS利用者
+  Cloudflare  : 無料プランあり, Workers, DDoS防御                   適: 汎用・コスパ重視
+  Fastly      : リアルタイムPurge, VCL/Wasm, 高速                  適: 動的コンテンツ
+
+  【Edge Computing】
+  CDNエッジでロジック実行 (API応答, A/Bテスト, 認証)
+  例: Cloudflare Workers, Lambda@Edge, Fastly Compute
+
+================================================================
+  SECTION 5: WebSocket & リアルタイム通信
+================================================================
+=== WebSocket Handshake ===
+
+  Client → Server:
+    GET /chat HTTP/1.1
+    Host: example.com
+    Upgrade: websocket
+    Connection: Upgrade
+    Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+    Sec-WebSocket-Version: 13
+
+  Server → Client:
+    HTTP/1.1 101 Switching Protocols
+    Upgrade: websocket
+    Connection: Upgrade
+    Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+
+  → WebSocket接続確立 (以降はフレームベース通信)
+
+=== WebSocket Frame Format ===
+
+   0                   1                   2                   3
+   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+  +-+-+-+-+-------+-+-------------+-------------------------------+
+  |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+  |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+  |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+  | |1|2|3|       |K|             |                               |
+  +-+-+-+-+-------+-+-------------+-------------------------------+
+  |     Masking-key (if MASK=1)   |          Payload Data         |
+  +-------------------------------+-------------------------------+
+
+  Opcode: 0x1=Text, 0x2=Binary, 0x8=Close, 0x9=Ping, 0xA=Pong
+  MASK:   クライアント→サーバーは必須 (プロキシキャッシュ汚染防止)
+  FIN:    最終フレームフラグ (大きなメッセージは分割送信)
+
+=== リアルタイム通信方式 比較 ===
+  項目             | Long Polling             | SSE                      | WebSocket               
+  ---------------+--------------------------+--------------------------+-------------------------
+  プロトコル          | HTTP                     | HTTP                     | WS (HTTP Upgrade)       
+  方向             | 擬似双方向                    | サーバー→クライアント              | 全二重双方向                  
+  接続             | 繰り返しHTTPリクエスト            | 1つの持続接続                  | 1つの持続接続                 
+  オーバーヘッド        | 高い(毎回ヘッダ)                | 中(HTTPヘッダ1回)             | 低い(2-14Bフレーム)           
+  ブラウザ対応         | 全て                       | IE以外                     | 全モダンブラウザ                
+  再接続            | 自動(次のリクエスト)              | EventSource自動再接続         | 手動実装必要                  
+  適用例            | チャット(レガシー)               | 通知・フィード                  | ゲーム・チャット・取引             
+
+=== Pub/Sub on WebSocket ===
+
+  [user-1] subscribed to 'chat/room-1'
+  [user-2] subscribed to 'chat/room-1'
+  [user-1] subscribed to 'notifications'
+  [user-3] subscribed to 'notifications'
+
+  [user-1] publish to 'chat/room-1': Hello everyone!
+    → delivered to [user-1]
+    → delivered to [user-2]
+  [system] publish to 'notifications': New update available
+    → delivered to [user-1]
+    → delivered to [user-3]
+
+================================================================
+  SECTION 6: gRPC & Protocol Buffers
+================================================================
+=== Protocol Buffers エンコーディング ===
+
+  【Varint (可変長整数)】
+         1 → 00000001 (1 bytes)
+       127 → 01111111 (1 bytes)
+       128 → 10000000 00000001 (2 bytes)
+       300 → 10101100 00000010 (2 bytes)
+     16384 → 10000000 10000000 00000001 (3 bytes)
+
+  【Field Tag = (field_number << 3) | wire_type】
+    wire_type=0: Varint (int32, bool, enum)
+    wire_type=1: 64-bit (double, fixed64)
+    wire_type=2: Length-delimited (string, bytes, embedded msg)
+    wire_type=5: 32-bit (float, fixed32)
+
+  【JSON vs Protobuf サイズ比較】
+    JSON:     64 bytes  '{"id":12345,"name":"Alice","email":"alice@example.com","age":30}'
+    Protobuf: ~33 bytes  (バイナリ)
+    → 48% サイズ削減
+
+=== gRPC 通信パターン ===
+
+  1. Unary RPC
+    Client --req--> Server --res--> Client
+    説明: 通常のリクエスト/レスポンス (REST相当)
+    Proto: rpc GetUser(UserRequest) returns (User)
+
+  2. Server Streaming
+    Client --req--> Server ==res==> Client (複数)
+    説明: サーバーが複数レスポンスをストリーム送信
+    Proto: rpc ListUsers(Filter) returns (stream User)
+
+  3. Client Streaming
+    Client ==req==> Server (複数) --res--> Client
+    説明: クライアントが複数リクエストをストリーム送信
+    Proto: rpc UploadChunks(stream Chunk) returns (Status)
+
+  4. Bidirectional Streaming
+    Client <=====req/res=====> Server
+    説明: 双方向で同時にストリーム通信
+    Proto: rpc Chat(stream Msg) returns (stream Msg)
+
+=== gRPC vs REST 比較 ===
+  項目               | gRPC                     | REST                    
+  -----------------+--------------------------+-------------------------
+  プロトコル            | HTTP/2                   | HTTP/1.1 or HTTP/2      
+  データ形式            | Protocol Buffers         | JSON (テキスト)             
+  スキーマ             | .proto (厳密型)             | OpenAPI (任意)            
+  コード生成            | 自動 (多言語対応)               | 手動 or ツール               
+  ストリーミング          | 4パターン対応                  | 限定的 (SSE等)              
+  ブラウザ             | gRPC-Web必要               | ネイティブ対応                 
+  デバッグ             | 難 (バイナリ)                 | 容易 (テキスト)               
+  パフォーマンス          | 高速 (小サイズ, 多重化)           | 中速                      
+  適用場面             | マイクロサービス間通信              | 公開API・Web/モバイル          
+
+  【gRPC-Web】
+  ブラウザから直接gRPCを呼べない → gRPC-Webプロキシ経由
+  Envoy, grpc-web (npm) で対応
+
+  【gRPC Gateway】
+  gRPCサービスにRESTful APIエンドポイントを自動生成
+  .protoにHTTPアノテーション追加 → REST→gRPC変換プロキシ
+
+================================================================
+  SECTION 7: ロードバランシング詳細
+================================================================
+=== ロードバランシング アルゴリズム ===
+
+  【L4 (Transport) vs L7 (Application) ロードバランサー】
+      L4 (TCP/UDP)                   L7 (HTTP/HTTPS)               
+      ------------------------------ ------------------------------
+      判断基準       IP, ポート, TCP情報                 URL, ヘッダ, Cookie, Body        
+      速度         高速 (パケット転送のみ)                  中速 (HTTPパース必要)                
+      機能         シンプルな振り分け                      パスルーティング, SSL終端               
+      例          NLB, HAProxy (TCP)             ALB, Nginx, Envoy             
+
+  --- Round Robin ---
+    Request 1 → server-A
+    Request 2 → server-B
+    Request 3 → server-C
+    Request 4 → server-A
+    Request 5 → server-B
+    Request 6 → server-C
+
+  --- Least Connections ---
+    現在の接続数: [('server-A', 0), ('server-B', 5), ('server-C', 3)]
+    Request 1 → server-A
+    Request 2 → server-A
+    Request 3 → server-A
+    Request 4 → server-A
+
+  --- IP Hash (セッション維持) ---
+    192.168.1.1 → server-A
+    192.168.1.2 → server-C
+    192.168.1.1 → server-A
+    10.0.0.1 → server-A
+
+  --- Consistent Hashing ---
+    user:1001 → server-A
+    user:1002 → server-A
+    user:1003 → server-A
+    session:abc → server-C
+    [サーバーB障害発生]
+    user:1001 → server-A 
+    user:1002 → server-A 
+    user:1003 → server-A 
+    session:abc → server-C 
+
+  【Health Check】
+  Active: LBがサーバーに定期的にプローブ送信 (HTTP GET /health)
+  Passive: 実トラフィックの応答を監視 (5xx連続 → unhealthy)
+  → 両方組み合わせが推奨
+
+  【Connection Draining (Graceful Shutdown)】
+  1. サーバーをunhealthyにマーク (新規リクエスト停止)
+  2. 既存接続の完了を待つ (タイムアウト付き)
+  3. 全接続完了後にサーバー停止
+  → デプロイ/スケールイン時のリクエスト断を防止
+
+  【Service Discovery】
+  Client-side: クライアントがレジストリ問合せ → 直接接続
+    例: Netflix Eureka, Consul (クライアントライブラリ)
+  Server-side: LB/プロキシがレジストリ問合せ → 転送
+    例: AWS ALB + ECS, Kubernetes Service
+
+================================================================
+  SECTION 8: TLS/SSL Deep Dive
+================================================================
+=== TLS 1.3 Handshake ===
+
+
+  【1-RTT Handshake (初回接続)】
+  Client                              Server
+    |                                    |
+    |--- ClientHello ------------------->|  鍵共有パラメータ含む
+    |    (Supported Ciphers,             |  (TLS 1.2は2-RTT必要だった)
+    |     Key Share,                     |
+    |     Supported Groups)              |
+    |                                    |
+    |<-- ServerHello + EncryptedExt -----|  以降は暗号化
+    |    Certificate                     |
+    |    CertificateVerify               |
+    |    Finished                        |
+    |                                    |
+    |--- Finished --------------------->|
+    |                                    |
+    |<========= 暗号化通信 ==========>|
+    |            (1 RTT)                 |
+
+  【0-RTT (再接続 / Early Data)】
+  - 前回のセッション鍵 (PSK) を使って即データ送信
+  - リスク: リプレイ攻撃の可能性 (冪等なリクエストのみ推奨)
+
+  【TLS 1.3 の改善点】
+  - 暗号スイート簡素化 (安全でないもの除去: RC4, SHA-1, CBC等)
+  - 前方秘匿性 (Forward Secrecy) 必須: ECDHE のみ
+  - ハンドシェイク暗号化 (Certificate を暗号化して送信)
+  - 0-RTT 再接続サポート
+
+=== Certificate Chain 検証 ===
+
+  ── [サーバー証明書]
+     CN: example.com
+     発行者: 中間CA発行
+    └─ [中間CA証明書]
+       CN: DigiCert SHA2 Secure CA
+       発行者: ルートCA発行
+      └─ [ルートCA証明書]
+         CN: DigiCert Global Root G2
+         発行者: 自己署名 (信頼ストア)
+
+  検証プロセス:
+  1. サーバー証明書の署名を中間CAの公開鍵で検証
+  2. 中間CA証明書の署名をルートCAの公開鍵で検証
+  3. ルートCA証明書がOSの信頼ストアに存在するか確認
+  4. 有効期限・失効状態 (OCSP/CRL) チェック
+  5. ドメイン名一致確認 (CN or SAN)
+
+=== mTLS (相互TLS認証) ===
+
+  通常のTLS: サーバーのみ証明書を提示
+  mTLS:      サーバー + クライアントの双方が証明書を提示
+
+  Client                              Server
+    |--- ClientHello ------------------>|
+    |<-- ServerHello + Certificate -----|
+    |<-- CertificateRequest ------------|  ← サーバーがクライアント証明書を要求
+    |--- Certificate (client) --------->|  ← クライアントも証明書を提示
+    |--- CertificateVerify ------------>|
+    |--- Finished --------------------->|
+    |<-- Finished ----------------------|
+
+  【用途】
+  - マイクロサービス間認証 (Service Mesh: Istio, Linkerd)
+  - ゼロトラストアーキテクチャ
+  - IoTデバイス認証
+  - API認証 (クライアント証明書ベース)
+
+  【Certificate Pinning】
+  - 特定の証明書/公開鍵のみを信頼する
+  - CA侵害時の中間者攻撃を防止
+  - リスク: 証明書ローテーション時の更新が必要
+  - 方式: 公開鍵ピン留め (HPKP, アプリ内埋め込み)
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║          ネットワーク & プロトコル 学習優先度                   ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  【Tier 1: 必須 (全エンジニア)】                               ║
+║  ・TCP/UDP の基礎 (3-Way HS, 信頼性, フロー制御)              ║
+║  ・HTTP/1.1 → HTTP/2 の違い (Keep-Alive, 多重化)             ║
+║  ・DNS の仕組み (名前解決, レコードタイプ)                     ║
+║  ・TLS/SSL の基礎 (HTTPS, 証明書チェーン)                     ║
+║  ・ロードバランシング基礎 (L4/L7, Round Robin)                ║
+║                                                                ║
+║  【Tier 2: 重要 (バックエンド/インフラ)】                      ║
+║  ・TCP 輻輳制御 (Slow Start, Congestion Avoidance)            ║
+║  ・CDN (キャッシュ戦略, Origin Shield)                        ║
+║  ・WebSocket (リアルタイム通信)                                ║
+║  ・ロードバランシング応用 (Consistent Hashing, Health Check)  ║
+║  ・TLS 1.3 ハンドシェイク詳細                                  ║
+║                                                                ║
+║  【Tier 3: 実践的 (アーキテクト/SRE)】                        ║
+║  ・HTTP/3 (QUIC) の利点と採用判断                              ║
+║  ・gRPC & Protocol Buffers                                     ║
+║  ・mTLS (ゼロトラスト, Service Mesh)                           ║
+║  ・DNS セキュリティ (DNSSEC, DoH/DoT)                         ║
+║  ・Connection Draining, Service Discovery                      ║
+║                                                                ║
+║  【Tier 4: 専門知識 (ネットワークスペシャリスト)】             ║
+║  ・TCP 内部実装 (Nagle, Delayed ACK, Sliding Window詳細)      ║
+║  ・Protobuf エンコーディング (Varint, Wire Type)              ║
+║  ・Certificate Pinning                                         ║
+║  ・Edge Computing 詳細                                         ║
+║  ・QUIC プロトコル内部構造                                     ║
+║                                                                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+完了: 全セクション実行済み

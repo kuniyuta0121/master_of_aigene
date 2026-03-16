@@ -1,0 +1,431 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  Distributed Systems Deep Dive                                 ║
+║  合意・一貫性・トランザクション・レプリケーション                 ║
+║  DDIA (Designing Data-Intensive Applications) を実装で理解      ║
+╚══════════════════════════════════════════════════════════════════╝
+======================================================================
+Chapter 1: Consensus Protocols
+  分散合意 — 複数ノードが1つの値に合意する方法
+======================================================================
+
+────────────────────────────────────────────────────────────
+1.1 Raft 合意アルゴリズム (完全実装)
+────────────────────────────────────────────────────────────
+
+  5ノードクラスタで Raft 合意シミュレーション:
+
+  N1: Term 1 — 選挙開始
+    N2 → 投票 YES
+    N3 → 投票 YES
+    N4 → 投票 YES
+    N5 → 投票 YES
+  N1: ★ LEADER 当選 (得票: 5/5)
+
+  N1: Append 'SET x=1' (index=0)
+    → N2: replicated
+    → N3: replicated
+    → N4: replicated
+    → N5: replicated
+  N1: COMMITTED 'SET x=1' (acks=5/5)
+  N1: Append 'SET y=2' (index=1)
+    → N2: replicated
+    → N3: replicated
+    → N4: replicated
+    → N5: replicated
+  N1: COMMITTED 'SET y=2' (acks=5/5)
+
+
+  ⚡ N1 CRASHED (was Leader)
+  N3: Term 2 — 選挙開始
+    N1 → 投票 YES
+    N2 → 投票 YES
+    N4 → 投票 YES
+    N5 → 投票 YES
+  N3: ★ LEADER 当選 (得票: 5/5)
+
+  N3: Append 'SET z=3' (index=2)
+    → N1: replicated
+    → N2: replicated
+    → N4: replicated
+    → N5: replicated
+  N3: COMMITTED 'SET z=3' (acks=5/5)
+
+    Raft の安全性保証:
+    1. Election Safety: 各 term で最大1人の Leader
+    2. Leader Append-Only: Leader は自分のログを上書きしない
+    3. Log Matching: 同じ index+term → 同じ entry
+    4. Leader Completeness: committed entry は将来の Leader にもある
+    5. State Machine Safety: 同じ index → 同じ command を適用
+
+    Raft vs Paxos vs ZAB:
+    ┌──────────────┬──────────┬──────────┬──────────┐
+    │               │ Raft      │ Paxos     │ ZAB       │
+    ├──────────────┼──────────┼──────────┼──────────┤
+    │ 理解しやすさ  │ ◎        │ △         │ ○         │
+    │ Leader必須   │ Yes       │ No*       │ Yes       │
+    │ ログ順序保証  │ Yes       │ No*       │ Yes       │
+    │ 使用例       │ etcd,Consul│ Chubby    │ ZooKeeper │
+    └──────────────┴──────────┴──────────┴──────────┘
+    * Multi-Paxos で Leader あり
+    
+
+======================================================================
+Chapter 2: Consistency Models & CRDTs
+  CAP の先にある一貫性の世界
+======================================================================
+
+────────────────────────────────────────────────────────────
+2.1 Vector Clock (因果関係の追跡)
+────────────────────────────────────────────────────────────
+
+  Event sequence:
+    A local event → A={'A': 1, 'B': 0, 'C': 0}
+    A sends to B  → A={'A': 2, 'B': 0, 'C': 0}
+    B receives    → B={'A': 2, 'B': 1, 'C': 0}
+    B local event → B={'A': 2, 'B': 2, 'C': 0}
+    C local event → C={'A': 0, 'B': 0, 'C': 1}
+
+    B happens-before C? False
+    B concurrent with C? True
+    → B と C は因果関係なし (concurrent)
+
+────────────────────────────────────────────────────────────
+2.2 CRDT (Conflict-Free Replicated Data Types)
+────────────────────────────────────────────────────────────
+
+    CRDT: ネットワーク分断中でも各レプリカで独立に更新し、
+    後からマージしても必ず収束する (Eventual Consistency を保証)
+    
+
+  PN-Counter (3 replicas, partitioned):
+    R1: +5      → value=5
+    R2: +3, -1  → value=2
+    R3: +2      → value=2
+
+    After merge:  → value=9 (5+3-1+2=9)
+
+  OR-Set:
+    S1: add(apple, banana)
+    S2: add(cherry), remove(apple) [not seen]
+    Merged: {'apple', 'banana', 'cherry'}
+    → apple は S2 の remove 時に S2 が知らなかったので残る
+
+    CRDT 一覧:
+    ┌────────────────┬────────────────────────────────┐
+    │ Type            │ 用途                            │
+    ├────────────────┼────────────────────────────────┤
+    │ G-Counter       │ いいね数, PV (増加のみ)          │
+    │ PN-Counter      │ 在庫, カート個数 (増減)          │
+    │ G-Set           │ タグ追加 (削除不可)              │
+    │ OR-Set          │ ショッピングカート (追加/削除)    │
+    │ LWW-Register    │ ユーザー名 (最後の書き込み勝ち)  │
+    │ MV-Register     │ 競合を保持して後から解決          │
+    │ RGA             │ 共同編集テキスト                  │
+    └────────────────┴────────────────────────────────┘
+
+    使用例: Redis CRDT, Riak, Automerge, Yjs (共同編集)
+    
+
+======================================================================
+Chapter 3: Distributed Transactions
+  2PC・Saga・Outbox — 複数サービスの整合性
+======================================================================
+
+────────────────────────────────────────────────────────────
+3.1 Two-Phase Commit (2PC)
+────────────────────────────────────────────────────────────
+
+  Case 1: All succeed
+    === Phase 1: Prepare ===
+      OrderService: VOTE YES
+      PaymentService: VOTE YES
+      InventoryService: VOTE YES
+    === Phase 2: Commit ===
+      OrderService: COMMITTED
+      PaymentService: COMMITTED
+      InventoryService: COMMITTED
+    Result: COMMITTED
+
+  Case 2: Payment fails
+    === Phase 1: Prepare ===
+      OrderService: VOTE YES
+      PaymentService: VOTE NO (failure)
+      InventoryService: VOTE YES
+    === Phase 2: Abort ===
+      OrderService: ROLLBACK
+      PaymentService: already failed
+      InventoryService: ROLLBACK
+    Result: ABORTED
+
+    2PC の問題:
+    1. Blocking: Coordinator 障害で全 Participant がブロック
+    2. Single Point of Failure: Coordinator が SPOF
+    3. Performance: 2 回の同期通信 → レイテンシ増
+
+    → マイクロサービスでは 2PC は避け、Saga を使う
+    
+────────────────────────────────────────────────────────────
+3.2 Saga Pattern (補償トランザクション)
+────────────────────────────────────────────────────────────
+
+  EC注文 Saga (Payment で失敗):
+    === Saga Execution ===
+      ✓ Order: 注文を作成
+      ✓ Inventory: 在庫を予約
+      ✗ Payment: 決済を実行 → FAILED
+    === Compensation (逆順) ===
+      ↩ Inventory: 在庫を戻す
+      ↩ Order: 注文をキャンセル
+
+    Orchestration vs Choreography:
+
+    Orchestration (中央指揮者):
+    ┌────────────┐
+    │ Orchestrator│───→ Order ──→ Inventory ──→ Payment
+    │             │←── result ←── result    ←── result
+    └────────────┘
+    ✓ フロー可視化が容易
+    ✗ 中央指揮者が SPOF
+
+    Choreography (イベント連鎖):
+    Order ──event──→ Inventory ──event──→ Payment
+      ↑                                    │
+      └──────── compensation event ────────┘
+    ✓ 疎結合
+    ✗ フロー追跡が困難
+
+    ★ 面接での答え方:
+    「3-4 ステップまでなら Choreography、
+     5+ ステップや補償ロジックが複雑なら Orchestration。
+     大規模では Temporal/Cadence のような Workflow Engine を使う。」
+    
+────────────────────────────────────────────────────────────
+3.3 Transactional Outbox Pattern
+────────────────────────────────────────────────────────────
+
+    問題: DB更新とメッセージ送信のアトミック性
+
+    ✗ 危険なパターン:
+    1. UPDATE orders SET status='paid'
+    2. kafka.send("order.paid")       ← ここで crash → メッセージ欠損
+    3. COMMIT
+
+    ✓ Outbox Pattern:
+    BEGIN TRANSACTION
+      1. UPDATE orders SET status='paid'
+      2. INSERT INTO outbox (event_type, payload) VALUES ('order.paid', ...)
+    COMMIT
+
+    別プロセスが outbox テーブルをポーリング or CDC:
+    3. SELECT * FROM outbox WHERE sent=false
+    4. kafka.send(event)
+    5. UPDATE outbox SET sent=true WHERE id=...
+
+    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+    │ Service      │    │ Outbox      │    │ Message     │
+    │              │───→│ Table       │───→│ Broker      │
+    │ (TRANSACTION)│    │ (same DB)   │    │ (Kafka)     │
+    └─────────────┘    └─────────────┘    └─────────────┘
+         atomic              CDC/Poll
+
+    CDC (Change Data Capture):
+    - Debezium: MySQL/PostgreSQL の binlog/WAL を読む
+    - → outbox テーブルの変更を自動的に Kafka に送信
+    - → ポーリング不要、リアルタイム
+
+    ★ Exactly-Once を実現する:
+    - Producer: Outbox + べき等キー
+    - Consumer: べき等処理 (同じイベントを2回処理してもOK)
+    
+
+======================================================================
+Chapter 4: Replication & Partitioning
+  データをどう分散し、どう一貫性を保つか
+======================================================================
+
+────────────────────────────────────────────────────────────
+4.1 Quorum Reads/Writes (Dynamo-style)
+────────────────────────────────────────────────────────────
+
+    Quorum 条件: R + W > N → 強い一貫性を保証
+
+    ┌──────────┬─────────┬─────────┬──────────────────┐
+    │ Config    │ 一貫性   │ 可用性   │ ユースケース       │
+    ├──────────┼─────────┼─────────┼──────────────────┤
+    │ N=3,W=3,R=1│ 強い     │ Write低 │ 読み取り重視      │
+    │ N=3,W=1,R=3│ 強い     │ Read低  │ 書き込み重視      │
+    │ N=3,W=2,R=2│ 強い     │ バランス│ 一般的 (推奨)     │
+    │ N=3,W=1,R=1│ 結果整合 │ 高い    │ 高可用性優先      │
+    └──────────┴─────────┴─────────┴──────────────────┘
+    
+    WRITE user:1=Alice (ts=1773560858891)
+      Replica 0: ACK
+      Replica 1: ACK
+      Replica 2: ACK
+      ACKs: 3/3, W=2 → SUCCESS
+    READ user:1
+      Replica 0: Alice (ts=1773560858891)
+      Replica 1: Alice (ts=1773560858891)
+      Replica 2: Alice (ts=1773560858891)
+      → Latest: Alice from Replica 0
+
+    Sloppy Quorum + Hinted Handoff:
+    - 本来のレプリカが down → 別ノードに一時保存 (hint)
+    - 本来のレプリカ復旧 → hint を転送 (handoff)
+    - → 可用性向上、ただし W+R > N でも一貫性保証が弱まる
+
+    Read Repair:
+    - Read 時に古いレプリカを発見 → 最新値で上書き
+    - → バックグラウンドで一貫性を回復
+
+    Anti-Entropy:
+    - Merkle Tree で全レプリカのデータを比較
+    - 差分だけを同期 → 帯域効率が良い
+    
+────────────────────────────────────────────────────────────
+4.2 Consistent Hashing (Virtual Nodes)
+────────────────────────────────────────────────────────────
+
+  3 nodes, 100 vnodes each, 1000 keys:
+    node-A: 319 ███████████████████████████████
+    node-B: 327 ████████████████████████████████
+    node-C: 354 ███████████████████████████████████
+
+  After adding node-D: 287/1000 keys moved (28.7%)
+  Ideal: 25.0% (1/N of keys)
+    node-A: 212 █████████████████████
+    node-B: 270 ███████████████████████████
+    node-C: 231 ███████████████████████
+    node-D: 287 ████████████████████████████
+
+======================================================================
+Chapter 5: Time, Ordering & Failure Detection
+  分散システムで最も難しい問題: 時間と障害
+======================================================================
+
+────────────────────────────────────────────────────────────
+5.1 Hybrid Logical Clock (HLC)
+────────────────────────────────────────────────────────────
+
+    なぜ物理時計だけではダメか:
+    - NTP の精度: 数ms〜数十ms (インターネット経由)
+    - クロックスキュー: ノード間で時刻が異なる
+    - Leap second: UTC の調整で時計が巻き戻る可能性
+
+    HLC = max(物理時計, 論理時計) で因果順序を保証
+
+    Google TrueTime (Spanner):
+    - GPS + 原子時計で ε < 7ms の不確実性
+    - TT.now() → [earliest, latest] の区間を返す
+    - Commit-wait: 不確実性区間が過ぎるまで待つ
+    → 外部一貫性 (External Consistency) を保証
+    → 実質的に Linearizability を地理分散で実現
+    
+────────────────────────────────────────────────────────────
+5.2 Snowflake ID (分散ID生成)
+────────────────────────────────────────────────────────────
+
+    Snowflake ID 構造 (64 bits):
+    ┌─────────────────┬──────┬──────┬────────────┐
+    │ Timestamp (41b)  │DC(5b)│WK(5b)│ Sequence(12b)│
+    └─────────────────┴──────┴──────┴────────────┘
+    - 41 bits: ミリ秒タイムスタンプ (69年分)
+    - 5 bits: データセンターID (32 DC)
+    - 5 bits: ワーカーID (32 workers/DC)
+    - 12 bits: シーケンス (4096/ms/worker)
+    → 1ワーカーあたり 毎秒 4,096,000 ID 生成可能
+    
+  Generated IDs:
+    2033087715519639552 → dc=1, worker=3, seq=0
+    2033087715519639553 → dc=1, worker=3, seq=1
+    2033087715519639554 → dc=1, worker=3, seq=2
+    2033087715519639555 → dc=1, worker=3, seq=3
+    2033087715519639556 → dc=1, worker=3, seq=4
+
+    他のID生成方式:
+    ┌──────────────┬────────┬──────────┬──────────────┐
+    │ Method        │ 順序性  │ 分散対応  │ 用途          │
+    ├──────────────┼────────┼──────────┼──────────────┤
+    │ UUID v4       │ ✗      │ ✓        │ 汎用          │
+    │ UUID v7       │ ✓      │ ✓        │ DB PK (推奨)  │
+    │ Snowflake     │ ✓      │ ✓        │ Twitter, Discord│
+    │ ULID          │ ✓      │ ✓        │ Snowflake の改良│
+    │ DB Auto-Inc   │ ✓      │ ✗        │ 単一DB         │
+    │ Leaf (Meituan)│ ✓      │ ✓        │ 中央割当サーバー│
+    └──────────────┴────────┴──────────┴──────────────┘
+
+    ★ UUID v4 が B-Tree インデックスに悪い理由:
+    - ランダムなので挿入が全ページに分散 → キャッシュ効率↓
+    - UUID v7 / ULID / Snowflake はタイムスタンプ先頭 → 順序挿入
+    
+────────────────────────────────────────────────────────────
+5.3 Phi Accrual Failure Detector
+────────────────────────────────────────────────────────────
+
+  Normal heartbeat interval: ~1.0s, Threshold: φ=8.0
+
+   Elapsed        φ     Status
+  ------------------------------
+      0.5s     0.23      ALIVE
+      1.0s     0.45      ALIVE
+      2.0s     0.88      ALIVE
+      3.0s     1.32      ALIVE
+      5.0s     2.18      ALIVE
+     10.0s     4.35      ALIVE
+     20.0s     8.69  SUSPECTED
+
+    従来の Fixed Timeout vs Phi Accrual:
+    - Fixed: 3秒で timeout → ネットワーク揺らぎで誤検出
+    - Phi: ハートビート間隔の統計分布に基づく
+    - φ = -log10(P(遅延がこれ以上続く確率))
+    - φ > threshold → suspect
+    - Cassandra default: φ threshold = 8
+
+    ★ SWIM Protocol (Scalable Weakly-consistent Infection-style Membership):
+    - Gossip + Failure Detection の統合
+    - 各ノードがランダムにペアを選んで probe
+    - 直接 probe 失敗 → 他ノード経由で間接 probe
+    - 間接も失敗 → suspect → 一定時間後 declare dead
+    - HashiCorp Serf / Consul で使用
+    
+
+======================================================================
+Summary: 分散システムの核心
+======================================================================
+
+    1. 合意 (Consensus): Raft/Paxos — Leader選出 + ログ複製
+    2. 一貫性 (Consistency): Linearizability > Sequential > Causal > Eventual
+    3. CRDT: 衝突なしで結果整合 — G-Counter, OR-Set
+    4. 分散トランザクション: 2PC (強い) vs Saga (柔軟) vs Outbox (信頼性)
+    5. レプリケーション: Quorum (R+W>N) + Read Repair + Anti-Entropy
+    6. パーティショニング: Consistent Hashing + Virtual Nodes
+    7. 時間: HLC / TrueTime, Snowflake ID
+    8. 障害検出: Phi Accrual (適応的) > Fixed Timeout
+
+    必読: "Designing Data-Intensive Applications" by Martin Kleppmann
+    
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・Consistent Hashing (Virtual Nodes, ノード追加/削除時の再配置)
+    ・Quorum (R+W>N) (強い一貫性の条件, N=3,W=2,R=2 が推奨)
+    ・Saga パターン (補償トランザクション, Orchestration vs Choreography)
+    ・2PC (Two-Phase Commit) (Prepare/Commit, ブロッキング問題)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・Raft 合意アルゴリズム (Leader選出, ログ複製, 過半数の意味)
+    ・Vector Clock (因果関係の追跡, concurrent の検出)
+    ・Outbox Pattern (DB更新+メッセージ送信のアトミック性, CDC/Debezium)
+    ・Snowflake ID (64-bit構造, UUID v4 のB-Tree問題, UUID v7/ULID)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・CRDT (G-Counter, OR-Set) (衝突なし結果整合, Yjs/Automerge)
+    ・HLC (Hybrid Logical Clock) (物理時計+論理時計, TrueTime)
+    ・Sloppy Quorum + Hinted Handoff (可用性と一貫性のトレードオフ)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・Phi Accrual Failure Detector (適応的障害検出, Cassandra)
+    ・Raft membership change (ノード追加/削除の安全な方法)
+    ・Merkle Tree (レプリカ間の差分検出, Anti-Entropy)
+

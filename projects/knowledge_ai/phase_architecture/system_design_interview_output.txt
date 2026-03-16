@@ -1,0 +1,735 @@
+
+========================================================================
+  FAANG System Design Interview 完全ウォークスルーガイド
+  ─ 45分で大規模システムを設計する技術 ─
+========================================================================
+
+========================================================================
+  PART 1: System Design 面接フレームワーク (Step 1-5)
+========================================================================
+
+
+  ── Step 1: 要件整理 (Requirements Clarification) — 最初の5分 ──
+
+    > 面接官に質問を投げることが最も重要。黙って設計を始めない。
+    > Functional Requirements: ユーザーが何をできるか
+    > Non-Functional Requirements: スケール・可用性・レイテンシ・一貫性
+    > 規模見積もり: DAU → QPS → Storage → Bandwidth
+
+    例 (URL Shortener の場合):
+    ┌─────────────────────────────────────────────────┐
+    │ Functional:                                     │
+    │   - 長いURLを短縮URLに変換                        │
+    │   - 短縮URLにアクセスすると元URLにリダイレクト      │
+    │   - カスタムエイリアス (optional)                  │
+    │   - Analytics (optional)                         │
+    │ Non-Functional:                                  │
+    │   - 高可用性 (99.99%)                             │
+    │   - 低レイテンシ (< 100ms リダイレクト)            │
+    │   - 短縮URLは一意で予測不能                       │
+    └─────────────────────────────────────────────────┘
+
+
+  ── Step 2: API 設計 — 次の3分 ──
+
+    > REST or GraphQL のエンドポイントを定義
+    > パラメータ・レスポンスを明示
+    > Rate Limiting のヘッダーにも言及するとボーナス
+
+    POST /api/v1/urls
+      Body: { "long_url": "...", "custom_alias": "...", "expiry": "..." }
+      Response: { "short_url": "https://tny.im/abc123" }
+
+    GET /{short_code}
+      Response: 301 Redirect (永続) or 302 (一時)
+
+
+  ── Step 3: High-Level Design — 10分 ──
+
+    > 主要コンポーネントをブロック図で描く
+    > データフロー（書き込み/読み取り）を矢印で示す
+    ┌────────┐    ┌─────────────┐    ┌──────────┐
+    │ Client │───>│ API Gateway │───>│ App      │
+    │        │<───│ + LB        │<───│ Server   │
+    └────────┘    └─────────────┘    └────┬─────┘
+                                          │
+                              ┌───────────┼───────────┐
+                              │           │           │
+                         ┌────▼───┐  ┌───▼────┐  ┌───▼───┐
+                         │ Cache  │  │  DB    │  │ Queue │
+                         │ (Redis)│  │(MySQL) │  │(Kafka)│
+                         └────────┘  └────────┘  └───────┘
+
+
+  ── Step 4: Deep Dive — 20分 ──
+
+    > ボトルネックを特定して解決策を提示
+    > スケーリング: 水平分割 (Sharding), レプリケーション, キャッシュ
+    > データモデル: テーブル設計, インデックス
+    > 障害対策: レプリカ切替, サーキットブレーカー, リトライ
+
+
+  ── Step 5: トレードオフ議論 — 最後の5分 ──
+
+    > 正解は1つではない。複数案を比較して選択理由を述べる
+    > CAP 定理のどこに立つか (CP vs AP)
+    > 一貫性 vs レイテンシ, コスト vs 可用性
+    > 「もし時間があれば○○も追加したい」で締めくくる
+
+    ┌──────────────────┬──────────────────┬─────────────────┐
+    │     観点         │    Option A      │    Option B     │
+    ├──────────────────┼──────────────────┼─────────────────┤
+    │ 一貫性           │ 強整合 (CP)      │ 結果整合 (AP)   │
+    │ レイテンシ       │ 高 (同期書込)    │ 低 (非同期)     │
+    │ 実装複雑度       │ 低               │ 中〜高          │
+    │ 採用ケース       │ 決済, 在庫       │ SNS, フィード   │
+    └──────────────────┴──────────────────┴─────────────────┘
+
+
+========================================================================
+  PART 2: 規模見積もり計算 (Back-of-Envelope)
+========================================================================
+
+
+  ── 計算公式テンプレート ──
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ QPS = DAU × avg_requests / 86400                        │
+    │ Peak QPS = QPS × 2 (or ×3 for spiky traffic)            │
+    │ Write QPS = QPS / (1 + R:W ratio)                       │
+    │ Storage (5yr) = daily_data × 365 × 5                    │
+    │ Bandwidth = QPS × data_size × 8 bits                    │
+    │ Cache = daily_data × 0.2 (80/20 rule)                   │
+    │ Servers = Peak QPS / capacity_per_server                 │
+    └──────────────────────────────────────────────────────────┘
+
+
+  ── 例1: URL Shortener (DAU 100M) ──
+
+    dau: 100,000,000
+    total_daily_requests: 100,000,000
+    avg_qps: 1,157.4
+    peak_qps: 2,314.8
+    write_qps: 11.5
+    read_qps: 1,145.9
+    daily_storage_gb: 46.57
+    total_storage_tb: 82.99
+    bandwidth_mbps: 4.63
+    cache_size_gb: 9.31
+    servers_needed: 1
+
+  ── 例2: Chat System (DAU 50M) ──
+
+    dau: 50,000,000
+    total_daily_requests: 2,000,000,000
+    avg_qps: 23,148.1
+    peak_qps: 46,296.3
+    write_qps: 11,574.1
+    read_qps: 11,574.1
+    daily_storage_gb: 372.53
+    total_storage_tb: 663.93
+    bandwidth_mbps: 37.04
+    cache_size_gb: 74.51
+    servers_needed: 5
+
+  ── 例3: Video Streaming (DAU 200M) ──
+
+    dau: 200,000,000
+    total_daily_requests: 1,000,000,000
+    avg_qps: 11,574.1
+    peak_qps: 23,148.1
+    write_qps: 57.6
+    read_qps: 11,516.5
+    daily_storage_gb: 46,566,128.73
+    total_storage_tb: 82,991,391.54
+    bandwidth_mbps: 4,629,629.63
+    cache_size_gb: 9,313,225.75
+    servers_needed: 47
+  [考えてほしい疑問] 見積もりが10倍ずれたらどうなる？許容できるか？
+
+
+========================================================================
+  PART 3: 10大設計問題 完全ウォークスルー
+========================================================================
+
+
+  ── 設計問題 1: URL Shortener ──
+
+    [Step 1: 要件]
+    Functional: URL短縮, リダイレクト, Analytics, カスタムエイリアス
+    Non-Functional: 99.99% 可用性, <100ms リダイレクト, 一意性保証
+    規模: DAU 100M, 書込 1K QPS, 読込 100K QPS
+
+    [Step 2: API]
+    POST /api/v1/shorten  → { short_url }
+    GET  /{code}          → 301 Redirect
+    GET  /api/v1/stats/{code} → { clicks, referrers, geo }
+
+    301 vs 302:
+      301 (Moved Permanently): ブラウザがキャッシュ → サーバー負荷減
+      302 (Found):             毎回サーバー経由 → Analytics に必須
+
+    [Step 3: High-Level Design]
+    Client ──> LB ──> Web Server ──> DB (Write Path)
+                          │
+                          ├──> Cache (Redis)  ──> DB (Read Path)
+                          │
+                          └──> Analytics Queue ──> Analytics DB
+    
+    短縮キー生成:
+      方式A: Base62 (MD5ハッシュの先頭7文字 → 62^7 = 3.5兆通り)
+      方式B: Auto-increment ID → Base62 変換
+      方式C: 事前生成 Key Generation Service (KGS)
+
+    [Base62 エンコード実装]
+    ID             1: → 1 (長さ 1)
+    ID         1,000: → g8 (長さ 2)
+    ID     1,000,000: → 4c92 (長さ 4)
+    ID 3,500,000,000: → 3ORDSU (長さ 6)
+
+    [Step 4: Deep Dive]
+    > 衝突回避: DB に UNIQUE 制約 + リトライ or KGS で事前確保
+    > キャッシュ: 頻繁アクセスURL を Redis に LRU キャッシュ
+    > DB: NoSQL (DynamoDB) — Key-Value アクセスパターン
+    > Sharding: hash(short_code) % N でパーティション
+
+    [Step 5: トレードオフ]
+    ┌─────────────────┬──────────────────┬──────────────────┐
+    │ 方式            │ メリット         │ デメリット       │
+    ├─────────────────┼──────────────────┼──────────────────┤
+    │ Hash + 衝突検知 │ 実装シンプル     │ 衝突時リトライ   │
+    │ Auto-inc + B62  │ 衝突なし         │ 推測可能(連番)   │
+    │ KGS (事前生成)  │ 高速・衝突なし   │ 運用コスト増     │
+    └─────────────────┴──────────────────┴──────────────────┘
+
+
+  ── 設計問題 2: Rate Limiter ──
+
+    [Step 1: 要件]
+    Functional: API ごとにリクエスト数を制限, 超過時 429 返却
+    Non-Functional: 低レイテンシ (<1ms), 分散環境対応, 高精度
+
+    [Step 2: API]
+    ミドルウェアとして実装 (API Gateway or Sidecar)
+    Response Headers:
+      X-RateLimit-Limit: 100
+      X-RateLimit-Remaining: 42
+      X-RateLimit-Retry-After: 30
+
+    [Step 3: High-Level Design]
+    Client ──> API Gateway ──> Rate Limiter ──> Backend
+                                   │
+                              ┌────▼────┐
+                              │  Redis  │ (カウンター/トークン管理)
+                              └─────────┘
+                                   │
+                              ┌────▼────────┐
+                              │ Rules Config │ (YAML/DB)
+                              └─────────────┘
+
+    [Token Bucket アルゴリズム 実装]
+    Token Bucket (cap=5, rate=1/s), 8連続リクエスト: [True, True, True, True, True, False, False, False]
+
+    [Sliding Window Counter 実装]
+    > Token Bucket: バースト許容, 実装シンプル, メモリ効率良い
+    > Sliding Window: 精度が高い, メモリ少し多め
+    > 分散環境: Redis INCR + EXPIRE or Lua スクリプトで原子操作
+
+    [Step 5: トレードオフ]
+    ┌──────────────────────┬──────────────────┬────────────────┐
+    │ アルゴリズム         │ メリット         │ デメリット     │
+    ├──────────────────────┼──────────────────┼────────────────┤
+    │ Token Bucket         │ バースト可, 省メモリ│ 精度がやや低い│
+    │ Sliding Window Log   │ 高精度           │ メモリ大       │
+    │ Sliding Window Count │ バランス良好     │ 近似値         │
+    │ Fixed Window         │ 最もシンプル     │ 境界でバースト │
+    └──────────────────────┴──────────────────┴────────────────┘
+
+
+  ── 設計問題 3: Chat System ──
+
+    [Step 1: 要件]
+    Functional: 1対1チャット, グループチャット, オンライン状態, 既読
+    Non-Functional: リアルタイム (<200ms), メッセージ順序保証, 永続化
+    規模: DAU 50M, 1人40msg/day → 2B msg/day, 23K write QPS
+
+    [Step 2: API]
+    WebSocket: wss://chat.example.com/ws (双方向リアルタイム)
+    REST (fallback): POST /api/v1/messages, GET /api/v1/messages?channel_id=
+
+    [Step 3: High-Level Design]
+    ┌────────┐  WebSocket  ┌──────────────┐     ┌────────────┐
+    │User A  │────────────>│ Chat Server  │────>│ Message DB │
+    └────────┘             │ (Stateful)   │     │ (Cassandra)│
+                           └──────┬───────┘     └────────────┘
+                                  │
+                           ┌──────▼───────┐     ┌────────────┐
+                           │ Message Queue│────>│ Chat Server│
+                           │  (Kafka)     │     │ (User B)   │
+                           └──────────────┘     └──────┬─────┘
+                                                       │ WebSocket
+                                                ┌──────▼─────┐
+                                                │   User B   │
+                                                └────────────┘
+    
+    オンライン状態: Heartbeat (30秒間隔) → Redis に last_seen 記録
+    グループチャット: Fan-out via Message Queue
+
+    [Step 4: Deep Dive]
+    > メッセージ順序: サーバー側タイムスタンプ + Sequence ID (per channel)
+    > DB選定: Cassandra / HBase — Write heavy, 時系列データに最適
+    > パーティションキー: channel_id, クラスタリングキー: message_id (時系列)
+    > Fan-out on Write (小グループ): 送信時に全員の inbox に書き込み
+    > Fan-out on Read (大グループ 500+): 受信時にグループから pull
+    > 既読管理: {user_id, channel_id, last_read_msg_id} → Redis
+
+    [Step 5: トレードオフ]
+    > WebSocket vs Long Polling: WS は双方向・低レイテンシだがステートフル
+    > Push vs Pull: Push は小グループ向き, Pull は大グループ向き
+    > メッセージ保存期間: 無制限 vs TTL (コスト vs ユーザー体験)
+
+
+  ── 設計問題 4: News Feed ──
+
+    [Step 1: 要件]
+    Functional: 投稿作成, フィード取得 (フォロー中ユーザーの投稿)
+    Non-Functional: フィード生成 <500ms, ランキング/パーソナライズ
+    規模: DAU 300M, フォロー中の平均200人
+
+    [Step 2: API]
+    POST /api/v1/feed/posts     → 投稿作成
+    GET  /api/v1/feed?cursor=   → フィード取得 (カーソルページネーション)
+
+    [Step 3: High-Level Design]
+    投稿フロー (Write Path):
+      User ──> Post Service ──> Post DB
+                    │
+                    ├──> Fan-out Service ──> News Feed Cache (per user)
+                    └──> Notification Service
+    
+    フィード取得 (Read Path):
+      User ──> Feed Service ──> News Feed Cache ──> 表示
+                    │
+                    └──> (Cache Miss) ──> Fan-out on Read (celebrity)
+
+    [Step 4: Deep Dive — Celebrity Problem]
+    > 一般ユーザー (フォロワー < 10K): Fan-out on Write (プリコンピュート)
+    > Celebrity (フォロワー > 10K): Fan-out on Read (リクエスト時にマージ)
+    > ハイブリッド: 一般は Push, Celebrity は Pull → フィード取得時にマージ
+
+    [ランキングスコア計算の例]
+    Post 1 (likes=10, age=1h): score = 41.8
+    Post 2 (likes=100, age=24h): score = 50.0
+    Post 3 (likes=5, age=0.5h): score = 13.3
+
+
+  ── 設計問題 5: Notification System ──
+
+    [Step 1: 要件]
+    Functional: Push通知 (iOS/Android), SMS, Email, In-app
+    Non-Functional: ソフトリアルタイム (<30s), 重複排除, 配信保証
+    規模: 10B notifications/day
+
+    [Step 2: API]
+    POST /api/v1/notifications
+    Body: { user_id, type, channel, template_id, params, priority }
+
+    [Step 3: High-Level Design]
+    ┌──────────┐    ┌──────────┐    ┌────────────────┐
+    │ Service  │───>│ Notif.   │───>│ Priority Queue │
+    │ (Caller) │    │ Service  │    │ (Kafka/SQS)    │
+    └──────────┘    └──────────┘    └───┬───┬───┬────┘
+                                        │   │   │
+                                  ┌─────▼┐ ┌▼──┐ ┌▼────┐
+                                  │ iOS  │ │SMS│ │Email│
+                                  │Worker│ │   │ │     │
+                                  └──────┘ └───┘ └─────┘
+                                        │   │   │
+                                  ┌─────▼───▼───▼────┐
+                                  │ Delivery Log DB  │
+                                  │ (Dedup + Status) │
+                                  └──────────────────┘
+
+    [Step 4: Deep Dive]
+    > Priority Queue: P0 (セキュリティ) > P1 (取引) > P2 (SNS) > P3 (マーケ)
+    > Rate Limiting: ユーザーあたり通知上限 (1時間に5件 etc)
+    > Template: 「{user}さんがいいねしました」→ テンプレートDB管理
+    > 重複排除: notification_id で idempotency check (Redis SET NX)
+    > リトライ: Exponential Backoff + Dead Letter Queue
+
+    [Step 5: トレードオフ]
+    > Push vs Pull: Push はリアルタイム性高いが、サーバー負荷大
+    > 配信保証: At-least-once (重複許容) vs Exactly-once (実装複雑)
+
+
+  ── 設計問題 6: Web Crawler ──
+
+    [Step 1: 要件]
+    Functional: Webページを再帰的にクロール, コンテンツ保存
+    Non-Functional: Politeness (同一ドメインに過負荷をかけない)
+    規模: 月10億ページ → ~400 pages/sec
+
+    [Step 2: API]
+    内部システム (API は管理用)
+    POST /api/v1/crawl  { seed_urls, depth, domain_filter }
+    GET  /api/v1/status { pages_crawled, errors, queue_size }
+
+    [Step 3: High-Level Design]
+    Seed URLs ──> URL Frontier ──> DNS Resolver ──> Fetcher
+                      ▲                                │
+                      │                          ┌─────▼──────┐
+                URL Filter                       │ Content    │
+               (Dedup +                          │ Parser     │
+                robots.txt)                      └─────┬──────┘
+                      ▲                                │
+                      │     ┌──────────────────────────┤
+                      │     │                          │
+                ┌─────┴──┐  │                    ┌────▼─────┐
+                │URL Seen│  │                    │ Content  │
+                │ (Set)  │  │                    │ Store    │
+                └────────┘  │                    └──────────┘
+                      ┌─────▼──────┐
+                      │ Link       │
+                      │ Extractor  │
+                      └────────────┘
+
+    [Step 4: Deep Dive]
+    > URL Frontier: 優先度キュー (PageRank) + Politeness キュー (ドメイン別)
+    > Dedup: URL → MD5 ハッシュ → Bloom Filter (メモリ効率)
+    > robots.txt: クロール前に必ず確認・キャッシュ
+    > Trap 回避: URL 深さ制限, 同一ドメイン連続アクセス間隔 1秒以上
+
+    [Bloom Filter 簡易実装 (URL重複検知)]
+    page1 in filter: True
+    page3 in filter: False
+    > False positive あり, False negative なし → 重複検知に最適
+
+
+  ── 設計問題 7: Search Autocomplete ──
+
+    [Step 1: 要件]
+    Functional: 入力文字列に対してTop-K候補をリアルタイム返却
+    Non-Functional: <100ms レイテンシ, 1日のクエリ = 5B
+
+    [Step 2: API]
+    GET /api/v1/suggestions?prefix=hel&limit=10
+    Response: ["hello world", "help center", "helmet"]
+
+    [Step 3: High-Level Design]
+                        ┌─────────────────────┐
+      User typing ────> │ Autocomplete Service│
+                        │   (Read Path)       │
+                        └────────┬────────────┘
+                                 │
+                        ┌────────▼────────────┐
+                        │  Trie Cache (Redis)  │
+                        └─────────────────────┘
+    
+      Search logs ────> Data Collection ────> Aggregation ────> Trie Build
+      (Write Path)      (Kafka)               (Spark/Flink)    (Offline)
+
+    [Trie + Top-K 実装]
+    prefix='hel': [(1000, 'hello world'), (800, 'help center'), (500, 'helmet')]
+    prefix='he': [(1000, 'hello world'), (800, 'help center'), (500, 'helmet')]
+    prefix='her': [(300, 'hero')]
+
+    [Step 4: Deep Dive]
+    > Trie 更新: オフラインでバッチ再構築 → Trie サーバーにスワップデプロイ
+    > メモリ削減: 短いプレフィックスのみ保持 (6文字以下)
+    > 多言語: Unicode 対応, 中国語は Pinyin 変換も
+    > パーソナライズ: ユーザー履歴をマージ (ローカル + グローバル)
+
+
+  ── 設計問題 8: YouTube / Video Streaming ──
+
+    [Step 1: 要件]
+    Functional: 動画アップロード, ストリーミング再生, 検索
+    Non-Functional: 高可用性, 高速再生開始 (<2s), 世界規模CDN
+    規模: DAU 200M, 5本/日視聴, アップロード 500K本/日
+
+    [Step 2: API]
+    POST /api/v1/videos/upload (multipart, resumable)
+    GET  /api/v1/videos/{id}/stream?quality=720p
+    GET  /api/v1/search?q=keyword&page=1
+
+    [Step 3: High-Level Design]
+    アップロードフロー:
+      User ──> Upload Service ──> Object Store (S3)
+                    │
+                    ▼
+      Transcode Queue ──> Transcode Workers (DAG)
+           │                    │
+           │              ┌─────▼──────┐
+           │              │ 360p, 480p │
+           │              │ 720p,1080p │
+           │              │ (parallel) │
+           │              └─────┬──────┘
+           │                    ▼
+           │              CDN に配信
+    
+    視聴フロー:
+      User ──> CDN Edge ──> (miss) ──> Origin (S3)
+                 │
+                 ▼
+      Adaptive Bitrate Streaming (HLS/DASH)
+
+    [Step 4: Deep Dive]
+    > Resumable Upload: チャンク分割 + チェックポイント (Google の Resumable API)
+    > トランスコード DAG: Video → Split → Encode (並列) → Merge → Thumbnail
+    > Adaptive Bitrate: ネットワーク品質に応じて自動切替 (HLS manifest)
+    > CDN: 地理的に近いエッジからデリバリー, 人気動画はプリウォーム
+    > メタデータDB: MySQL (ACID) + ElasticSearch (検索)
+
+    [トランスコード DAG タスク定義]
+    Task t1: video_raw.mp4 → 360p [pending]
+    Task t2: video_raw.mp4 → 720p [pending]
+    Task t3: video_raw.mp4 → 1080p [pending]
+
+
+  ── 設計問題 9: Google Maps ──
+
+    [Step 1: 要件]
+    Functional: 地図表示, 経路探索 (最短/最速), ETA, ナビゲーション
+    Non-Functional: リアルタイム交通情報反映, 世界規模, <1s 経路計算
+
+    [Step 2: API]
+    GET /api/v1/tiles?lat=35.6&lng=139.7&zoom=15
+    GET /api/v1/directions?origin=A&dest=B&mode=driving
+    GET /api/v1/eta?origin=A&dest=B
+
+    [Step 3: High-Level Design]
+    ┌────────┐   ┌──────────┐   ┌──────────────┐
+    │ Client │──>│ API GW   │──>│ Route Planner│
+    └────────┘   └──────────┘   └──────┬───────┘
+         │                             │
+         │    ┌────────────┐    ┌──────▼───────┐
+         └───>│ Tile Server│    │ Graph Engine │
+              │ (CDN+S3)  │    │(Dijkstra/A*) │
+              └────────────┘    └──────┬───────┘
+                                       │
+                         ┌─────────────┼────────────┐
+                         │             │            │
+                   ┌─────▼───┐  ┌─────▼────┐ ┌────▼─────┐
+                   │Road     │  │Traffic   │ │ETA ML    │
+                   │Graph DB │  │(Realtime)│ │Model     │
+                   └─────────┘  └──────────┘ └──────────┘
+
+    [Dijkstra 最短経路 簡易実装]
+    渋谷 → 東京 最短距離: 9.0km
+    経路: 渋谷 → 六本木 → 東京
+
+    [Step 4: Deep Dive]
+    > グラフ分割: 大規模グラフは領域分割 (Graph Partitioning)
+    > 階層型経路探索: 高速道路ネットワーク → 一般道 (Contraction Hierarchies)
+    > タイルレンダリング: Zoom レベル別にプリレンダー → CDN キャッシュ
+    > Geospatial Index: Geohash / S2 Geometry / QuadTree
+    > ETA: 過去データ + リアルタイム交通 → ML モデル予測
+
+
+  ── 設計問題 10: Distributed Cache ──
+
+    [Step 1: 要件]
+    Functional: Key-Value Put/Get, TTL, Eviction
+    Non-Functional: <1ms レイテンシ, 高スループット, 水平スケール
+    規模: 100TB データ, 1M QPS
+
+    [Step 2: API]
+    PUT(key, value, ttl)  → void
+    GET(key)              → value | null
+    DELETE(key)           → void
+
+    [Step 3: High-Level Design]
+    Client ──> Cache Proxy (Consistent Hashing) ──> Cache Node 1
+                                                 ──> Cache Node 2
+                                                 ──> Cache Node N
+    
+    各ノード: Hash Map + Doubly Linked List (LRU)
+
+    [Consistent Hashing 実装]
+    キー分布 (10,000 keys, 3 nodes):
+    cache-1: 3,166 keys ###############################################################
+    cache-2: 3,751 keys ###########################################################################
+    cache-3: 3,083 keys #############################################################
+    ノード追加後 (cache-4 追加):
+    cache-1: 2,179 keys ###########################################
+    cache-2: 2,947 keys ##########################################################
+    cache-3: 2,266 keys #############################################
+    cache-4: 2,608 keys ####################################################
+
+    [LRU Cache 実装]
+    PUT(a, 1): cache=['a']
+    PUT(b, 2): cache=['a', 'b']
+    PUT(c, 3): cache=['a', 'b', 'c']
+    GET(a): 1, cache=['b', 'c', 'a']
+    PUT(d, 4): cache=['c', 'a', 'd']
+    GET(b): None, cache=['c', 'a', 'd']
+    GET(c): 3, cache=['a', 'd', 'c']
+    Hit rate: 66.7%
+
+    [Step 4: Deep Dive]
+    > Caching Strategy:
+      Cache-Aside: App が Cache と DB を別々に管理 (最も一般的)
+      Write-Through: Write → Cache → DB (一貫性高いが書込遅い)
+      Write-Behind: Write → Cache → 非同期で DB (高速だがデータロスリスク)
+      Read-Through: Cache が DB を自動 fetch (App はCache のみ参照)
+
+    > Eviction Policy: LRU (最も一般的), LFU (頻度ベース), TTL
+    > Hot Key 対策: レプリカ分散 or ローカルキャッシュ併用
+    > Cache Stampede: Mutex Lock or Probabilistic Early Expiration
+
+
+========================================================================
+  PART 4: 分散システム Building Blocks まとめ
+========================================================================
+
+
+  ── 4-1: Load Balancer ──
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │ L4 (Transport層)          │ L7 (Application層)              │
+    ├──────────────────────────────────────────────────────────────┤
+    │ TCP/UDP レベルで振り分け   │ HTTP ヘッダ/パスで振り分け      │
+    │ 高速・低オーバーヘッド     │ コンテンツベースルーティング     │
+    │ 例: NLB, HAProxy (TCP)    │ 例: ALB, Nginx, Envoy          │
+    └──────────────────────────────────────────────────────────────┘
+
+    > アルゴリズム: Round Robin, Weighted RR, Least Connections, IP Hash
+    > ヘルスチェック: Active (定期 ping) vs Passive (失敗カウント)
+
+
+  ── 4-2: CDN (Content Delivery Network) ──
+
+    Push CDN: コンテンツ更新時にオリジンから CDN へ push
+      → 更新頻度が低い静的コンテンツ向き
+    Pull CDN: 初回リクエスト時に CDN がオリジンから fetch
+      → アクセスパターンが予測しにくい場合に有利
+
+    > Cache Invalidation: TTL, Purge API, バージョン付き URL (?v=2)
+
+
+  ── 4-3: Message Queue ──
+
+    ┌──────────────────────┬────────────────────────────────────┐
+    │ セマンティクス       │ 説明                             │
+    ├──────────────────────┼────────────────────────────────────┤
+    │ At-most-once         │ 失ったら諦める (Fire & Forget)   │
+    │ At-least-once        │ 再送あり, 消費側で冪等性必要     │
+    │ Exactly-once         │ トランザクション + 冪等キー      │
+    └──────────────────────┴────────────────────────────────────┘
+
+    > Kafka: 高スループット, ログベース, パーティション並列
+    > RabbitMQ: 柔軟なルーティング, 低レイテンシ
+    > SQS: マネージド, 運用コスト低, FIFO モードあり
+
+
+  ── 4-4: DB 選定フローチャート ──
+
+    データに ACID が必要？
+      ├── Yes ──> リレーショナル (MySQL, PostgreSQL)
+      │            └── 超大規模？ ──> NewSQL (CockroachDB, TiDB)
+      └── No
+           ├── Key-Value アクセス？ ──> Redis, DynamoDB
+           ├── ドキュメント型？ ──> MongoDB
+           ├── Wide-Column (時系列)？ ──> Cassandra, HBase
+           ├── グラフ構造？ ──> Neo4j, Neptune
+           └── 全文検索？ ──> Elasticsearch
+
+
+  ── 4-5: Caching Strategy ──
+
+    Cache-Aside (Lazy Loading):
+      Read: App → Cache (hit?) → DB → Cache に書き込み
+      Write: App → DB → Cache を invalidate
+    
+    Write-Through:
+      Write: App → Cache → DB (同期)
+    
+    Write-Behind (Write-Back):
+      Write: App → Cache → DB (非同期バッチ)
+    
+    Read-Through:
+      Read: App → Cache (miss → Cache が DB を fetch)
+
+
+  ── 4-6: Sharding (データ分割) ──
+
+    ┌───────────────┬────────────────────┬──────────────────────┐
+    │ 方式          │ メリット           │ デメリット           │
+    ├───────────────┼────────────────────┼──────────────────────┤
+    │ Range-based   │ 範囲クエリ効率的   │ ホットスポット       │
+    │ Hash-based    │ 均一分散           │ 範囲クエリ不可       │
+    │ Directory     │ 柔軟な制御         │ SPOF, ルックアップ   │
+    └───────────────┴────────────────────┴──────────────────────┘
+
+    > Resharding: Consistent Hashing で最小限のデータ移動
+    > Cross-shard クエリ: Scatter-Gather パターン (レイテンシ注意)
+
+
+  ── 4-7: Replication (データ複製) ──
+
+    Leader-Follower: 1台の Leader が書込, Follower は読取専用
+      → 読み取りスケール可, Leader が SPOF
+    Multi-Leader: 複数 Leader で書込可
+      → 書込スケール, 衝突解決が複雑 (LWW, CRDT)
+    Leaderless: 全ノードが読み書き (Quorum: W+R > N)
+      → 可用性最大, 一貫性は Quorum 設定次第
+
+
+  ── 4-8: ID Generation ──
+
+    ┌──────────────────┬──────────────────────┬──────────────────┐
+    │ 方式             │ メリット             │ デメリット       │
+    ├──────────────────┼──────────────────────┼──────────────────┤
+    │ UUID v4          │ 分散生成, 衝突ほぼ無 │ 128bit, ソート不可│
+    │ Snowflake        │ 64bit, 時系列ソート可│ Clock依存        │
+    │ DB Auto-inc     │ シンプル, ソート可    │ SPOF, ボトルネック│
+    │ ULID             │ ソート可, UUID互換   │ ライブラリ依存   │
+    └──────────────────┴──────────────────────┴──────────────────┘
+
+    [Snowflake ID 簡易実装]
+    Snowflake ID: 688292272357249024 (binary length: 60 bits)
+    Snowflake ID: 688292272357249025 (binary length: 60 bits)
+    Snowflake ID: 688292272357249026 (binary length: 60 bits)
+    Snowflake ID: 688292272357249027 (binary length: 60 bits)
+    Snowflake ID: 688292272357249028 (binary length: 60 bits)
+    > 41bit timestamp → 約69年分, 12bit sequence → 4096 ID/ms/machine
+
+
+========================================================================
+  PART 5: 学習優先度 (Tier 1-4)
+========================================================================
+
+    ┌──────┬────────────────────────────────────────────────────────┐
+    │ Tier │ 内容                                                  │
+    ├──────┼────────────────────────────────────────────────────────┤
+    │  1   │ 面接フレームワーク (Step 1-5) をカラダに染み込ませる    │
+    │      │ 規模見積もり (Back-of-Envelope) を30秒で出せるように   │
+    │      │ Building Blocks (LB, Cache, Queue, DB選定)            │
+    ├──────┼────────────────────────────────────────────────────────┤
+    │  2   │ 必須設計問題: URL Shortener, Rate Limiter, Chat       │
+    │      │ News Feed, Notification — この5問は確実に解けること    │
+    │      │ Consistent Hashing, Sharding, Replication             │
+    ├──────┼────────────────────────────────────────────────────────┤
+    │  3   │ Web Crawler, Search Autocomplete, Video Streaming     │
+    │      │ Google Maps — 問題のバリエーションを広げる            │
+    │      │ ID Generation (Snowflake), Bloom Filter               │
+    ├──────┼────────────────────────────────────────────────────────┤
+    │  4   │ Distributed Cache の深堀り (Cache Stampede, Hot Key)  │
+    │      │ 面接で「もし時間があれば」と言える追加機能の設計       │
+    │      │ 実際の OSS (Redis, Kafka, Cassandra) のアーキ理解     │
+    └──────┴────────────────────────────────────────────────────────┘
+
+    > Tier 1 を完璧にすれば、どんな問題が来ても構造的に解ける
+    > Tier 2 の5問は暗記ではなく「自力で導出」できるレベルを目指す
+    > Tier 3-4 は Tier 1-2 の土台があれば応用で対応可能
+
+  [考えてほしい疑問] 面接本番では完璧を目指さない。
+
+    > 「この部分は時間があれば深掘りしたい」と言えることが Senior の証。
+    > 面接官は「何を知っているか」よりも「どう考えるか」を見ている。
+
+========================================================================
+  ガイド終了。
+  「設計に正解はない。トレードオフを語れることが正解。」
+========================================================================
+

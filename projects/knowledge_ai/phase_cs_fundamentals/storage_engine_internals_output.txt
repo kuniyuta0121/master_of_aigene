@@ -1,0 +1,295 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  Storage Engine Internals — From Physics to Data Structures       ║
+║  Based on: Database Internals (Petrov) + OSTEP                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+========================================================================
+  SECTION 1: STORAGE MEDIA PHYSICS
+========================================================================
+
+  HDD Simulator (7200 RPM):
+    Rotational latency:  4.17 ms
+    Random read IOPS:    82
+    Sequential MB/s:     29
+    Random read (track 0→25000): 13.76 ms
+    Sequential read (next track): 5.18 ms
+
+  SSD Flash Translation Layer:
+    Write Amplification Factor: 1.00
+    Erase counts — min: 0, max: 0, avg: 0.0
+    Worn-out blocks: 0
+
+=== Storage Media Comparison ===
+Media               SeqR MB/s  SeqW MB/s   RandR IOPS   RandW IOPS    Latency
+-----------------------------------------------------------------------------
+HDD 7200RPM               150        140          100          100    8,000 μs
+SATA SSD                  550        520       90,000       30,000       80 μs
+NVMe SSD                3,500      3,000      500,000      100,000       15 μs
+Intel Optane            2,500      2,200      550,000      500,000        7 μs
+
+========================================================================
+  SECTION 2: FILE SYSTEM INTERNALS
+========================================================================
+
+  Inode max file size: 4.0 TB
+    Block          0: direct[0]
+    Block          5: direct[5]
+    Block         11: direct[11]
+    Block         12: single_indirect → slot[0]
+    Block      1,035: single_indirect → slot[1023]
+    Block  1,048,587: double_indirect → [1022] → [1023]
+
+  ext4 Simulator:
+    resolve('/home/user/data.csv') → inode 3
+    stat: {'ino': 3, 'mode': 'regular', 'size': 16000, 'blocks': 4, 'links': 1}
+    free space: {'free_blocks': 1008, 'free_bytes': 4128768, 'free_inodes': 123}
+
+  Journaling Modes:
+       JOURNAL: TXN 1: fully committed, no action needed
+       ORDERED: TXN 1: fully committed, no action needed
+     WRITEBACK: TXN 1: metadata OK but data may be stale (writeback mode risk)
+
+  Copy-on-Write Filesystem:
+    Current file1.txt: b'version2'
+    Snap1   file1.txt: b'version1'
+    Blocks allocated:  2 (old block preserved for snapshot)
+
+  Merkle Checksum Tree:
+    Root hash: 7423365c8b3faa84
+    Verify block 3 (valid): True
+    Verify block 3 (corrupt): False
+
+========================================================================
+  SECTION 3: BUFFER POOL & PAGE CACHE
+========================================================================
+
+  LRU Policy:
+    Hit rate: 65.7%
+    Stats: hits=46, misses=24, evictions=16
+
+  Clock-Sweep Policy:
+    Hit rate: 65.7%
+    Stats: hits=46, misses=24, evictions=16
+
+  LRU-2 Policy:
+    Hit rate: 65.7%
+    Stats: hits=46, misses=24, evictions=16
+
+  Prefetching (sequential):
+    After sequential scan of 20 pages:
+    Hit rate: 44.2% (prefetching turns misses into hits)
+
+========================================================================
+  SECTION 4: B+TREE ON-DISK IMPLEMENTATION
+========================================================================
+
+  B+Tree (height=3):
+  [Int p7: keys=[35]] 
+  [Int p2: keys=[15, 25]] [Int p6: keys=[45, 55]] 
+  [Leaf p0: [(5, 500), (10, 1000)]] [Leaf p3: [(15, 1500), (20, 2000)]] [Leaf p4: [(25, 2500), (30, 3000)]] [Leaf p1: [(35, 3500), (40, 4000)]] [Leaf p5: [(45, 4500), (50, 5000)]] [Leaf p8: [(55, 5500), (60, 6000)]] 
+
+  Point lookups:
+    search(25) = 2500
+    search(42) = None
+    search(55) = 5500
+
+  Range scan [20, 45]:
+    [(20, 2000), (25, 2500), (30, 3000), (35, 3500), (40, 4000), (45, 4500)]
+
+  Serialization round-trip:
+    Original keys:      [35]
+    Deserialized keys:  [35]
+    Page size:          4096 bytes
+
+  Bulk Loading (bottom-up):
+
+  B+Tree (height=2):
+  [Int p5: keys=[20, 40, 60, 80]] 
+  [Leaf p0: [(0, 0), (5, 50), (10, 100), (15, 150)]] [Leaf p1: [(20, 200), (25, 250), (30, 300), (35, 350)]] [Leaf p2: [(40, 400), (45, 450), (50, 500), (55, 550)]] [Leaf p3: [(60, 600), (65, 650), (70, 700), (75, 750)]] [Leaf p4: [(80, 800), (85, 850), (90, 900), (95, 950)]] 
+    Height: 2, Pages: 6
+
+=== B-Tree Family Comparison ===
+  Property       B-Tree             B+Tree             B*Tree            
+  --------------------------------------------------------------------
+  Values in      Internal+Leaf      Leaf only          Leaf only         
+  Leaf linked    No                 Yes                Yes               
+  Min fill       50%                50%                66%               
+  Split          1->2               1->2               2->3 (delay)      
+  Range scan     Tree walk          Leaf chain         Leaf chain        
+  Used by        General            InnoDB/PG/SQLite   Some FS           
+
+========================================================================
+  SECTION 5: LSM-TREE DEEP DIVE
+========================================================================
+
+  Bloom Filter:
+    Size: 9585 bits (9.6 bits/key)
+    Hash functions: 6
+    Theoretical FP rate: 0.0101
+    Empirical FP rate:   0.0070
+
+  Skip List (MemTable):
+    Inserted 20 random keys, sorted output: [3, 4, 11, 13, 14, 17, 27, 28, 29, 31]...
+    search(42) = None
+
+  LSM-Tree (LEVELED):
+    Tables per level: [2, 3, 0, 0, 0, 0, 0]
+    Entries per level: [64, 177, 0, 0, 0, 0, 0]
+    Write amplification: 2.16x
+    Space amplification: 1.31x
+    Keys found: 183/200
+
+  LSM-Tree (SIZE_TIERED):
+    Tables per level: [2, 3, 0, 0, 0, 0, 0]
+    Entries per level: [64, 303, 0, 0, 0, 0, 0]
+    Write amplification: 1.66x
+    Space amplification: 1.99x
+    Keys found: 183/200
+
+  Compaction Strategy Comparison:
+  ┌──────────────┬──────────────┬──────────────┬──────────────┐
+  │  Metric      │ Size-Tiered  │  Leveled     │  FIFO        │
+  ├──────────────┼──────────────┼──────────────┼──────────────┤
+  │ Write Amp    │ O(log N)     │ O(L × ratio) │ O(1)         │
+  │ Read Amp     │ O(N tables)  │ O(1/level)   │ O(N tables)  │
+  │ Space Amp    │ ~2x          │ ~1.1x        │ ~1x          │
+  │ Write Speed  │ Fast         │ Medium       │ Fastest      │
+  │ Read Speed   │ Slow         │ Fast         │ Slow         │
+  │ Used By      │ Cassandra    │ RocksDB      │ TTL data     │
+  └──────────────┴──────────────┴──────────────┴──────────────┘
+
+========================================================================
+  SECTION 6: WRITE-AHEAD LOG (WAL)
+========================================================================
+
+  WAL Log (11 records):
+    LSN=  1 Txn= 1 BEGIN        
+    LSN=  2 Txn= 1 UPDATE        page=10 [old_A→new_A]
+    LSN=  3 Txn= 1 UPDATE        page=20 [old_B→new_B]
+    LSN=  4 Txn= 1 COMMIT       
+    LSN=  5 Txn= 2 BEGIN        
+    LSN=  6 Txn= 2 UPDATE        page=30 [old_C→new_C]
+    LSN=  7 Txn= 2 UPDATE        page=40 [old_D→new_D]
+    LSN=  8 Txn= 3 BEGIN        
+    LSN=  9 Txn= 3 UPDATE        page=50 [old_E→new_E]
+    LSN= 10 Txn= 3 COMMIT       
+    LSN= 11 Txn=-1 CHECKPOINT   
+
+  ARIES Recovery (crash with Txn 2 uncommitted):
+    ANALYSIS:
+      Checkpoint at LSN 11
+      Active txns at crash: {2: 5}
+      Committed txns: set()
+      Loser txns (need undo): {2}
+      Dirty pages: set()
+    REDO:
+      Redid 5 updates
+    UNDO:
+      Undid 2 updates from loser txns
+
+  Pages after recovery:
+    Page 10: new_A
+    Page 20: new_B
+    Page 30: old_C
+    Page 40: old_D
+    Page 50: new_E
+    (Pages 30,40 reverted to old_C,old_D — Txn 2 undone)
+
+  Group Commit Optimization:
+  ┌─────────────────────────────────────────────────┐
+  │  Without group commit:                          │
+  │    Txn1 commit → fsync → Txn2 commit → fsync   │
+  │    Each fsync ≈ 5-10ms (HDD) or 50μs (SSD)     │
+  │    Max commits/sec = 1/fsync_time               │
+  │                                                 │
+  │  With group commit (batch size=4):              │
+  │    Txn1,2,3,4 commit → single fsync             │
+  │    4x throughput improvement                    │
+  │    PostgreSQL: commit_delay + commit_siblings   │
+  └─────────────────────────────────────────────────┘
+
+========================================================================
+  SECTION 7: RAID SYSTEMS
+========================================================================
+
+  RAID 5 (4 disks):
+    Usable capacity: 60 blocks (75%)
+    Stripe 0: data=[0, 1, 2], parity=3
+    Stripe 1: data=[10, 11, 12], parity=13
+    Stripe 2: data=[20, 21, 22], parity=23
+    Stripe 3: data=[30, 31, 32], parity=33
+    Stripe 4: data=[40, 41, 42], parity=43
+
+  Failing disk 2...
+    Stripe 0 (degraded read): [0, 1, 2]
+    Stripe 1 (degraded read): [10, 11, 12]
+    Stripe 2 (degraded read): [20, 21, 22]
+    Rebuild complete: 20 blocks reconstructed
+    Stripe 0 (after rebuild): [0, 1, 2]
+    Stripe 1 (after rebuild): [10, 11, 12]
+    Stripe 2 (after rebuild): [20, 21, 22]
+    Rebuild 1TB disk @ 50MB/s: 5.8 hours
+    Rebuild 4TB disk @ 50MB/s: 23.3 hours
+    Rebuild 12TB disk @ 50MB/s: 69.9 hours
+
+  RAID Level Comparison:
+    RAID  0: 4 disks × 100 blocks = 400 usable (100%)
+    RAID  1: 4 disks × 100 blocks = 200 usable (50%)
+    RAID  5: 4 disks × 100 blocks = 300 usable (75%)
+    RAID  6: 4 disks × 100 blocks = 200 usable (50%)
+    RAID 10: 4 disks × 100 blocks = 200 usable (50%)
+
+  RAID Write Hole:
+    RAID write hole risk EXISTS. If crash occurs between data write and parity update, stripe is inconsistent. Mitigations: BBWC, write-intent bitmap, or use ZFS/btrfs.
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │         Storage Engine Architecture Comparison                  │
+  ├────────────┬───────────┬───────────┬───────────┬───────────────┤
+  │ Feature    │ InnoDB    │ RocksDB   │WiredTiger │ PostgreSQL    │
+  ├────────────┼───────────┼───────────┼───────────┼───────────────┤
+  │ Structure  │ B+Tree    │ LSM-Tree  │ B-Tree+   │ Heap+B-Tree   │
+  │            │           │           │ LSM hybrid│               │
+  │ Buffer Mgr │ LRU       │ Block     │ WT cache  │ Clock-Sweep   │
+  │            │           │ cache     │           │               │
+  │ WAL        │ Redo log  │ WAL       │ Journal   │ WAL           │
+  │ Recovery   │ ARIES-like│ Replay    │ Checkpoint│ ARIES         │
+  │ MVCC       │ Undo log  │ Sequence# │ Timestamps│ Tuple version │
+  │ Compaction │ N/A       │ Leveled/  │ Background│ VACUUM        │
+  │            │           │ Universal │ merge     │               │
+  │ Best For   │ OLTP      │ Write-    │ Mixed     │ General       │
+  │            │ balanced  │ heavy     │ workloads │ purpose       │
+  │ Used By    │ MySQL     │ CockroachDB│ MongoDB  │ PostgreSQL    │
+  │            │           │ TiKV      │           │               │
+  └────────────┴───────────┴───────────┴───────────┴───────────────┘
+
+========================================================================
+  KEY FORMULAS REFERENCE
+========================================================================
+
+  HDD Random I/O Latency:
+    T = T_seek + T_rotation + T_transfer
+    IOPS = 1000 / (T_seek_ms + T_rotation_ms)
+
+  SSD Write Amplification:
+    WAF = Physical Writes / Logical Writes
+    Ideal WAF = 1.0, typical 2-10x depending on workload
+
+  B+Tree Height:
+    h = ceil(log_B(N)) where B = branching factor, N = num keys
+    4KB page, 8B keys → B ≈ 254 → 254^3 ≈ 16M keys in 3 levels
+
+  LSM Write Amplification:
+    Leveled: WAF ≈ size_ratio × num_levels
+    Size-tiered: WAF ≈ num_levels
+
+  Bloom Filter:
+    Bits needed: m = -(n × ln(p)) / (ln2)^2
+    Optimal hashes: k = (m/n) × ln2
+    10 bits/key → ~1% FP rate
+
+  RAID 5 Usable Capacity:
+    C = (N-1) × disk_size   (1 disk worth of parity)
+
+  RAID Rebuild Time:
+    T = disk_capacity / (rebuild_rate - active_io_rate)
+
+  [All demos completed successfully]

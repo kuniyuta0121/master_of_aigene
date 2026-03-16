@@ -1,0 +1,1607 @@
+============================================================
+  DevOps / Infrastructure ハンズオン学習モジュール
+  Docker | K8s | Terraform | CI/CD | FinOps | Security
+============================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 1: Docker Patterns
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 1.1 Multi-stage Build パターン ──
+
+    Multi-stage build は最終イメージサイズを劇的に削減する手法。
+    ビルド環境と実行環境を分離し、実行に必要なアーティファクトだけをコピーする。
+
+    ┌─────────────── Build Stage ───────────────┐
+    │  FROM golang:1.21 AS builder               │
+    │  - ソースコード                              │
+    │  - コンパイラ / ビルドツール                   │
+    │  - 依存パッケージ                             │
+    │  - 最終バイナリ ← これだけ次へ                 │
+    └──────────────────┬────────────────────────┘
+                       │ COPY --from=builder
+    ┌──────────────────▼────────────────────────┐
+    │  FROM gcr.io/distroless/static-debian12   │
+    │  - バイナリのみ (数MB)                      │
+    │  - シェルなし・パッケージマネージャなし         │
+    │  - 攻撃対象面 (Attack Surface) を最小化       │
+    └───────────────────────────────────────────┘
+    
+
+  [Go アプリの Multi-stage Dockerfile]
+    # ---- Stage 1: Build ----
+    FROM golang:1.21-alpine AS builder
+    WORKDIR /app
+    COPY go.mod go.sum ./
+    RUN go mod download          # 依存だけ先にDL (レイヤーキャッシュ活用)
+    COPY . .
+    RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/server .
+    
+    # ---- Stage 2: Runtime ----
+    FROM gcr.io/distroless/static-debian12:nonroot
+    COPY --from=builder /app/server /server
+    USER nonroot:nonroot
+    EXPOSE 8080
+    ENTRYPOINT ["/server"]
+
+
+  [Python アプリの Multi-stage Dockerfile]
+    # ---- Stage 1: Build ----
+    FROM python:3.11-slim AS builder
+    WORKDIR /app
+    RUN python -m venv /opt/venv
+    ENV PATH="/opt/venv/bin:$PATH"
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    # ---- Stage 2: Runtime ----
+    FROM python:3.11-slim
+    COPY --from=builder /opt/venv /opt/venv
+    ENV PATH="/opt/venv/bin:$PATH"
+    WORKDIR /app
+    COPY . .
+    RUN useradd --create-home appuser
+    USER appuser
+    EXPOSE 8000
+    CMD ["gunicorn", "app:create_app()", "-b", "0.0.0.0:8000"]
+
+
+  ── 1.2 イメージサイズ比較シミュレーション ──
+
+    ベースイメージ別サイズ比較:
+    イメージ                                            サイズ
+    ────────────────────────────────────────── ────────
+    ubuntu:22.04 + build tools + app              850 MB  ██████████████████████████████████████████
+    python:3.11 (full)                            920 MB  ██████████████████████████████████████████████
+    python:3.11-slim                              150 MB  ███████
+    python:3.11-alpine                             55 MB  ██
+    golang:1.21 (full)                            800 MB  ████████████████████████████████████████
+    distroless/static (Go binary)                   5 MB  
+    scratch (Go binary)                             3 MB  
+
+  ── 1.3 Docker Compose オーケストレーション ──
+
+  [本番レベルの docker-compose.yml]
+    version: "3.9"
+    services:
+      app:
+        build:
+          context: .
+          dockerfile: Dockerfile
+          target: runtime            # multi-stage の特定ステージ指定
+        ports:
+          - "8080:8080"
+        environment:
+          - DATABASE_URL=postgres://db:5432/mydb
+          - REDIS_URL=redis://cache:6379
+        depends_on:
+          db:
+            condition: service_healthy
+          cache:
+            condition: service_started
+        deploy:
+          resources:
+            limits:
+              cpus: "1.0"
+              memory: 512M
+            reservations:
+              cpus: "0.25"
+              memory: 128M
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 40s
+        restart: unless-stopped
+    
+      db:
+        image: postgres:16-alpine
+        volumes:
+          - pgdata:/var/lib/postgresql/data
+        environment:
+          POSTGRES_DB: mydb
+          POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+        secrets:
+          - db_password
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+    
+      cache:
+        image: redis:7-alpine
+        command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    
+    volumes:
+      pgdata:
+        driver: local
+    
+    secrets:
+      db_password:
+        file: ./secrets/db_password.txt
+
+
+  ── 1.4 コンテナネットワーキング ──
+
+    Docker のネットワークドライバ:
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │ Driver      │ 用途              │ 特徴                       │
+    ├─────────────┼───────────────────┼────────────────────────────┤
+    │ bridge      │ 単一ホスト内通信    │ デフォルト。NAT経由で外部接続  │
+    │ host        │ パフォーマンス重視   │ ホストのネットワークスタック共有│
+    │ overlay     │ マルチホスト(Swarm) │ VXLAN で L2 ネットワーク構築  │
+    │ macvlan     │ 物理NW直接接続      │ コンテナに固有MACアドレス付与  │
+    │ none        │ 完全隔離           │ ネットワークなし              │
+    └─────────────┴───────────────────┴────────────────────────────┘
+
+    bridge ネットワークの通信フロー:
+    ┌─────────┐     ┌──────────┐     ┌─────────────┐
+    │ ContainerA│───▶│ docker0  │───▶ │ ContainerB  │
+    │ 172.17.0.2│    │ (bridge) │     │ 172.17.0.3  │
+    └─────────┘     └────┬─────┘     └─────────────┘
+                         │ iptables NAT
+                    ┌────▼─────┐
+                    │ eth0     │
+                    │ (host)   │
+                    └──────────┘
+    
+
+  ── 1.5 ボリューム戦略 ──
+
+    ボリュームタイプ比較:
+
+    [Named Volume]
+      コマンド例: docker volume create mydata
+      用途: データの永続化。DBデータなど。Docker が管理。
+
+    [Bind Mount]
+      コマンド例: -v /host/path:/container/path
+      用途: 開発時のソースコード共有。ホストとコンテナで双方向同期。
+
+    [tmpfs Mount]
+      コマンド例: --tmpfs /tmp
+      用途: メモリ上の一時領域。秘密情報の一時保持に最適。
+
+    [Volume Driver]
+      コマンド例: driver: local / nfs / s3fs
+      用途: NFS, EFS, S3 などリモートストレージをマウント。
+
+  ── 1.6 Docker セキュリティベストプラクティス ──
+
+  [セキュアな Dockerfile テンプレート]
+    FROM python:3.11-slim
+    
+    # 1. non-root ユーザー作成
+    RUN groupadd -r appgroup && useradd -r -g appgroup -d /home/appuser appuser
+    
+    # 2. 必要最小限のパッケージのみインストール
+    RUN apt-get update && \
+        apt-get install -y --no-install-recommends curl && \
+        rm -rf /var/lib/apt/lists/*
+    
+    WORKDIR /app
+    COPY --chown=appuser:appgroup . .
+    
+    # 3. non-root ユーザーで実行
+    USER appuser
+    
+    # 4. セキュリティオプション
+    # docker run --read-only --no-new-privileges --security-opt=no-new-privileges ...
+
+    セキュリティチェックリスト:
+      [x] non-root 実行              -- USER 命令で root 以外を指定
+      [x] read-only FS             -- --read-only フラグで書き込み防止
+      [x] no-new-privileges        -- 権限昇格を防止
+      [x] capabilities 制限          -- --cap-drop ALL --cap-add NET_BIND_SERVICE
+      [x] イメージスキャン                 -- trivy / grype でCVEスキャン
+      [x] 署名検証                     -- Docker Content Trust (DCT) で署名
+      [x] .dockerignore            -- .git, .env, node_modules を除外
+      [x] COPY vs ADD              -- ADDは自動展開するため COPY を優先
+
+  ── 1.7 レイヤーキャッシュ最適化 ──
+
+    Dockerfile の命令順序がキャッシュ効率を決定する。
+    変更頻度が低い → 高い の順に並べる。
+
+    ❌ 悪い例 (毎回全レイヤー再ビルド):
+      COPY . .                    # ソース変更 → 以降すべて無効
+      RUN pip install -r req.txt
+
+    ✅ 良い例 (依存はキャッシュ済み):
+      COPY requirements.txt .     # 依存ファイルだけ先にコピー
+      RUN pip install -r req.txt  # 依存が変わらない限りキャッシュ
+      COPY . .                    # ソースのみ再コピー
+
+    キャッシュ無効化の条件:
+      - RUN 命令の文字列が変わった
+      - COPY/ADD のファイル内容が変わった
+      - 上位レイヤーが無効化された → 以降すべて無効
+    
+
+  [Quiz] Docker multi-stage build の主な目的は?
+    A. ビルド速度を上げるため
+    B. 最終イメージサイズを削減するため
+    C. マルチアーキテクチャに対応するため
+    D. Docker Compose と連携するため
+  --> 正解: B. 最終イメージサイズを削減するため
+      解説: ビルドツールを最終イメージに含めず、実行に必要なアーティファクトだけをコピーすることでイメージサイズを大幅に削減できる。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 2: Kubernetes Day-2 Operations
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 2.1 Pod ライフサイクル ──
+
+    Pod のフェーズ遷移:
+
+    Pending ──▶ Running ──▶ Succeeded
+                  │              │
+                  ▼              │
+               Failed ◀─────────┘
+
+    Pod 内のコンテナ構成パターン:
+
+    ┌──────────── Pod ─────────────────────────┐
+    │  ┌────────────┐  ┌──────────┐            │
+    │  │ Init       │  │ Init     │  (順次実行) │
+    │  │ Container 1│─▶│ Container2│            │
+    │  └────────────┘  └────┬─────┘            │
+    │                       ▼                  │
+    │  ┌────────────┐  ┌──────────┐            │
+    │  │ Main App   │  │ Sidecar  │  (並行実行) │
+    │  │ Container  │  │ (log等)  │            │
+    │  └────────────┘  └──────────┘            │
+    └──────────────────────────────────────────┘
+    
+
+  [Pod with Init Container & Probes]
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: app-pod
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z db-svc 5432; do sleep 2; done']
+    
+      containers:
+        - name: app
+          image: myapp:1.0
+          ports:
+            - containerPort: 8080
+    
+          # Startup Probe: 起動完了を検知 (起動が遅いアプリ向け)
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            failureThreshold: 30    # 30 * 10s = 最大5分待つ
+            periodSeconds: 10
+    
+          # Liveness Probe: デッドロック検知 → コンテナ再起動
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 15
+            failureThreshold: 3
+    
+          # Readiness Probe: トラフィック受入れ可否 → Service から除外
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+    
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+    
+        - name: log-shipper         # Sidecar パターン
+          image: fluent-bit:2.1
+          volumeMounts:
+            - name: log-vol
+              mountPath: /var/log/app
+    
+      volumes:
+        - name: log-vol
+          emptyDir: {}
+
+
+  ── 2.2 デプロイメント戦略 ──
+
+    デプロイメント戦略の比較:
+    戦略               メリット                     デメリット
+    ──────────────── ──────────────────────── ────────────────────────────
+    Rolling Update   ダウンタイムなし                 ロールバックに時間がかかる場合がある
+                     (段階的に旧→新へ置換)
+    Blue-Green       即座にロールバック可能              リソースが2倍必要
+                     (新旧環境を並行運用し一括切替)
+    Canary           リスクを限定できる                トラフィック制御の仕組みが必要
+                     (一部トラフィックのみ新バージョンへ)
+    Recreate         シンプル                     ダウンタイムが発生
+                     (全Pod停止 → 新Pod起動)
+
+  ── 2.3 Rolling Update シミュレーション ──
+
+    設定: replicas=4, maxSurge=1, maxUnavailable=1
+    Step 1: [pod-1:v1] [pod-2:v1] [pod-3:v1] [pod-4:v2]
+    Step 2: [pod-2:v1] [pod-3:v1] [pod-4:v2] [pod-5:v2]
+    Step 3: [pod-3:v1] [pod-4:v2] [pod-5:v2] [pod-6:v2]
+    Step 4: [pod-4:v2] [pod-5:v2] [pod-6:v2] [pod-7:v2]
+    完了: 全 4 Pod が v2 に更新されました
+
+  [Rolling Update Deployment 設定]
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: app
+    spec:
+      replicas: 4
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1           # 最大で replicas + 1 Pod まで
+          maxUnavailable: 1     # 最低 replicas - 1 Pod は Running
+      selector:
+        matchLabels:
+          app: myapp
+      template:
+        metadata:
+          labels:
+            app: myapp
+        spec:
+          containers:
+            - name: app
+              image: myapp:v2
+
+
+  ── 2.4 リソース管理 & QoS クラス ──
+
+    QoS クラスの決定ルール:
+
+    ┌───────────────────────────────────────────────────────────┐
+    │ QoS Class     │ 条件                   │ 退去優先度      │
+    ├───────────────┼────────────────────────┼─────────────────┤
+    │ Guaranteed    │ requests == limits      │ 最後 (最も安全) │
+    │               │ (全コンテナ・CPU/Mem)   │                 │
+    ├───────────────┼────────────────────────┼─────────────────┤
+    │ Burstable     │ requests < limits       │ 中間            │
+    │               │ (一部でも設定あり)       │                 │
+    ├───────────────┼────────────────────────┼─────────────────┤
+    │ BestEffort    │ 設定なし               │ 最初に退去       │
+    └───────────────┴────────────────────────┴─────────────────┘
+
+    ノードのメモリ不足時、BestEffort → Burstable → Guaranteed の順に Pod が退去される。
+    本番ワークロードは Guaranteed または Burstable(requests設定)を推奨。
+    
+
+  [HPA (Horizontal Pod Autoscaler) 設定]
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: app-hpa
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: app
+      minReplicas: 2
+      maxReplicas: 20
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 80
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          policies:
+            - type: Percent
+              value: 100           # 最大2倍まで一気にスケール
+              periodSeconds: 60
+        scaleDown:
+          stabilizationWindowSeconds: 300  # 5分間安定してから縮小
+          policies:
+            - type: Percent
+              value: 10
+              periodSeconds: 60
+
+
+  ── 2.5 ConfigMap / Secret 管理 ──
+
+  [ConfigMap と Secret の使い分け]
+    # ConfigMap: 平文の設定値
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: app-config
+    data:
+      LOG_LEVEL: "info"
+      DB_HOST: "db-service.default.svc.cluster.local"
+      config.yaml: |
+        server:
+          port: 8080
+          read_timeout: 30s
+    
+    ---
+    # Secret: Base64 エンコード (暗号化ではない!)
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: app-secrets
+    type: Opaque
+    data:
+      DB_PASSWORD: cGFzc3dvcmQxMjM=    # echo -n "password123" | base64
+      API_KEY: c2VjcmV0LWtleQ==
+    
+    # 本番では外部シークレットマネージャを使う:
+    #   - AWS Secrets Manager + External Secrets Operator
+    #   - HashiCorp Vault + CSI Driver
+    #   - GCP Secret Manager
+
+
+  ── 2.6 RBAC モデル ──
+
+    Kubernetes RBAC の構成要素:
+
+    ┌───────────────┐     ┌──────────────┐     ┌────────────────┐
+    │ Subject       │     │ RoleBinding   │     │ Role           │
+    │ (User/SA/     │◀────│              │────▶│ (Namespace内)  │
+    │  Group)       │     │              │     │ rules:         │
+    └───────────────┘     └──────────────┘     │  - resources   │
+                                               │  - verbs       │
+                                               └────────────────┘
+
+    ClusterRole / ClusterRoleBinding: クラスタ全体に適用
+    
+
+  [最小権限の RBAC 設定例]
+    # ServiceAccount
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: app-sa
+      namespace: production
+    
+    ---
+    # Role: namespace 内の Pod を読み取り専用
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: pod-reader
+      namespace: production
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "pods/log"]
+        verbs: ["get", "list", "watch"]
+    
+    ---
+    # RoleBinding: SA に Role を紐付け
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: app-pod-reader
+      namespace: production
+    subjects:
+      - kind: ServiceAccount
+        name: app-sa
+        namespace: production
+    roleRef:
+      kind: Role
+      name: pod-reader
+      apiGroup: rbac.authorization.k8s.io
+
+
+  ── 2.7 Network Policies ──
+
+  [マイクロサービス間通信を制限する NetworkPolicy]
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: api-netpol
+      namespace: production
+    spec:
+      podSelector:
+        matchLabels:
+          app: api-server
+      policyTypes:
+        - Ingress
+        - Egress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app: frontend       # frontend からのみ受信
+          ports:
+            - protocol: TCP
+              port: 8080
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app: database       # database へのみ送信
+          ports:
+            - protocol: TCP
+              port: 5432
+        - to:                         # DNS は許可
+            - namespaceSelector: {}
+          ports:
+            - protocol: UDP
+              port: 53
+
+
+  ── 2.8 Helm チャート構造 ──
+
+    Helm チャートのディレクトリ構造:
+
+    mychart/
+    ├── Chart.yaml           # チャートのメタデータ (name, version, appVersion)
+    ├── values.yaml          # デフォルト値 (helm install -f custom.yaml で上書き)
+    ├── templates/
+    │   ├── _helpers.tpl     # テンプレートヘルパー関数
+    │   ├── deployment.yaml  # {{ .Values.replicaCount }} で値を参照
+    │   ├── service.yaml
+    │   ├── ingress.yaml
+    │   ├── hpa.yaml
+    │   ├── configmap.yaml
+    │   └── NOTES.txt        # インストール後の案内文
+    ├── charts/              # サブチャート (依存関係)
+    └── .helmignore
+
+    よく使う Helm コマンド:
+      helm install myrelease ./mychart -f prod-values.yaml
+      helm upgrade myrelease ./mychart --set image.tag=v2.0
+      helm rollback myrelease 1    # リビジョン1にロールバック
+      helm template ./mychart      # テンプレートレンダリング確認
+      helm diff upgrade ...        # 差分プレビュー (plugin)
+    
+
+  ── 2.9 Kubernetes トラブルシューティング ──
+
+    [CrashLoopBackOff]
+      症状: コンテナが起動直後にクラッシュし、再起動を繰り返す
+      対処法:
+        $ kubectl logs <pod> --previous   # 前回のログ確認
+        $ kubectl describe pod <pod>      # Events 確認
+        $ 原因: アプリのバグ, 設定ミス, ヘルスチェック失敗
+
+    [OOMKilled]
+      症状: メモリ上限 (limits.memory) を超過して強制終了
+      対処法:
+        $ kubectl describe pod <pod> | grep -A5 'Last State'
+        $ 対策: limits.memory を増やす or アプリのメモリリーク修正
+        $ JVM: -Xmx をコンテナ limits の 75% 程度に設定
+
+    [ImagePullBackOff]
+      症状: コンテナイメージの取得に失敗
+      対処法:
+        $ kubectl describe pod <pod> | grep -A3 Events
+        $ 原因: イメージ名 typo, プライベートレジストリの認証失敗
+        $ 対策: imagePullSecrets を設定, イメージ名を確認
+
+    [Pending]
+      症状: Pod がスケジュールされない
+      対処法:
+        $ kubectl describe pod <pod> | grep Events
+        $ 原因: リソース不足, nodeSelector/affinity 不一致, PVC 未バインド
+        $ kubectl get nodes -o wide  # ノードのリソース状況確認
+
+  [Quiz] Kubernetes で Pod がノードのメモリ不足で退去される順番は?
+    A. Guaranteed -> Burstable -> BestEffort
+    B. BestEffort -> Burstable -> Guaranteed
+    C. ランダム
+    D. 作成時間が古い順
+  --> 正解: B. BestEffort -> Burstable -> Guaranteed
+      解説: BestEffort (requests/limits 未設定) が最初に退去され、Guaranteed (requests == limits) が最後に退去される。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 3: Infrastructure as Code - Terraform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 3.1 HCL (HashiCorp Configuration Language) 基本構文 ──
+
+    Terraform の主要ブロック:
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ Block        │ 役割                                      │
+    ├──────────────┼───────────────────────────────────────────┤
+    │ terraform    │ バージョン制約, backend設定                 │
+    │ provider     │ クラウドプロバイダの設定 (AWS, GCP等)        │
+    │ resource     │ インフラリソースの定義 (作成/更新/削除)       │
+    │ data         │ 既存リソースの参照 (読み取り専用)            │
+    │ variable     │ 入力変数                                   │
+    │ output       │ 出力値                                     │
+    │ locals       │ ローカル変数 (計算結果の再利用)              │
+    │ module       │ 再利用可能なリソースグループ                 │
+    └──────────────┴───────────────────────────────────────────┘
+    
+
+  [基本的な Terraform 構成 (main.tf)]
+    terraform {
+      required_version = ">= 1.5"
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = "~> 5.0"
+        }
+      }
+    
+      backend "s3" {
+        bucket         = "my-terraform-state"
+        key            = "prod/terraform.tfstate"
+        region         = "ap-northeast-1"
+        dynamodb_table = "terraform-locks"   # State Locking
+        encrypt        = true
+      }
+    }
+    
+    provider "aws" {
+      region = var.region
+      default_tags {
+        tags = {
+          Environment = var.environment
+          ManagedBy   = "terraform"
+          Project     = var.project_name
+        }
+      }
+    }
+
+
+  [variables.tf]
+    variable "region" {
+      description = "AWS region"
+      type        = string
+      default     = "ap-northeast-1"
+    }
+    
+    variable "environment" {
+      description = "Environment name"
+      type        = string
+      validation {
+        condition     = contains(["dev", "staging", "prod"], var.environment)
+        error_message = "Environment must be dev, staging, or prod."
+      }
+    }
+    
+    variable "instance_config" {
+      description = "EC2 instance configuration"
+      type = object({
+        instance_type = string
+        ami_id        = string
+        volume_size   = number
+      })
+      default = {
+        instance_type = "t3.micro"
+        ami_id        = "ami-0abcdef1234567890"
+        volume_size   = 20
+      }
+    }
+    
+    locals {
+      name_prefix = "${var.project_name}-${var.environment}"
+      common_tags = {
+        Environment = var.environment
+        Terraform   = "true"
+      }
+    }
+
+
+  ── 3.2 State 管理 ──
+
+    Terraform State の重要性:
+
+    terraform.tfstate はインフラの「真実の源泉」。
+    コードとクラウドの実態をマッピングする JSON ファイル。
+
+    ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
+    │ .tf コード    │     │  State File   │     │  Cloud       │
+    │ (desired)    │────▶│  (recorded)   │────▶│  (actual)    │
+    └──────────────┘     └───────────────┘     └──────────────┘
+
+    plan 時: コード vs State → 差分を計算
+    apply 時: 差分をクラウドに反映 → State を更新
+
+    State 管理のベストプラクティス:
+    1. Remote Backend (S3 + DynamoDB / GCS) で共有
+    2. State Locking で並行 apply を防止
+    3. State は Git にコミットしない (機密情報を含む)
+    4. Workspace でステート分離 (dev / staging / prod)
+
+    よく使う State 操作:
+      terraform state list                    # リソース一覧
+      terraform state show aws_instance.web   # 詳細表示
+      terraform state mv old.name new.name    # リソース名変更
+      terraform state rm aws_instance.web     # State から除去 (リソースは残る)
+      terraform import aws_instance.web i-xxx # 既存リソースをインポート
+    
+
+  ── 3.3 モジュールパターン ──
+
+    モジュール構成の推奨ディレクトリ構造:
+
+    infrastructure/
+    ├── modules/                    # 再利用可能モジュール
+    │   ├── vpc/
+    │   │   ├── main.tf
+    │   │   ├── variables.tf
+    │   │   ├── outputs.tf
+    │   │   └── README.md
+    │   ├── ecs-service/
+    │   └── rds/
+    │
+    ├── environments/
+    │   ├── dev/
+    │   │   ├── main.tf            # module "vpc" { source = "../../modules/vpc" }
+    │   │   ├── terraform.tfvars
+    │   │   └── backend.tf
+    │   ├── staging/
+    │   └── prod/
+    │
+    └── global/                    # 全環境共通 (IAM, Route53等)
+        ├── iam/
+        └── dns/
+    
+
+  [モジュール呼び出し (environments/prod/main.tf)]
+    module "vpc" {
+      source = "../../modules/vpc"
+    
+      cidr_block       = "10.0.0.0/16"
+      azs              = ["ap-northeast-1a", "ap-northeast-1c"]
+      private_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+      public_subnets   = ["10.0.101.0/24", "10.0.102.0/24"]
+      environment      = "prod"
+    }
+    
+    module "ecs_service" {
+      source = "../../modules/ecs-service"
+    
+      cluster_id   = module.ecs_cluster.id
+      vpc_id       = module.vpc.vpc_id
+      subnet_ids   = module.vpc.private_subnet_ids
+      service_name = "api"
+      image        = "123456789.dkr.ecr.ap-northeast-1.amazonaws.com/api:v1.0"
+      cpu          = 256
+      memory       = 512
+      desired_count = 3
+    }
+
+
+  ── 3.4 Lifecycle ルール ──
+
+  [Lifecycle 設定の活用例]
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = var.instance_type
+    
+      lifecycle {
+        # リソースを先に作成してから古いものを削除 (ダウンタイム防止)
+        create_before_destroy = true
+    
+        # 誤削除防止 (terraform destroy でもエラー)
+        prevent_destroy = true
+    
+        # 外部変更を無視 (手動変更との競合回避)
+        ignore_changes = [
+          tags["LastModifiedBy"],
+          user_data,
+        ]
+      }
+    }
+    
+    # Terraform import の使い方:
+    # 1. resource ブロックを .tf に書く
+    # 2. terraform import aws_instance.web i-0abcd1234efgh5678
+    # 3. terraform plan で差分がないことを確認
+    # 4. 必要に応じて .tf を調整
+    
+    # Terraform 1.5+ の import ブロック:
+    import {
+      to = aws_instance.web
+      id = "i-0abcd1234efgh5678"
+    }
+
+
+  ── 3.5 Terraform ワークフロー シミュレーション ──
+
+    terraform plan 出力シミュレーション:
+    ──────────────────────────────────────────────────
+      + aws_vpc.main
+      + aws_subnet.public[0]
+      + aws_subnet.public[1]
+      + aws_subnet.private[0]
+      + aws_security_group.web
+      + aws_instance.web
+      + aws_lb.main
+      + aws_rds_instance.db
+
+    Plan: 8 to add, 0 to change, 0 to destroy.
+
+    terraform apply 実行中...
+    [██░░░░░░░░░░░░░░░░░░]  12.5% - Creating aws_vpc.main...
+    [█████░░░░░░░░░░░░░░░]  25.0% - Creating aws_subnet.public[0]...
+    [███████░░░░░░░░░░░░░]  37.5% - Creating aws_subnet.public[1]...
+    [██████████░░░░░░░░░░]  50.0% - Creating aws_subnet.private[0]...
+    [████████████░░░░░░░░]  62.5% - Creating aws_security_group.web...
+    [███████████████░░░░░]  75.0% - Creating aws_instance.web...
+    [█████████████████░░░]  87.5% - Creating aws_lb.main...
+    [████████████████████] 100.0% - Creating aws_rds_instance.db...
+
+    Apply complete! Resources: 8 added, 0 changed, 0 destroyed.
+
+  [Quiz] Terraform で prevent_destroy = true を設定したリソースを削除するには?
+    A. terraform destroy -force を使う
+    B. 先に lifecycle ブロックを削除してから destroy する
+    C. terraform state rm で State から除去する
+    D. A と C の両方
+  --> 正解: B. 先に lifecycle ブロックを削除してから destroy する
+      解説: prevent_destroy はコード上の安全装置。まず .tf から prevent_destroy を削除し、apply 後に destroy する。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 4: CI/CD Pipeline Patterns
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 4.1 GitHub Actions ワークフロー構造 ──
+
+    GitHub Actions の階層構造:
+
+    Workflow (.github/workflows/*.yml)
+    └── Event (push, pull_request, schedule, workflow_dispatch)
+        └── Job (runs-on: ubuntu-latest)
+            └── Step
+                ├── uses: actions/checkout@v4    # 再利用可能アクション
+                └── run: npm test                # シェルコマンド
+
+    Job 間の依存関係:
+    ┌─────┐   ┌──────┐   ┌─────────┐   ┌──────────┐
+    │ lint │──▶│ test │──▶│ build   │──▶│ deploy   │
+    └─────┘   └──────┘   └─────────┘   └──────────┘
+                │
+                └──▶ ┌────────────┐
+                     │ e2e-test   │
+                     └────────────┘
+    
+
+  [本番レベルの CI/CD ワークフロー (.github/workflows/ci.yml)]
+    name: CI/CD Pipeline
+    on:
+      push:
+        branches: [main]
+      pull_request:
+        branches: [main]
+    
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    
+    jobs:
+      lint:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v5
+            with:
+              python-version: "3.11"
+          - run: pip install ruff
+          - run: ruff check .
+    
+      test:
+        runs-on: ubuntu-latest
+        needs: [lint]
+        strategy:
+          matrix:
+            python-version: ["3.10", "3.11", "3.12"]
+        services:
+          postgres:
+            image: postgres:16
+            env:
+              POSTGRES_PASSWORD: test
+            ports:
+              - 5432:5432
+            options: >-
+              --health-cmd pg_isready
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 5
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v5
+            with:
+              python-version: ${{ matrix.python-version }}
+          - name: Cache pip
+            uses: actions/cache@v4
+            with:
+              path: ~/.cache/pip
+              key: pip-${{ runner.os }}-${{ hashFiles('requirements*.txt') }}
+              restore-keys: pip-${{ runner.os }}-
+          - run: pip install -r requirements.txt -r requirements-dev.txt
+          - run: pytest --cov=app --cov-report=xml -v
+          - uses: codecov/codecov-action@v4
+            if: matrix.python-version == '3.11'
+    
+      build:
+        runs-on: ubuntu-latest
+        needs: [test]
+        if: github.ref == 'refs/heads/main'
+        permissions:
+          contents: read
+          packages: write
+        steps:
+          - uses: actions/checkout@v4
+          - uses: docker/setup-buildx-action@v3
+          - uses: docker/login-action@v3
+            with:
+              registry: ${{ env.REGISTRY }}
+              username: ${{ github.actor }}
+              password: ${{ secrets.GITHUB_TOKEN }}
+          - uses: docker/build-push-action@v5
+            with:
+              push: true
+              tags: |
+                ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+                ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+    
+      deploy-staging:
+        runs-on: ubuntu-latest
+        needs: [build]
+        environment: staging
+        steps:
+          - uses: actions/checkout@v4
+          - name: Deploy to staging
+            run: |
+              echo "Deploying ${{ github.sha }} to staging..."
+              # kubectl set image deployment/app app=$IMAGE:$TAG
+    
+      deploy-production:
+        runs-on: ubuntu-latest
+        needs: [deploy-staging]
+        environment:
+          name: production
+          url: https://myapp.example.com
+        steps:
+          - uses: actions/checkout@v4
+          - name: Deploy to production
+            run: |
+              echo "Deploying ${{ github.sha }} to production..."
+
+
+  ── 4.2 パイプラインパターン ──
+
+    パイプライン実行シミュレーション:
+    ───────────────────────────────────────────────────────
+    [PASS] Lint                 (    8s) [ruff check, eslint]
+    [PASS] Unit Test            (   45s) [pytest (py3.10), pytest (py3.11), pytest (py3.12)]
+    [PASS] Build Image          ( 2m00s) [docker build, docker push]
+    [PASS] Deploy Staging       ( 1m00s) [kubectl apply, smoke test]
+    [PASS] E2E Test             ( 3m00s) [playwright run]
+    [PASS] Deploy Prod          ( 5m00s) [canary 10%, canary 50%, canary 100%]
+
+    Total Pipeline Time: 11m53s
+
+  ── 4.3 キャッシュ戦略 ──
+
+    CI/CD でのキャッシュ戦略:
+
+    1. 依存関係キャッシュ:
+       - pip: ~/.cache/pip (key: requirements.txt のハッシュ)
+       - npm: ~/.npm (key: package-lock.json のハッシュ)
+       - Go:  ~/go/pkg/mod (key: go.sum のハッシュ)
+
+    2. Docker レイヤーキャッシュ:
+       - GitHub Actions: cache-from/to: type=gha
+       - BuildKit inline cache: --build-arg BUILDKIT_INLINE_CACHE=1
+       - レジストリキャッシュ: cache-from: type=registry
+
+    3. ビルドアーティファクトキャッシュ:
+       - actions/cache で中間成果物を保存
+       - actions/upload-artifact / download-artifact でジョブ間共有
+
+    キャッシュキーの設計:
+      key:          pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+      restore-keys: pip-${{ runner.os }}-
+      # 完全一致 → 部分一致のフォールバックでヒット率向上
+    
+
+  ── 4.4 CI/CD シークレット管理 ──
+
+    シークレット管理の階層:
+
+    ┌─────────────────────────────────────────────────────────┐
+    │ レベル         │ スコープ              │ 例             │
+    ├────────────────┼───────────────────────┼────────────────┤
+    │ Repository     │ 単一リポジトリ         │ API_KEY        │
+    │ Environment    │ staging / production  │ DB_PASSWORD    │
+    │ Organization   │ 全リポジトリ共有       │ NPM_TOKEN      │
+    └────────────────┴───────────────────────┴────────────────┘
+
+    ベストプラクティス:
+    1. Environment secrets で本番/ステージングを分離
+    2. OIDC 認証 (secrets 不要で AWS/GCP に認証)
+    3. 短寿命トークンの利用 (GITHUB_TOKEN は自動失効)
+    4. シークレットのローテーション自動化
+    5. PRからのシークレットアクセスを制限
+
+    OIDC フェデレーション (推奨):
+      GitHub Actions → OIDC Token → AWS STS AssumeRole
+      パスワードレスで一時的な認証情報を取得
+    
+
+  ── 4.5 GitOps with ArgoCD ──
+
+    GitOps の原則:
+    1. Git がインフラの唯一の真実の源泉 (Single Source of Truth)
+    2. 宣言的な構成 (Declarative)
+    3. 自動同期 (Automated Reconciliation)
+    4. Git の変更履歴 = デプロイ履歴
+
+    ArgoCD のアーキテクチャ:
+
+    Developer ─── git push ──▶ Git Repository
+                                     │
+                              ArgoCD watches
+                                     │
+                                     ▼
+                             ┌──────────────┐
+                             │   ArgoCD     │
+                             │  Controller  │
+                             └──────┬───────┘
+                                    │ kubectl apply
+                                    ▼
+                             ┌──────────────┐
+                             │  Kubernetes  │
+                             │   Cluster    │
+                             └──────────────┘
+
+    Sync Status:
+      - Synced:    Git の状態 == クラスタの状態
+      - OutOfSync: Git の状態 != クラスタの状態 → 自動/手動で同期
+    
+
+  [ArgoCD Application マニフェスト]
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: myapp
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/myorg/myapp-k8s.git
+        targetRevision: main
+        path: overlays/production     # Kustomize overlay
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: production
+      syncPolicy:
+        automated:
+          prune: true                 # Git から削除 → k8s からも削除
+          selfHeal: true              # 手動変更を自動修復
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
+
+  ── 4.6 パイプライン最適化 ──
+
+    最適化テクニック:
+
+    1. 並列実行:
+       - matrix strategy で複数バージョン/OS を並列テスト
+       - 独立したジョブ (lint, test, security-scan) を並列化
+
+    2. 条件付き実行:
+       - paths フィルタ: docs/ 変更時はテスト不要
+       - if: github.ref == 'refs/heads/main' でデプロイ制御
+
+    3. 早期失敗:
+       - fail-fast: true で最初のテスト失敗で全マトリクス停止
+       - lint を最初に実行 (高速 & フィードバック早い)
+
+    4. Self-hosted runner:
+       - 大規模プロジェクトでコスト削減
+       - GPU テスト、特殊環境が必要な場合
+
+    5. Reusable Workflows:
+       - .github/workflows/reusable-deploy.yml を作成
+       - workflow_call で他ワークフローから呼び出し
+    
+
+  [Quiz] GitOps において Git リポジトリが果たす役割は?
+    A. ソースコードの保存場所
+    B. インフラの唯一の真実の源泉 (Single Source of Truth)
+    C. CI/CD ログの保存場所
+    D. シークレットの管理場所
+  --> 正解: B. インフラの唯一の真実の源泉 (Single Source of Truth)
+      解説: GitOps ではインフラの望ましい状態 (desired state) を Git で管理し、クラスタを自動的に Git の状態に収束させる。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 5: FinOps & Cost Optimization
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 5.1 クラウドコストモデル ──
+
+    主要な料金モデル:
+
+    ┌───────────────────────────────────────────────────────────────┐
+    │ モデル            │ 割引率    │ コミットメント  │ ユースケース  │
+    ├───────────────────┼──────────┼────────────────┼──────────────┤
+    │ On-Demand         │ 0%       │ なし           │ 開発/テスト   │
+    │ Reserved (1yr)    │ ~30-40%  │ 1年           │ 安定ワークロード│
+    │ Reserved (3yr)    │ ~50-60%  │ 3年           │ 長期安定      │
+    │ Savings Plans     │ ~30-60%  │ $/hr で契約    │ 柔軟なコミット│
+    │ Spot/Preemptible  │ ~60-90%  │ なし(中断あり)  │ バッチ処理    │
+    └───────────────────┴──────────┴────────────────┴──────────────┘
+    
+
+  ── 5.2 コスト比較シミュレーション ──
+
+    インスタンス            vCPU  Mem(GB)   On-Demand/月    1yr RI/月     Spot/月      節約額/月
+    ──────────────── ───── ──────── ───────────── ─────────── ────────── ──────────
+    t3.micro             2      1.0 $       7.59 $     4.93 $    2.28 $    5.31
+    t3.medium            2      4.0 $      30.37 $    19.74 $    9.11 $   21.26
+    m5.large             2      8.0 $      70.08 $    45.55 $   21.02 $   49.06
+    m5.xlarge            4     16.0 $     140.16 $    91.10 $   42.05 $   98.11
+    c5.2xlarge           8     16.0 $     248.20 $   161.33 $   74.46 $  173.74
+    r5.xlarge            4     32.0 $     183.96 $   119.57 $   55.19 $  128.77
+
+  ── 5.3 ライトサイジング戦略 ──
+
+    ライトサイジング分析結果:
+    ワークロード                           現在    CPU平均    Mem平均             推奨     削減
+    ──────────────────── ────────────── ──────── ──────── ────────────── ──────
+    API Server                m5.xlarge      15%      25%       m5.large    50% <--
+    Worker                   c5.2xlarge      65%      40%      c5.xlarge    50% <--
+    Database (RDS)           r5.2xlarge      30%      70%      r5.xlarge    50% <--
+    Batch Processor          m5.2xlarge      80%      60%     m5.2xlarge     0% 
+
+  ── 5.4 コスト配分 (タグ戦略) ──
+
+    必須タグの設計:
+
+    ┌─────────────────────────────────────────────────────────┐
+    │ タグキー       │ 例                │ 目的              │
+    ├────────────────┼───────────────────┼───────────────────┤
+    │ Environment    │ prod / staging    │ 環境別コスト把握   │
+    │ Team           │ platform / ml     │ チーム別配分      │
+    │ Service        │ api / worker      │ サービス別コスト   │
+    │ CostCenter     │ CC-1234           │ 部門への請求      │
+    │ Owner          │ alice@example.com │ 責任者            │
+    │ ManagedBy      │ terraform         │ 管理方法          │
+    └────────────────┴───────────────────┴───────────────────┘
+
+    AWS: Tag Policy + SCP で必須タグ強制
+    GCP: Labels + Organization Policy
+    
+
+  ── 5.5 FinOps フレームワーク ──
+
+    FinOps のライフサイクル:
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │                                                             │
+    │   ┌─────────┐    ┌──────────┐    ┌─────────┐              │
+    │   │ INFORM  │───▶│ OPTIMIZE │───▶│ OPERATE │──┐           │
+    │   └─────────┘    └──────────┘    └─────────┘  │           │
+    │       ▲                                        │           │
+    │       └────────────────────────────────────────┘           │
+    │                                                             │
+    │   Inform:   可視化、レポート、アラート                        │
+    │   Optimize: RI/SP購入、ライトサイジング、Spot活用             │
+    │   Operate:  ガバナンス、予算管理、自動化                      │
+    └─────────────────────────────────────────────────────────────┘
+
+    成熟度モデル:
+      Crawl: 基本的なコスト可視化、タグ付け開始
+      Walk:  チーム別配分、RI/SP購入、アラート設定
+      Run:   自動最適化、Unit Economics、予測分析
+    
+
+  ── 5.6 Unit Economics シミュレーション ──
+
+    月間クラウドコスト:     $15,000
+    月間リクエスト数:       50,000,000
+    月間アクティブユーザー:  100,000
+    
+    コスト / リクエスト:    $0.000300
+    コスト / ユーザー:      $0.15
+
+    月次トレンド:
+       月        コスト          リクエスト        $/req     $/user
+    ──── ────────── ────────────── ──────────── ──────────
+       1 $   15,750    55,000,000 $   0.000286 $    0.15
+       2 $   16,500    60,000,000 $   0.000275 $    0.14
+       3 $   17,250    65,000,000 $   0.000265 $    0.14
+       4 $   18,000    70,000,000 $   0.000257 $    0.14
+       5 $   18,750    75,000,000 $   0.000250 $    0.13
+       6 $   19,500    80,000,000 $   0.000244 $    0.13
+
+    ポイント: コストが増えても、Unit Economics が改善していれば健全。
+    リクエスト成長率 > コスト成長率 = スケールメリットが効いている。
+
+  ── 5.7 コスト異常検知アプローチ ──
+
+    過去20日の平均: $501/day
+    標準偏差:       $19
+    異常検知閾値:   $539 (平均 + 2σ)
+
+       Day     Cost Status
+    ────── ──────── ────────────────
+    Day 19: $    501  ██████████  normal
+    Day 20: $    497  █████████  normal
+    Day 21: $    516  ██████████  normal
+    Day 22: $    456  █████████  normal
+    Day 23: $   1200  ████████████████████████  ANOMALY!
+    Day 24: $    950  ███████████████████  ANOMALY!
+    Day 25: $    526  ██████████  normal
+    Day 26: $    493  █████████  normal
+    Day 27: $    511  ██████████  normal
+    Day 28: $    507  ██████████  normal
+    Day 29: $    523  ██████████  normal
+    Day 30: $    467  █████████  normal
+
+  [Quiz] Spot / Preemptible インスタンスに最適なワークロードは?
+    A. データベースサーバー
+    B. バッチ処理 / データパイプライン
+    C. リアルタイム決済システム
+    D. DNS サーバー
+  --> 正解: B. バッチ処理 / データパイプライン
+      解説: Spot インスタンスは中断の可能性があるため、中断耐性があり再実行可能なバッチ処理やデータパイプラインに最適。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Chapter 6: Cloud Security Fundamentals
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ── 6.1 責任共有モデル (Shared Responsibility Model) ──
+
+    AWS 責任共有モデル:
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │                   顧客の責任                                 │
+    │              "Security IN the Cloud"                         │
+    │                                                              │
+    │   ┌──────────────────────────────────────────────────────┐   │
+    │   │  データの暗号化・分類                                  │   │
+    │   │  IAM (アクセス管理)                                   │   │
+    │   │  OS / ネットワーク / ファイアウォール設定               │   │
+    │   │  アプリケーションセキュリティ                           │   │
+    │   │  データ保護 (暗号化, バックアップ)                     │   │
+    │   └──────────────────────────────────────────────────────┘   │
+    ├──────────────────────────────────────────────────────────────┤
+    │                   AWS の責任                                 │
+    │              "Security OF the Cloud"                         │
+    │                                                              │
+    │   ┌──────────────────────────────────────────────────────┐   │
+    │   │  物理セキュリティ (データセンター)                      │   │
+    │   │  ハードウェア / ネットワークインフラ                     │   │
+    │   │  仮想化レイヤー                                       │   │
+    │   │  マネージドサービスの基盤部分                           │   │
+    │   └──────────────────────────────────────────────────────┘   │
+    └──────────────────────────────────────────────────────────────┘
+
+    サービスモデル別の責任範囲:
+      IaaS (EC2):  OS以上は顧客責任
+      PaaS (ECS):  アプリ & データは顧客責任
+      SaaS (S3):   データ & アクセス管理は顧客責任
+    
+
+  ── 6.2 IAM ベストプラクティス ──
+
+    IAM セキュリティチェックリスト:
+      [ ] 最小権限の原則
+          必要最小限の権限のみ付与。Action と Resource を具体的に指定
+      [ ] MFA 必須化
+          全 IAM ユーザーに MFA を強制。特に管理者アカウント
+      [ ] ルートアカウント不使用
+          日常業務にルートアカウントを使わない。MFA + アクセスキー無効化
+      [ ] サービスアカウント分離
+          アプリごとに専用の IAM Role / Service Account を作成
+      [ ] 一時認証情報の利用
+          長期アクセスキーの代わりに IAM Role + STS を使用
+      [ ] 定期的な棚卸し
+          未使用の IAM ユーザー/ロール/ポリシーを定期的に削除
+      [ ] SCPによるガードレール
+          Organization SCP で禁止操作を組織全体に適用
+
+  [最小権限 IAM ポリシー例]
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "AllowS3ReadSpecificBucket",
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ],
+          "Resource": [
+            "arn:aws:s3:::my-app-data",
+            "arn:aws:s3:::my-app-data/*"
+          ],
+          "Condition": {
+            "StringEquals": {
+              "aws:RequestedRegion": "ap-northeast-1"
+            }
+          }
+        },
+        {
+          "Sid": "DenyUnencryptedUploads",
+          "Effect": "Deny",
+          "Action": "s3:PutObject",
+          "Resource": "arn:aws:s3:::my-app-data/*",
+          "Condition": {
+            "StringNotEquals": {
+              "s3:x-amz-server-side-encryption": "aws:kms"
+            }
+          }
+        }
+      ]
+    }
+
+
+  ── 6.3 ネットワークセキュリティ ──
+
+    VPC ネットワーク層の防御:
+
+    ┌─── Internet ─────────────────────────────────────────────┐
+    │                                                          │
+    │   ┌─── WAF (Layer 7) ──────────────────────────────┐     │
+    │   │  SQL Injection, XSS, Bot Protection             │     │
+    │   └──────────────┬──────────────────────────────────┘     │
+    │                  ▼                                       │
+    │   ┌─── ALB/NLB ────────────────────────────────────┐     │
+    │   │  TLS終端, リクエストルーティング                  │     │
+    │   └──────────────┬──────────────────────────────────┘     │
+    │                  ▼                                       │
+    │   ┌─── VPC ────────────────────────────────────────┐     │
+    │   │                                                │     │
+    │   │  ┌─ Public Subnet ──────────────────────────┐  │     │
+    │   │  │  NACL: ステートレス (IN/OUT 両方設定)      │  │     │
+    │   │  │  ┌─────────────────────────────────┐      │  │     │
+    │   │  │  │ Security Group: ステートフル      │      │  │     │
+    │   │  │  │ (IN 許可 → OUT 自動許可)         │      │  │     │
+    │   │  │  │  ┌─────────┐ ┌──────────┐       │      │  │     │
+    │   │  │  │  │ NAT GW  │ │ Bastion  │       │      │  │     │
+    │   │  │  │  └─────────┘ └──────────┘       │      │  │     │
+    │   │  │  └─────────────────────────────────┘      │  │     │
+    │   │  └──────────────────────────────────────────┘  │     │
+    │   │                                                │     │
+    │   │  ┌─ Private Subnet ─────────────────────────┐  │     │
+    │   │  │  App Servers, Databases                   │  │     │
+    │   │  │  インターネット直接アクセス不可              │  │     │
+    │   │  └──────────────────────────────────────────┘  │     │
+    │   └────────────────────────────────────────────────┘     │
+    └──────────────────────────────────────────────────────────┘
+
+    Security Group vs NACL:
+    ┌──────────────────┬──────────────────┬──────────────────┐
+    │                  │ Security Group   │ NACL             │
+    ├──────────────────┼──────────────────┼──────────────────┤
+    │ 状態管理         │ ステートフル      │ ステートレス      │
+    │ 適用対象         │ ENI (インスタンス)│ サブネット        │
+    │ ルール           │ 許可のみ         │ 許可 + 拒否      │
+    │ 評価順           │ 全ルール評価     │ 番号順に評価      │
+    │ デフォルト       │ OUT全許可        │ ALL DENY         │
+    └──────────────────┴──────────────────┴──────────────────┘
+    
+
+  ── 6.4 データ暗号化 ──
+
+    暗号化の3層:
+
+    1. 保存時暗号化 (At-Rest):
+       - S3: SSE-S3 / SSE-KMS / SSE-C
+       - EBS: AES-256 暗号化
+       - RDS: TDE (Transparent Data Encryption)
+       - DynamoDB: AWS managed key / CMK
+
+    2. 転送時暗号化 (In-Transit):
+       - TLS 1.2+ (ALB/NLB で TLS 終端)
+       - VPC 内通信も暗号化推奨 (Service Mesh / mTLS)
+       - S3: aws:SecureTransport 条件で HTTP を拒否
+
+    3. 鍵管理 (KMS):
+       - AWS KMS: CMK (Customer Managed Key) を作成
+       - Key Rotation: 自動ローテーション (年1回)
+       - Key Policy: 誰が鍵を使えるかを制御
+       - Envelope Encryption: CMK → Data Key → データ暗号化
+
+    ┌─────────────────────────────────────────────────────┐
+    │  Envelope Encryption:                               │
+    │                                                     │
+    │  CMK (KMS) ──encrypt──▶ Data Key (暗号化済み)       │
+    │                                                     │
+    │  Data Key (平文) ──encrypt──▶ データ (暗号化済み)    │
+    │                                                     │
+    │  保存するもの: 暗号化済みData Key + 暗号化済みデータ  │
+    │  平文のData Key はメモリ上でのみ使用し即座に破棄      │
+    └─────────────────────────────────────────────────────┘
+    
+
+  ── 6.5 コンプライアンスフレームワーク概要 ──
+
+    主要コンプライアンスフレームワーク:
+
+    [SOC 2]
+      対象: Type I: ある時点の設計評価 / Type II: 期間中の運用評価
+      要点: SaaS企業のほぼ必須。Trust Services Criteria (セキュリティ、可用性、機密性等)
+
+    [HIPAA]
+      対象: 医療情報 (PHI) の保護
+      要点: BAA (Business Associate Agreement) の締結が必要。暗号化・監査ログ必須
+
+    [PCI-DSS]
+      対象: クレジットカード情報の保護
+      要点: 4レベルのコンプライアンス。Level 1 は年次監査必須。トークナイゼーション推奨
+
+    [GDPR]
+      対象: EU 個人データ保護
+      要点: データ主体の権利 (削除権、ポータビリティ)。DPO任命。違反時は売上4%の罰金
+
+    [ISO 27001]
+      対象: 情報セキュリティマネジメントシステム (ISMS)
+      要点: リスクベースアプローチ。PDCA サイクル。認証取得で信頼性向上
+
+  ── 6.6 セキュリティモニタリング (AWS) ──
+
+    AWS セキュリティサービスマップ:
+
+    ┌───────────────────────────────────────────────────────────┐
+    │ カテゴリ      │ サービス           │ 用途                 │
+    ├───────────────┼───────────────────┼──────────────────────┤
+    │ 監査ログ      │ CloudTrail        │ API コール記録       │
+    │ 脅威検知      │ GuardDuty         │ 異常検知 (ML ベース) │
+    │ 統合ダッシュ   │ Security Hub      │ セキュリティ状態一覧  │
+    │ 構成監査      │ AWS Config        │ リソース変更追跡     │
+    │ 脆弱性スキャン │ Inspector         │ EC2/ECR 脆弱性検査  │
+    │ DDoS 防御    │ Shield / WAF      │ L3-L7 攻撃防御     │
+    │ シークレット   │ Secrets Manager   │ 認証情報の管理       │
+    │ 鍵管理       │ KMS               │ 暗号鍵の管理        │
+    │ アクセス分析   │ IAM Access Analyzer│ 外部アクセス検出     │
+    └───────────────┴───────────────────┴──────────────────────┘
+
+    推奨構成:
+      CloudTrail → S3 (ログ保存) + CloudWatch Logs (リアルタイム監視)
+      GuardDuty → SNS → Lambda → Slack/PagerDuty (アラート通知)
+      Security Hub → 全サービスの Findings を集約
+    
+
+  ── 6.7 インシデントレスポンス基本 ──
+
+    インシデントレスポンスの6フェーズ (NIST SP 800-61):
+
+    ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+    │ 1.準備 │─▶│ 2.検知   │─▶│ 3.分析   │─▶│ 4.封じ込め│
+    └────────┘  └──────────┘  └──────────┘  └────┬─────┘
+                                                  │
+    ┌────────┐  ┌──────────┐                      │
+    │ 6.教訓 │◀─│ 5.復旧   │◀─────────────────────┘
+    └────────┘  └──────────┘
+
+    フェーズ別アクション:
+
+    1. 準備 (Preparation):
+       - Runbook / Playbook の整備
+       - インシデント対応チームの定義
+       - 連絡先リスト、エスカレーションパス
+
+    2. 検知 (Detection):
+       - GuardDuty, CloudTrail, IDS/IPS
+       - アラートの優先度分類 (P0-P3)
+
+    3. 分析 (Analysis):
+       - 影響範囲の特定
+       - 攻撃経路の調査 (IOC: Indicators of Compromise)
+       - タイムラインの作成
+
+    4. 封じ込め (Containment):
+       - 短期: Security Group で通信遮断
+       - 長期: 感染リソースの隔離、認証情報ローテーション
+       - フォレンジック用にスナップショット取得
+
+    5. 復旧 (Recovery):
+       - クリーンなイメージから再構築
+       - パッチ適用、脆弱性修正
+       - 段階的にトラフィック復旧
+
+    6. 教訓 (Lessons Learned):
+       - Post-Incident Review (PIR) / Blameless Postmortem
+       - 改善アクションアイテムの作成
+       - Runbook の更新
+    
+
+  ── 6.8 セキュリティ監査シミュレーション ──
+
+    セキュリティ監査レポート
+    スコア: 10/16 (62%)
+    ───────────────────────────────────────────────────────
+    Service        Check                                        Status
+    ────────────── ────────────────────────────────────────── ────────
+    IAM            Root account MFA enabled                       PASS
+    IAM            No access keys for root account                PASS
+    IAM            MFA enabled for all IAM users                  FAIL
+    IAM            No unused IAM credentials (90 days)            FAIL
+    S3             No public buckets                              PASS
+    S3             Default encryption enabled                     PASS
+    S3             Access logging enabled                         FAIL
+    EC2            No unrestricted SSH (0.0.0.0/0:22)             FAIL
+    EC2            EBS volumes encrypted                          PASS
+    RDS            Multi-AZ enabled                               PASS
+    RDS            Automated backups enabled                      PASS
+    RDS            Public accessibility disabled                  PASS
+    CloudTrail     Enabled in all regions                         PASS
+    GuardDuty      Enabled                                        FAIL
+    VPC            Flow Logs enabled                              FAIL
+    KMS            Key rotation enabled                           PASS
+
+    要対応項目 (6件):
+      1. [IAM] MFA enabled for all IAM users
+      2. [IAM] No unused IAM credentials (90 days)
+      3. [S3] Access logging enabled
+      4. [EC2] No unrestricted SSH (0.0.0.0/0:22)
+      5. [GuardDuty] Enabled
+      6. [VPC] Flow Logs enabled
+
+  [Quiz] AWS の責任共有モデルにおいて、顧客が責任を持つのは?
+    A. データセンターの物理セキュリティ
+    B. ハイパーバイザーの管理
+    C. IAM ポリシーとデータの暗号化
+    D. グローバルネットワークインフラ
+  --> 正解: C. IAM ポリシーとデータの暗号化
+      解説: 顧客は 'Security IN the Cloud' の責任を持つ。IAM設定、データの暗号化、アプリケーションセキュリティ等が含まれる。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  全チャプター完了!
+  次のステップ:
+    1. Docker: multi-stage build で自分のアプリをコンテナ化
+    2. K8s: minikube でローカル Deployment を作成
+    3. Terraform: LocalStack で AWS リソースを IaC 化
+    4. CI/CD: GitHub Actions で自動テスト + ビルドを構築
+    5. FinOps: AWS Cost Explorer でコスト可視化を実践
+    6. Security: IAM Access Analyzer で権限を棚卸し
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

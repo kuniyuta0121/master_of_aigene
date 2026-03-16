@@ -1,0 +1,689 @@
+================================================================
+  Python Advanced Features - FAANG 対策完全ガイド
+  標準ライブラリのみ。外部依存なし。
+================================================================
+
+================================================================
+  1. 非同期プログラミング (Async/Await)
+================================================================
+
+
+  -- 1.1 async/await の基本 --
+
+      [task_A] 開始 (待機 0.1s)
+      [task_A] 完了
+      [task_B] 開始 (待機 0.1s)
+      [task_B] 完了
+    逐次実行: task_A_result, task_B_result (0.202s)
+      [task_A] 開始 (待機 0.1s)
+      [task_B] 開始 (待機 0.1s)
+      [task_A] 完了
+      [task_B] 完了
+    並行実行: task_A_result, task_B_result (0.100s)
+    速度向上: 2.0x
+  [考えてほしい疑問] 逐次では0.2s、並行では0.1sで終わる。なぜ？
+
+    > gather は両タスクを同時に開始し、最長の待ち時間だけで済む
+
+  -- 1.2 asyncio.create_task - タスクのスケジューリング --
+
+    タスクをスケジュールした。他の仕事を挟む...
+    create_task 結果: [0, 1, 4, 9, 16]
+    > create_task は gather と違い、タスクを個別に管理できる
+    > キャンセル: task.cancel() で途中停止可能
+
+  -- 1.3 Semaphore - 並行度の制御 --
+
+    [job_0] 実行中 (同時実行数: 1)
+    [job_1] 実行中 (同時実行数: 2)
+    [job_2] 実行中 (同時実行数: 1)
+    [job_3] 実行中 (同時実行数: 2)
+    [job_4] 実行中 (同時実行数: 1)
+    [job_5] 実行中 (同時実行数: 2)
+    全タスク完了: 6件
+  [考えてほしい疑問] Semaphore(2) にしたのに6タスク実行できるのはなぜ？
+
+    > 同時実行数が2に制限されるだけ。順番に2つずつ処理される。
+
+  -- 1.4 Async Generator / Async Context Manager --
+
+    Async generator results: [0, 1, 4, 9, 16]
+    非同期リソース獲得
+    クエリ結果: query_result
+    非同期リソース解放
+
+  -- 1.5 asyncio vs threading vs multiprocessing 比較 --
+
++------------------+----------------+----------------+-----------------+
+| 特性             | asyncio        | threading      | multiprocessing |
++------------------+----------------+----------------+-----------------+
+| 並行/並列        | 並行(concurrent)| 並行(concurrent)| 並列(parallel)  |
+| GIL制約          | 関係なし(I/O)  | CPU処理に影響  | GIL回避         |
+| メモリ           | 最小           | スレッド分     | プロセス分(大)  |
+| 適用場面         | I/Oバウンド    | I/O + レガシー | CPUバウンド     |
+| デバッグ難易度   | 中             | 高(race cond.) | 中              |
+| コンテキスト切替 | 自発的(await)  | OS依存         | OS依存          |
++------------------+----------------+----------------+-----------------+
+
+  [考えてほしい疑問] asyncio はなぜ race condition が起きにくいか？
+
+    > await の位置でしかタスク切り替えが起きない（協調的マルチタスク）
+    > threading は OS がいつでも切り替えるため、予測不能な割り込みが起きる
+
+  -- 1.6 asyncio ベースの簡易 HTTP サーバー/クライアント --
+
+    サーバー起動: ('127.0.0.1', 62311)
+    サーバー受信: GET / HTTP/1.1
+    クライアント受信: {"status": "ok", "message": "Hello from asyncio!"}
+    > aiohttp を使わなくても asyncio だけで HTTP 通信は可能
+  [実装してみよう] WebSocket 風の双方向通信を asyncio.start_server で実装してみよう
+
+
+================================================================
+  2. メタプログラミング
+================================================================
+
+
+  -- 2.1 デコレータ - 関数を包む関数 --
+
+    @timer: slow_function took 0.007023s
+    結果: 4999950000
+    関数名保持 (functools.wraps): slow_function
+    > functools.wraps がないと __name__ は 'wrapper' になってしまう
+
+  -- 2.2 引数ありデコレータ: @retry --
+
+    @retry: flaky_api_call attempt 1 failed: サーバー不安定
+    @retry: flaky_api_call attempt 2 failed: サーバー不安定
+    @retry 結果: success (3回目で成功)
+
+  -- 2.3 型バリデーションデコレータ: @validate_types --
+
+    add_numbers(3, 4) = 7
+    型エラー検出: b: expected int, got str
+
+  -- 2.4 キャッシュデコレータ: @cache 手動実装 --
+
+    fibonacci(30) = 832040
+    キャッシュサイズ: 31
+
+  -- 2.5 クラスデコレータ --
+
+    同一インスタンスか？: True
+
+  -- 2.6 メタクラス - クラスを生成するクラス --
+
+クラスの生成プロセス:
+  1. class文を解析
+  2. type(name, bases, namespace) を呼ぶ
+  3. type.__new__ でクラスオブジェクトを作成
+  4. type.__init__ で初期化
+
+メタクラス = この type を置き換えるもの
+
+    登録済みプラグイン: ['AuthPlugin', 'CachePlugin']
+    > メタクラスは強力だが複雑。大抵は __init_subclass__ で代替可能
+
+  -- 2.7 __init_subclass__ - メタクラスの軽量版 --
+
+    バリデータ一覧: ['EmailValidator', 'PhoneValidator']
+
+  -- 2.8 Descriptor Protocol (__get__, __set__) --
+
+    User: name=Alice, age=30
+    Descriptor 型エラー: _age: expected int, got str
+    > property も descriptor の一種。@property は __get__/__set__ の糖衣構文
+
+  -- 2.9 @dataclass が裏でやっていること --
+
+@dataclass はクラスに以下を自動生成する:
+  - __init__: フィールドから引数を生成
+  - __repr__: フィールドを表示
+  - __eq__: フィールド同士の比較
+  - __hash__: frozen=True の場合
+  - __lt__ 等: order=True の場合
+
+「自分で書いたら退屈なボイラープレート」を自動生成する。
+
+    手動 dataclass: Point(x=1.0, y=2.0)
+    等値比較: True
+
+  -- 2.10 ABC (名目的型) vs Protocol (構造的型) --
+
+    Circle は Drawable か: True
+    Button は Renderable か: True
+
+使い分け:
+  ABC: 「このクラスは必ずXXXを実装せよ」と強制したいとき
+  Protocol: 既存コードを変更せずに互換性を定義したいとき
+  → Go の interface に近いのが Protocol
+  → Java の abstract class に近いのが ABC
+
+  [考えてほしい疑問] Django の Model は ABC とメタクラスのどちらを使っている？なぜ？
+
+
+================================================================
+  3. 型システム (Type Hints Advanced)
+================================================================
+
+
+  -- 3.1 TypeVar と Generic[T] --
+
+    Stack[int]: Stack([1, 2, 3])
+    pop: 3
+    Stack[str]: Stack(['hello', 'world'])
+    safe_divide(10, 3) = 3.3333
+
+  -- 3.2 Literal, TypeGuard --
+
+    Moving north by 5 steps
+    文字列リスト確認: ['a', 'b', 'c']
+    > TypeGuard は mypy に『この条件が True なら型はXXX』と教えるもの
+
+  -- 3.3 Protocol - 構造的型付けの威力 --
+
+    find_min([3,1,4,1,5]) = 1
+    find_min(['c','a','b']) = a
+
+  -- 3.4 @overload - 引数の型に応じた戻り値型 --
+
+    process("abc") = ['a', 'b', 'c']
+    process(5) = [0, 1, 2, 3, 4]
+    > @overload は mypy のため。ランタイムでは型による分岐を自分で書く
+
+  -- 3.5 Annotated - 型にメタデータを付与 --
+
+      PositiveInt = typing.Annotated[int, 'must be positive']
+      Email = typing.Annotated[str, 'must be valid email']
+      メタデータ取得: (<class 'int'>, 'must be positive')
+    > FastAPI/Pydantic は Annotated を使って依存性注入やバリデーションを実現
+
+  -- 3.6 mypy で検出できるバグの具体例 --
+
+# 例1: None チェック漏れ
+def get_user(id: int) -> Optional[User]:
+    ...
+user = get_user(1)
+print(user.name)  # mypy: "Optional[User]" has no attribute "name"
+
+# 例2: 型の不一致
+def add(a: int, b: int) -> int:
+    return a + b
+add(1, "2")  # mypy: Argument 2 has incompatible type "str"
+
+# 例3: 戻り値の型ミス
+def is_valid(x: int) -> bool:
+    return x  # mypy: Incompatible return value type
+
+# 例4: dict のキー存在チェック漏れ
+data: dict[str, int] = {}
+val: int = data["key"]  # mypy は警告しないが TypedDict なら検出可能
+
+ポイント: 型ヒントは「ドキュメント」ではなく「検証可能な仕様」
+
+  [考えてほしい疑問] Pythonの型ヒントはランタイムで何もしない。なぜ有用か？
+
+    > IDE補完、静的解析でのバグ検出、ドキュメント、リファクタ安全性
+
+================================================================
+  4. パフォーマンス最適化
+================================================================
+
+
+  -- 4.1 __slots__ - メモリ削減の実測 --
+
+    PointWithDict  サイズ: 152 bytes
+    PointWithSlots サイズ: 48 bytes
+    削減率: 68%
+    > __slots__ は __dict__ を廃止してメモリを節約する
+    > ただし動的な属性追加ができなくなる
+  [考えてほしい疑問] __slots__ を使ったクラスを継承するとどうなるか？
+
+    > 子クラスでも __slots__ を定義しないと __dict__ が復活する
+
+  -- 4.2 Generator vs List Comprehension - メモリ比較 --
+
+    List comprehension サイズ: 85,176 bytes
+    Generator expression サイズ: 104 bytes
+    メモリ効率: generator は 819x 少ない
+    > sum(), max(), any() に渡すなら generator で十分
+    > 例: sum(x*x for x in range(10000)) -- リストを作らない
+
+  -- 4.3 functools.lru_cache - メモ化 --
+
+    fib_naive(30):  0.8777s
+    fib_cached(30): 0.000026s
+    高速化: 33460x
+    キャッシュ情報: CacheInfo(hits=28, misses=31, maxsize=None, currsize=31)
+    > lru_cache(maxsize=None) は Python 3.9+ の @cache と同等
+    > 引数が hashable でないと使えない（list, dict は不可）
+
+  -- 4.4 bisect / heapq / deque の正しい使い方 --
+
+    insort 結果: [1, 2, 3, 5, 7, 8, 9]
+    bisect_left(5) -> index 3, value 5
+    heapq (最小値から取得):
+      priority=1, task=critical
+      priority=2, task=medium
+      priority=3, task=low
+    deque(maxlen=5) に 0-7 を追加: [3, 4, 5, 6, 7]
+    > maxlen を設定するとリングバッファとして使える
+
+  -- 4.5 struct.pack - バイナリデータ処理 --
+
+    パック済みバイナリ: 0800005000bc614e
+    アンパック: protocol=0x0800, port=80, seq=12345678
+    > ネットワークプログラミングでは byte order に注意
+    > ! = big-endian (ネットワーク標準), < = little-endian (x86)
+
+  -- 4.6 array.array vs list - メモリ比較 --
+
+    list[int] 推定サイズ:     359,656 bytes
+    array('i') サイズ:         40,420 bytes
+    > array.array は値を直接格納（ポインタのオーバーヘッドなし）
+    > numpy が使えない環境での数値配列に有用
+
+  -- 4.7 timeit / cProfile でのプロファイリング --
+
+    sum(range(1000)):         0.0324s / 1000回
+    sum(x for x in range()): 0.0787s / 1000回
+    > range は C 実装なので generator より速いことがある
+    cProfile 結果 (上位3件):
+      2 function calls in 0.001 seconds
+      
+         Ordered by: cumulative time
+      
+         ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+              1    0.001    0.001    0.001    0.001 /Users/yuta/master_of_aigene/projects/knowledge_ai/./phase_programming/python_advanced.py:1046(profile_target)
+              1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+  [考えてほしい疑問] なぜPythonはC/Go/Rustの100倍遅いのか？
+
+1. インタプリタ: バイトコード → CPython VM で逐次実行
+2. 動的型付け: 演算のたびに型チェック・ディスパッチ
+3. GIL: マルチコア活用不可（CPUバウンド）
+4. オブジェクトコスト: int 1つで 28 bytes (C は 4 bytes)
+
+対策: NumPy/C拡張 / PyPy / Cython / 適切なアルゴリズム選択
+
+  [実装してみよう] 同じアルゴリズムを Python と Go で実装して速度差を実測してみよう
+
+
+================================================================
+  5. コンテキストマネージャとリソース管理
+================================================================
+
+
+  -- 5.1 __enter__ / __exit__ 手動実装 --
+
+    [Timer] sum calculation: 0.0347s
+    結果: 499999500000, 経過: 0.0347s
+    [Suppress] 例外を抑制: テストエラー
+    ValueError は抑制され、ここに到達
+
+  -- 5.2 contextlib.contextmanager - ジェネレータで簡潔に --
+
+    ディレクトリ作成: /tmp/test_4304590384
+    作業中: /tmp/test_4304590384
+    ディレクトリ削除: /tmp/test_4304590384
+    > yield の前が __enter__、yield の後が __exit__
+    > try/finally で確実にクリーンアップ
+
+  -- 5.3 contextlib.ExitStack - 複数リソースの動的管理 --
+
+      [DB] 獲得
+      [Cache] 獲得
+      [Queue] 獲得
+    全リソース獲得: ['DB', 'Cache', 'Queue']
+      [Queue] 解放
+      [Cache] 解放
+      [DB] 解放
+    ExitStack: 全リソースが逆順で解放された
+    > 動的に数が変わるリソースに最適（例: N個のDB接続）
+
+  -- 5.4 Async Context Manager --
+
+    非同期DB接続開始: postgres://localhost/db
+    クエリ実行中: {'connection': 'postgres://localhost/db', 'status': 'connected'}
+    非同期DB接続終了: postgres://localhost/db
+
+  -- 5.5 ContextVar - asyncio 用のスレッドローカル代替 --
+
+      処理中 request_id=req-001
+      処理中 request_id=req-002
+      処理中 request_id=req-003
+    > threading.local の asyncio 版。タスクごとに独立した値を保持
+    > FastAPI の request context などで活用される
+
+================================================================
+  6. イテレータ・ジェネレータの深掘り
+================================================================
+
+
+  -- 6.1 イテレータプロトコル手動実装 --
+
+    Fibonacci (<=100): [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+
+  -- 6.2 yield from - サブジェネレータ委任 --
+
+    flatten([1, [2, 3], [4, [5, 6]], 7]) = [1, 2, 3, 4, 5, 6, 7]
+    accumulator 最終値: 60
+
+  -- 6.3 Generator の send() / throw() / close() --
+
+    send(10) -> avg = 10.0
+    send(20) -> avg = 15.0
+    send(30) -> avg = 20.0
+    > send() は yield 式に値を送り込む
+    > throw() はジェネレータ内で例外を発生させる
+    > close() は GeneratorExit を送出して終了
+
+  -- 6.4 itertools 実用パターン --
+
+    chain: [1, 2, 3, 4, 5]
+    product: [('A', '1'), ('A', '2'), ('B', '1'), ('B', '2')]
+    combinations('ABCD', 2): [('A', 'B'), ('A', 'C'), ('A', 'D'), ('B', 'C'), ('B', 'D'), ('C', 'D')]
+    permutations('ABC', 2): [('A', 'B'), ('A', 'C'), ('B', 'A'), ('B', 'C'), ('C', 'A'), ('C', 'B')]
+    groupby: {'A': [1, 3], 'B': [2, 4]}
+    islice(count(), 5, 10): [5, 6, 7, 8, 9]
+    accumulate([1,2,3,4,5]): [1, 3, 6, 10, 15]
+    starmap(pow, [(2,3),(3,2)]): [8, 9]
+
+  -- 6.5 無限イテレータ: count, cycle, repeat --
+
+    count(10, 3) 最初の5個: [10, 13, 16, 19, 22]
+    cycle(['R','G','B']) x 7: ['R', 'G', 'B', 'R', 'G', 'B', 'R']
+    repeat('x', 4): ['x', 'x', 'x', 'x']
+
+  -- 6.6 ジェネレータベースのパイプライン処理 --
+
+    Engineering メンバー: ['Alice', 'Charlie', 'Eve']
+    > 各ステージは遅延評価。メモリ使用量は O(1)
+    > Unix パイプ (cat | grep | sort) と同じ考え方
+  [実装してみよう] ログファイルを読み込み、エラーだけ抽出するパイプラインを作ってみよう
+
+
+================================================================
+  7. テスト技法
+================================================================
+
+
+  -- 7.1 unittest.mock - Mock と MagicMock --
+
+    Mock 結果: {'id': 1, 'name': 'Alice'}
+    呼び出し確認: True
+    呼び出し引数: call(user_id=1)
+    MagicMock len: 42
+    MagicMock [0]: item
+
+  -- 7.2 side_effect - エラーシミュレーション --
+
+    side_effect 例外: DB接続失敗
+    1回目: {'status': 500}
+    2回目: {'status': 200, 'data': 'ok'}
+    side_effect 関数: 7
+
+  -- 7.3 patch - モジュールレベルのモック --
+
+    patch後の os.path.exists('/fake'): True
+    patch解除後の os.path.exists('/fake'): False
+    > patch はコンテキストマネージャとしてもデコレータとしても使える
+
+  -- 7.4 テストダブル: Stub, Fake, Spy, Mock の違い --
+
+    Stub: {'id': 1, 'name': 'Test User', 'active': True}
+    Fake: {'id': 1, 'name': 'Alice'}
+    Spy 記録: ['action_1', 'action_2']
+    Mock: assert_called_once_with 通過
+
+使い分け:
+  Stub: 依存オブジェクトの戻り値を固定したいとき
+  Fake: 本物に近い動作が必要だがDBは使いたくないとき
+  Spy:  何が呼ばれたか記録したいとき
+  Mock: 特定のメソッドが特定の引数で呼ばれたか検証したいとき
+
+
+  -- 7.5 Property-Based テストの考え方 --
+
+従来のテスト:
+  assert sort([3, 1, 2]) == [1, 2, 3]  # 具体例
+
+Property-Based テスト:
+  任意のリスト xs に対して:
+    - sort(xs) の長さは len(xs) と同じ
+    - sort(xs) の各要素は元のリストに含まれる
+    - sort(xs)[i] <= sort(xs)[i+1] が全てのiで成立
+
+ツール: hypothesis (Python), QuickCheck (Haskell)
+
+    Property-Based テスト: 100ケース全て通過
+
+  -- 7.6 Fixture パターン --
+
+    Fixture: セットアップ完了
+    Fixture データ: {'id': 1, 'name': 'Alice', 'role': 'admin'}
+    Fixture: ティアダウン完了
+    > pytest では @pytest.fixture デコレータで宣言的に書ける
+    > scope='session' で全テストで共有するFixtureも定義可能
+  [実装してみよう] @retry デコレータのテストを Mock と side_effect で書いてみよう
+
+
+================================================================
+  8. Pythonic イディオム
+================================================================
+
+
+  -- 8.1 EAFP vs LBYL --
+
+    LBYL: Alice
+    EAFP: Alice
+
+EAFP が Pythonic な理由:
+  1. 例外処理が高速に最適化されている（正常パスは速い）
+  2. TOCTOU 問題を回避（チェックと使用の間に状態が変わりうる）
+  3. ダックタイピングと相性が良い
+  4. コードが DRY になる（チェックと使用が分離しない）
+
+
+  -- 8.2 Walrus Operator (:=) - Python 3.8+ --
+
+    Walrus operator: [25, 64, 81]
+    Walrus + while: errors = ['404', '500']
+    > := は『計算結果を変数に束縛しつつ、式として使う』
+    > 乱用すると読みにくい。条件式とwhile で使うのが主な用途
+
+  -- 8.3 match-case - 構造的パターンマッチ (Python 3.10+) --
+
+      {'action': 'move', 'direction': 'north', 'steps': 3} -> Moving north by 3 steps
+      {'action': 'attack', 'target': 'dragon'} -> Attacking dragon
+      {'action': 'heal', 'amount': 50} -> Healing for 50 HP
+      {'action': 'dance'} -> Unknown action: dance
+      invalid -> Invalid command
+      chapter_8_pythonic.<locals>.HttpResponse(status=200, body='Hello World') -> OK: Hello World
+      chapter_8_pythonic.<locals>.HttpResponse(status=404, body='') -> Not Found
+      chapter_8_pythonic.<locals>.HttpResponse(status=503, body='Service Unavailable') -> Server Error: 503
+    > match-case は単純な if-elif ではない。構造の分解ができる
+    > ガード条件 (if ...) で追加のフィルタリングが可能
+
+  -- 8.4 引数: *args, **kwargs, /, * --
+
+    api_function("/users"): GET /users (timeout=30)
+    api_function("/users", "POST", timeout=10): POST /users (timeout=10)
+    positional-only エラー: chapter_8_pythonic.<locals>.api_function() got some positional-only arguments passed as keyword arguments: 'path'
+
+引数の種類:
+  def f(a, b, /, c, d, *, e, f):
+        ^^^^      ^^^^      ^^^^
+    positional-   通常   keyword-
+      only                 only
+
+なぜ重要か:
+  - API設計で意図を明確にする
+  - 引数名の変更がbreaking changeにならない (positional-only)
+  - キーワード強制で可読性を上げる (keyword-only)
+
+
+  -- 8.5 __all__, __slots__, __repr__, __hash__, __eq__ --
+
+    Money: Money(1000, 'JPY')
+    Money + Money: Money(3000, 'JPY')
+    hash: -4872690980742181110
+    等値: True
+    dict キー: cheap
+    イミュータブル: Money is immutable
+
+  -- 8.6 namedtuple vs dataclass vs TypedDict --
+
+    namedtuple: Color(r=255, g=0, b=0), r=255
+    NamedTuple: Coordinate(lat=35.6762, lon=139.6503, label='Tokyo')
+    dataclass: chapter_8_pythonic.<locals>.Product(name='Widget', price=9.99, stock=10), available=True
+    frozen dataclass: FrozenInstanceError: cannot assign to field 'price'
+    TypedDict: {'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
+    TypedDict type: <class 'dict'>
+
+使い分け:
+  namedtuple: 座標、色など immutable な値の組。軽量。
+  dataclass:  メソッドが必要な構造体。ミュータブルなデータ。
+  TypedDict:  JSON/APIレスポンスの型定義。dict として扱いたい。
+  frozen DC:  dict キーに使いたい値オブジェクト。
+
+
+  -- 8.7 高度なパターンマッチ: シーケンス/マッピング/型 --
+
+      []                             -> 空リスト
+      [42]                           -> 要素1つ: 42
+      [1, 2]                         -> ペア: (1, 2)
+      [1, 2, 3, 4, 5]                -> 先頭 1, 残り 4 個
+      'Hello World from Python'      -> 長い文字列: Hello Worl...
+      42                             -> 正の整数: 42
+      -1                             -> その他: int
+
+================================================================
+  9. 総合演習: 実践的な設計パターン
+================================================================
+
+
+  -- 9.1 Observer パターン --
+
+    user_created イベント発火:
+      Email送信: Alice さんへようこそ!
+      ログ記録: ユーザー Alice を作成
+
+  -- 9.2 Pipeline パターン - データ処理チェーン --
+
+    Pipeline 結果: [64, 100, 144, 196, 256, 324]
+
+  -- 9.3 Repository パターン - ABC + dataclass --
+
+    find_by_id(1): chapter_9_practical.<locals>.Entity(id=1, name='Alice', created_at=1773561665.15902)
+    find_all: ['Alice', 'Bob', 'Charlie']
+    delete(2): True
+    残り: ['Alice', 'Charlie']
+
+  -- 9.4 Circuit Breaker パターン --
+
+      呼び出し 1: service down
+      呼び出し 2: service down
+      [CB] -> OPEN (failures=3)
+      呼び出し 3: service down
+      呼び出し 4: Circuit is OPEN for unreliable_service
+      [CB] HALF_OPEN
+      [CB] -> OPEN (failures=4)
+      呼び出し 5: service down
+      呼び出し 6: Circuit is OPEN for unreliable_service
+
+  -- 9.5 型安全な設定管理 --
+
+    debug: False
+    port: 8080
+    db_url: sqlite:///local.db
+    > descriptor + 環境変数で 12-Factor App の設定管理を実現
+
+  -- 9.6 非同期ワーカープール (asyncio + Semaphore) --
+
+    全タスク完了: 10 件
+    結果サンプル: [(0, 'result_0'), (1, 'result_1'), (2, 'result_2')]...
+  [実装してみよう] この非同期ワーカープールに進捗報告機能を追加してみよう
+
+
+================================================================
+  10. 面接でよく聞かれるポイントまとめ
+================================================================
+
+  Q: GIL とは？
+    A: Global Interpreter Lock。CPython で一度に1スレッドしか Pythonバイトコードを実行できない。
+    対策: multiprocessing(CPUバウンド), asyncio(I/Oバウンド), C拡張で GIL を解放
+
+  Q: デコレータの仕組み
+    A: @decorator は糖衣構文。func = decorator(func) と同じ。
+    引数ありの場合: @decorator(arg) は func = decorator(arg)(func)
+
+  Q: __new__ vs __init__
+    A: __new__: インスタンスを生成（cls を受け取る）
+    __init__: インスタンスを初期化（self を受け取る）
+    __new__ で生成を制御: シングルトン、イミュータブル型の拡張
+
+  Q: MRO (Method Resolution Order)
+    A: 多重継承時のメソッド探索順序。C3 線形化アルゴリズム。
+    MyClass.mro() で確認可能。super() は MRO に従う。
+
+  Q: is vs ==
+    A: is: 同一オブジェクト (id が同じ)
+    ==: 等値 (__eq__ で定義される)
+    None のチェックは必ず is を使う: if x is None
+
+  Q: 深いコピー vs 浅いコピー
+    A: 浅いコピー: copy.copy() -- ネストしたオブジェクトは共有
+    深いコピー: copy.deepcopy() -- 全てを再帰的にコピー
+    list[:], dict.copy() は浅いコピー
+
+  Q: ジェネレータの利点
+    A: 遅延評価でメモリ O(1)。パイプライン処理に最適。
+    大規模ファイル処理: for line in open('huge.txt') は generator
+
+  Q: async/await の動作原理
+    A: イベントループがタスクを管理。await で制御を返す。
+    シングルスレッド + 協調的マルチタスク。
+    I/O 待ちの間に他のタスクを進める。
+
+FAANG面接のコツ:
+  1. 「なぜ」を説明できること（How だけでなく Why）
+  2. トレードオフを語れること（メリットだけでなくデメリット）
+  3. 実務での経験を交えること（「前のプロジェクトで...」）
+  4. 代替案を提示できること（「Xもあるが、Yの方が適切。なぜなら...」）
+
+
+================================================================
+  全チャプター完了!
+
+  次のステップ:
+    1. [実装してみよう] のタスクに取り組む
+    2. 各 [考えてほしい疑問] に自分の言葉で答える
+    3. mypy python_advanced.py で型チェックを体験
+    4. polyglot_guide.py で他言語との比較を学ぶ
+================================================================
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - async/await基礎 (asyncio.gather, イベントループ)
+    - 型ヒント (TypeVar, Generic, Protocol)
+    - pytest / Mock (テスト設計・依存注入)
+    - リスト内包表記・Pythonic idioms
+
+  【Tier 2: 重要 — 実務で頻出】
+    - デコレータ (@retry, @cache, functools.wraps)
+    - contextmanager (with文カスタム)
+    - __slots__ (メモリ最適化)
+    - generator / yield (遅延評価)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - メタクラス (__init_subclass__, ABCMeta)
+    - descriptor (__get__/__set__)
+    - @overload (型の条件分岐)
+    - Property-based testing (Hypothesis的発想)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - match-case (構造的パターンマッチング)
+    - walrus operator (:=)
+    - メタプログラミング応用 (動的クラス生成, exec/eval)
+

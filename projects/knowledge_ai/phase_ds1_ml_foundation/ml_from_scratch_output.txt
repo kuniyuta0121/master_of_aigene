@@ -1,0 +1,175 @@
+/Users/yuta/master_of_aigene/projects/knowledge_ai/.venv/lib/python3.10/site-packages/sklearn/linear_model/_logistic.py:473: ConvergenceWarning: lbfgs failed to converge after 300 iteration(s) (status=1):
+STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
+
+Increase the number of iterations to improve the convergence (max_iter=300).
+You might also want to scale the data as shown in:
+    https://scikit-learn.org/stable/modules/preprocessing.html
+Please also refer to the documentation for alternative solver options:
+    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression
+  n_iter_i = _check_optimize_result(
+/Users/yuta/master_of_aigene/projects/knowledge_ai/.venv/lib/python3.10/site-packages/sklearn/linear_model/_logistic.py:473: ConvergenceWarning: lbfgs failed to converge after 300 iteration(s) (status=1):
+STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
+
+Increase the number of iterations to improve the convergence (max_iter=300).
+You might also want to scale the data as shown in:
+    https://scikit-learn.org/stable/modules/preprocessing.html
+Please also refer to the documentation for alternative solver options:
+    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression
+  n_iter_i = _check_optimize_result(
+/Users/yuta/master_of_aigene/projects/knowledge_ai/.venv/lib/python3.10/site-packages/sklearn/linear_model/_logistic.py:473: ConvergenceWarning: lbfgs failed to converge after 300 iteration(s) (status=1):
+STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
+
+Increase the number of iterations to improve the convergence (max_iter=300).
+You might also want to scale the data as shown in:
+    https://scikit-learn.org/stable/modules/preprocessing.html
+Please also refer to the documentation for alternative solver options:
+    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression
+  n_iter_i = _check_optimize_result(
+/Users/yuta/master_of_aigene/projects/knowledge_ai/.venv/lib/python3.10/site-packages/sklearn/linear_model/_logistic.py:473: ConvergenceWarning: lbfgs failed to converge after 300 iteration(s) (status=1):
+STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
+
+Increase the number of iterations to improve the convergence (max_iter=300).
+You might also want to scale the data as shown in:
+    https://scikit-learn.org/stable/modules/preprocessing.html
+Please also refer to the documentation for alternative solver options:
+    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression
+  n_iter_i = _check_optimize_result(
+╔════════════════════════════════════════════════════════════╗
+║   ML from Scratch - アルゴリズムを数学から実装する         ║
+╚════════════════════════════════════════════════════════════╝
+
+  学習のポイント:
+    ・各アルゴリズムの「更新式」を暗記ではなく導出から理解する
+    ・sklearn の実装と結果を比較して実装の正しさを確認する
+    ・Google面接では「このアルゴリズムをゼロから実装してください」が出る
+
+
+════════════════════════════════════════════════════════════
+📐 1. 線形回帰
+────────────────────────────────────────────────────────────
+  normal_equation          : R²=0.9821, θ≈[0.97 2.98 1.97]
+    収束: 101ステップ
+  gradient_descent         : R²=0.9821, θ≈[0.97 2.98 1.97]
+  ← θ = [切片≈1, 係数1≈3, 係数2≈2] が復元できているか確認
+  sklearn (参考):          R²=0.9821
+
+════════════════════════════════════════════════════════════
+📊 2. ロジスティック回帰
+────────────────────────────────────────────────────────────
+  正則化 λ=0.00: 精度=0.900
+  正則化 λ=0.01: 精度=0.900
+  正則化 λ=0.10: 精度=0.900
+  sklearn (参考):  精度=0.900
+
+════════════════════════════════════════════════════════════
+🌳 3. 決定木 - 過学習の観察
+────────────────────────────────────────────────────────────
+  max_depth | 訓練精度 | テスト精度 | 過学習ギャップ
+  ────────────────────────────────────────────────
+  depth=1     | 0.933   | 0.883    | 0.050 
+  depth=2     | 0.933   | 0.883    | 0.050 
+  depth=3     | 0.975   | 0.933    | 0.042 
+  depth=5     | 1.000   | 0.900    | 0.100 
+  depth=10    | 1.000   | 0.900    | 0.100 
+  depth=None  | 1.000   | 0.900    | 0.100 
+
+════════════════════════════════════════════════════════════
+🔵 4. K-Means クラスタリング
+────────────────────────────────────────────────────────────
+  K=4, K-Means++ 初期化
+  SSE（慣性）: 362.47
+  Adjusted Rand Index: 1.000 (1.0が完璧)
+  エルボー法（SSE vs k）:
+    k=1: SSE= 19780.3 ██████████
+    k=2: SSE=  9211.2 ██████████████████████████
+    k=3: SSE=  1919.4 █████████████████████████████████████
+    k=4: SSE=   362.5 ███████████████████████████████████████
+    k=5: SSE=   329.9 ███████████████████████████████████████
+    k=6: SSE=   295.0 ███████████████████████████████████████
+
+════════════════════════════════════════════════════════════
+📉 5. PCA - 次元削減
+────────────────────────────────────────────────────────────
+  元の次元数: 64次元 (8x8ピクセル)
+  累積説明分散比:
+    PC1: 14.9% | 累積: 14.9% ██████████████
+    PC2: 13.6% | 累積: 28.5% █████████████
+    PC3: 11.8% | 累積: 40.3% ███████████
+    PC4: 8.4% | 累積: 48.7% ████████
+    PC5: 5.8% | 累積: 54.5% █████
+    PC6: 4.9% | 累積: 59.4% ████
+    PC7: 4.3% | 累積: 63.7% ████
+    PC8: 3.7% | 累積: 67.4% ███
+    PC9: 3.4% | 累積: 70.7% ███
+    PC10: 3.1% | 累積: 73.8% ███
+    PC11: 2.4% | 累積: 76.2% ██
+    PC12: 2.3% | 累積: 78.5% ██
+    PC13: 1.8% | 累積: 80.3% █
+    PC14: 1.8% | 累積: 82.1% █
+    PC15: 1.5% | 累積: 83.5% █
+    PC16: 1.4% | 累積: 84.9% █
+    PC17: 1.3% | 累積: 86.3% █
+    PC18: 1.2% | 累積: 87.5% █
+    PC19: 1.0% | 累積: 88.5% █
+    PC20: 0.9% | 累積: 89.4% 
+    PC21: 0.9% | 累積: 90.3% 
+    PC22: 0.8% | 累積: 91.1% 
+    PC23: 0.8% | 累積: 91.9% 
+    PC24: 0.7% | 累積: 92.6% 
+    PC25: 0.7% | 累積: 93.3% 
+    PC26: 0.6% | 累積: 93.9% 
+    PC27: 0.6% | 累積: 94.5% 
+    PC28: 0.5% | 累積: 95.0% 
+    PC29: 0.5% | 累積: 95.5% 
+    → 29次元で95%の分散を説明できる
+  圧縮後: 20次元
+  再構成誤差 (MSE): 1.9843
+  10次元: 分類精度=0.885
+  20次元: 分類精度=0.898
+  40次元: 分類精度=0.926
+  64次元: 分類精度=0.928
+
+════════════════════════════════════════════════════════════
+📧 6. ナイーブベイズ - テキスト分類
+────────────────────────────────────────────────────────────
+  訓練: 2240件, テスト: 1492件
+  語彙数: 5,000
+  α=0.001: 精度=0.948
+  α=0.100: 精度=0.949
+  α=1.000: 精度=0.946
+
+════════════════════════════════════════════════════════════
+✅ 完了！面接で「実装してください」と言われたとき:
+   線形回帰: θ_new = θ - α * (1/N) * X^T(Xθ - y)
+   ロジスティック: θ_new = θ - α * (1/N) * X^T(σ(Xθ) - y)
+   決定木: 情報利得 = H(親) - Σ (|子|/|親|) * H(子)
+   K-Means: 割り当て → 重心更新 → 収束まで繰り返す
+   PCA: 共分散行列の固有値分解（または SVD）
+
+[実装してみよう]
+  1. ランダムフォレストを DecisionTree を使って実装（バギング）
+  2. ミニバッチ SGD で LinearRegression を拡張
+  3. SVM（サポートベクターマシン）のヒンジ損失を実装
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - 線形回帰(勾配降下法)
+    - ロジスティック回帰
+    - 決定木
+
+  【Tier 2: 重要 — 実務で頻出】
+    - K-Means(K-Means++初期化)
+    - PCA(次元削減)
+    - 交差検証
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Naive Bayes
+    - L1/L2正則化の数学的理解
+    - バイアス-バリアンス
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - カーネルSVM
+    - EM Algorithm
+    - ガウス過程
+

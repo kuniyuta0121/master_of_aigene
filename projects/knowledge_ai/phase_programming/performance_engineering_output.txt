@@ -1,0 +1,381 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  Performance Engineering                                       ║
+║  計測 → 分析 → 最適化 → 検証 のサイクル                        ║
+║  「推測するな、計測せよ」— Rob Pike                             ║
+╚══════════════════════════════════════════════════════════════════╝
+======================================================================
+Chapter 1: CPU & Memory Performance
+  キャッシュ・メモリレイアウト — ハードウェアを味方にする
+======================================================================
+
+────────────────────────────────────────────────────────────
+1.1 キャッシュフレンドリーなアクセスパターン
+────────────────────────────────────────────────────────────
+
+  1000×1000 matrix traversal:
+    Row-major (cache-friendly):     298.66 ms
+    Column-major (cache-hostile):    640.58 ms
+    Ratio: 2.14x slower
+
+    なぜ差が出るか:
+    ┌─────────────────────────────────────────────┐
+    │ CPU Cache Hierarchy                          │
+    │                                               │
+    │ L1 Cache:  32-64 KB,  ~1 ns   (4 cycles)     │
+    │ L2 Cache:  256-512 KB, ~3 ns  (12 cycles)    │
+    │ L3 Cache:  8-32 MB,   ~10 ns  (40 cycles)    │
+    │ Main RAM:             ~100 ns (400 cycles)    │
+    │ SSD:                  ~100 μs (400K cycles)   │
+    │ HDD:                  ~10 ms  (40M cycles)    │
+    └─────────────────────────────────────────────┘
+
+    Cache Line: 64 bytes (CPU は 64byte 単位でメモリを読む)
+    Row-major: 次の要素が同じ cache line → L1 hit
+    Column-major: 次の要素が SIZE × 8bytes 先 → cache miss
+    
+────────────────────────────────────────────────────────────
+1.2 Python オブジェクトのメモリサイズ
+────────────────────────────────────────────────────────────
+
+  Object                    Size (bytes)
+  ----------------------------------------
+  int (0)                             24
+  int (1)                             28
+  int (2**30)                         32
+  float                               24
+  bool                                28
+  None                                16
+  str (empty)                         49
+  str ('hello')                       54
+  list (empty)                        56
+  list (10 ints)                     136
+  dict (empty)                        64
+  dict (10 items)                    360
+  set (empty)                        216
+  tuple (empty)                       40
+  tuple (10)                         120
+
+  class WithoutSlots: 152 bytes (obj + __dict__)
+  class WithSlots:   56 bytes
+  → __slots__ で 96 bytes 削減/instance
+
+    ★ 100万オブジェクトのとき:
+    - WithoutSlots: ~152 bytes × 1M = 152 MB
+    - WithSlots:    ~56 bytes × 1M  = 56 MB  (63% 削減)
+    → 大量オブジェクトを扱う場合は __slots__ or dataclass(slots=True) を使う
+    
+────────────────────────────────────────────────────────────
+1.3 SoA vs AoS (データレイアウト)
+────────────────────────────────────────────────────────────
+
+    AoS (Array of Structs) — 一般的なOOP:
+    [Point(x=1,y=2,z=3), Point(x=4,y=5,z=6), ...]
+    Memory: |x1|y1|z1|x2|y2|z2|x3|y3|z3|...
+
+    SoA (Struct of Arrays) — 数値計算/ゲーム/GPU向け:
+    xs = [1, 4, 7, ...]
+    ys = [2, 5, 8, ...]
+    zs = [3, 6, 9, ...]
+    Memory: |x1|x2|x3|...|y1|y2|y3|...|z1|z2|z3|...
+
+    SoA のメリット:
+    - SIMD (ベクトル演算) で一括処理可能
+    - 特定フィールドだけアクセスする場合、cache line に無駄がない
+    - NumPy / Pandas / Polars は内部的に SoA (columnar)
+    
+  Summing x from 100,000 points:
+    AoS (list of dicts): 15.13 ms
+    SoA (separate lists): 1.18 ms
+    Ratio: 12.82x
+
+======================================================================
+Chapter 2: Probabilistic Data Structures
+  正確さを少し犠牲にして、大幅にメモリ・速度を改善する
+======================================================================
+
+────────────────────────────────────────────────────────────
+2.1 Bloom Filter
+────────────────────────────────────────────────────────────
+
+  Capacity: 10,000, FP rate: 1%
+  Bit array size: 95,850 bits (11.7 KB)
+  Hash functions: 6
+
+  False positive rate: 109/10000 = 1.09%
+  vs Set: 512 KB
+
+    用途:
+    - DB: 「このキーは存在しない」を高速判定 (ディスクI/O 回避)
+    - Web: ブラウザのフィッシングサイト検出 (Chrome Safe Browsing)
+    - CDN: キャッシュヒット率向上
+    - 分散システム: レプリカ間の差分検出の前段
+    
+────────────────────────────────────────────────────────────
+2.2 Count-Min Sketch (頻度推定)
+────────────────────────────────────────────────────────────
+
+  50,000 URL accesses (Zipf distribution):
+  Memory: 19.5 KB (vs dict: ~5 KB)
+
+  URL                    Actual  Estimated    Error
+  --------------------------------------------------
+  url:/page/1             32524      32524       +0
+  url:/page/2              8004       8004       +0
+  url:/page/3              3312       3312       +0
+  url:/page/4              1714       1714       +0
+  url:/page/5              1031       1031       +0
+  url:/page/6               701        701       +0
+  url:/page/7               489        489       +0
+  url:/page/8               377        377       +0
+
+    用途: Top-K, Heavy Hitter 検出, ストリーム処理での頻度推定
+    特徴: 常に過大推定 (never undercount), メモリ固定
+    
+────────────────────────────────────────────────────────────
+2.3 HyperLogLog (カーディナリティ推定)
+────────────────────────────────────────────────────────────
+
+  Added 100,000 items (50,000 unique):
+    Actual unique:        43,089
+    HLL estimated:        43,899
+    Error:                 1.88%
+    Memory:                16.0 KB (vs Set: ~2048 KB)
+
+    Redis の PFADD/PFCOUNT は HyperLogLog:
+    - 12 KB で数十億のユニーク数を ~0.81% 誤差で推定
+    - DAU (Daily Active Users) のカウントに最適
+    
+
+======================================================================
+Chapter 3: Caching Strategies
+  キャッシュの設計 — 正しく使えば 100x 速くなる
+======================================================================
+
+────────────────────────────────────────────────────────────
+3.1 キャッシュ置換アルゴリズム比較
+────────────────────────────────────────────────────────────
+
+  Workload: 10,000 ops, 80% hot (20 keys), 20% cold (1000 keys)
+  Cache capacity: 50
+
+  Algorithm      Hits   Misses   Hit Rate
+  ----------------------------------------
+  LRU            8018     1982     80.2%
+  LFU            8047     1953     80.5%
+
+    キャッシュ戦略:
+    ┌──────────────────┬────────────────────────────────┐
+    │ Strategy          │ 説明                            │
+    ├──────────────────┼────────────────────────────────┤
+    │ Cache-Aside       │ App が Cache miss → DB → Cache  │
+    │ Read-Through      │ Cache が DB から自動 load        │
+    │ Write-Through     │ Cache + DB に同時書き込み        │
+    │ Write-Behind      │ Cache に書いて後で DB に非同期   │
+    │ Write-Around      │ DB に直接書き、Cache は read で │
+    └──────────────────┴────────────────────────────────┘
+
+    Cache Stampede (Thundering Herd):
+    - 人気キーの TTL 期限切れ → 大量リクエストが同時に DB へ
+    - 対策:
+      1. Probabilistic Early Expiration: TTL前にランダムに更新
+      2. Lock: 1つのリクエストだけ DB に行く、他は待機
+      3. Stale-while-revalidate: 古いデータを返しつつバックグラウンド更新
+    
+
+======================================================================
+Chapter 4: System-Level Optimization
+  N+1 問題・コネクションプール・Rate Limiting
+======================================================================
+
+────────────────────────────────────────────────────────────
+4.1 N+1 問題のデモ
+────────────────────────────────────────────────────────────
+
+  N+1 pattern: 21 queries (1 + N=20)
+  Batch pattern: 2 queries
+  → 10x fewer queries
+
+    N+1 の見つけ方:
+    - ORMのログで同じクエリが N 回出てないか
+    - SQLAlchemy: echo=True, Django: django-debug-toolbar
+    - 解決: eager loading, DataLoader (GraphQL), IN句バッチ
+
+    ★ 面接: 「あなたのアプリが遅い。どう調査する？」
+    1. メトリクス確認: P50, P95, P99 のどこが遅い?
+    2. APM/トレース: どのスパンが支配的? (DB? 外部API? 計算?)
+    3. DBクエリ分析: slow query log, EXPLAIN ANALYZE
+    4. N+1 チェック: クエリ数を確認
+    5. プロファイリング: CPU (cProfile), Memory (tracemalloc)
+    
+────────────────────────────────────────────────────────────
+4.2 Rate Limiting アルゴリズム比較
+────────────────────────────────────────────────────────────
+
+    ┌────────────────────┬─────────────────────────────────┐
+    │ Algorithm           │ 特徴                             │
+    ├────────────────────┼─────────────────────────────────┤
+    │ Token Bucket        │ バースト許容、滑らかなレート      │
+    │ Leaky Bucket        │ 一定レートで処理 (queue)          │
+    │ Fixed Window        │ 実装簡単、境界でバースト問題      │
+    │ Sliding Window Log  │ 正確、メモリ使用多                │
+    │ Sliding Window Count│ 近似、メモリ効率良               │
+    └────────────────────┴─────────────────────────────────┘
+
+    Token Bucket (API Gateway のデファクト):
+    ┌───────────────────────────────────┐
+    │ Tokens: ████████░░ (8/10)         │
+    │ Rate: 10 tokens/sec               │
+    │ Request arrives → consume 1 token │
+    │ No tokens → reject (429)          │
+    └───────────────────────────────────┘
+
+    分散 Rate Limiting:
+    - Redis + Lua script で atomic にカウント
+    - or Token Bucket の state を Redis に保存
+    - 複数インスタンスで共有
+    
+────────────────────────────────────────────────────────────
+4.3 コネクションプールサイジング
+────────────────────────────────────────────────────────────
+
+    Little's Law: L = λ × W
+    - L: 同時接続数 (pool size)
+    - λ: リクエストレート (req/sec)
+    - W: 平均レスポンスタイム (sec)
+
+    例:
+    - 1000 req/sec, 平均 50ms → L = 1000 × 0.05 = 50 connections
+    - 1000 req/sec, 平均 200ms → L = 1000 × 0.2 = 200 connections
+
+    HikariCP (Java) の推奨:
+    pool_size = cpu_cores × 2 + disk_spindles
+    → 4 cores × 2 + 1 SSD = 9 connections (意外と小さい!)
+
+    ★ プールが大きすぎると:
+    - DB 側のメモリ消費増
+    - コンテキストスイッチ増
+    - Lock contention 増
+    → 「大きければ良い」は間違い
+    
+
+======================================================================
+Chapter 5: Benchmarking & Production Performance
+  正しく計測し、正しく判断する
+======================================================================
+
+────────────────────────────────────────────────────────────
+5.1 マイクロベンチマーク
+────────────────────────────────────────────────────────────
+
+  Lookup 'key:500' from 1000 items (5000 iterations):
+
+  Metric        dict (ns)    list (ns)    Ratio
+  ---------------------------------------------
+  mean                544        39609    72.8x
+  median              370        25428    68.7x
+  p95                 875        60720    69.4x
+  p99                1566        79653    50.9x
+
+    ★ ベンチマークの落とし穴:
+    1. JIT/Warmup 不足: 最初の実行は遅い (JVM, V8)
+    2. Dead Code Elimination: 結果を使わないとコンパイラが削除
+    3. Constant Folding: 定数を事前計算してしまう
+    4. メモリアロケーション: GC のタイミングで結果が歪む
+    5. CPU周波数スケーリング: Turbo Boost で結果が不安定
+    → 正しい計測: warmup + 十分な反復 + 統計分析
+    
+────────────────────────────────────────────────────────────
+5.2 Tail Latency Amplification
+────────────────────────────────────────────────────────────
+
+  Backend P99 = 100ms, P50 = 10ms
+
+     Fan-out    Agg P50    Agg P95    Agg P99
+  ---------------------------------------------
+           1      10.0ms      18.7ms     100.0ms
+           5      15.9ms     100.0ms     100.0ms
+          10      17.9ms     100.0ms     100.0ms
+          50      23.5ms     100.0ms     100.0ms
+         100     100.0ms     100.0ms     100.0ms
+
+    ★ Jeff Dean's "The Tail at Scale" (Google):
+    - 1台の P99 = 100ms でも、100台に fan-out すると
+      P50 ≈ 100ms になる (63% の確率で1台以上が遅い)
+
+    対策:
+    1. Hedged Requests: 一定時間後に2台目にも送る
+    2. Tied Requests: 最初から2台に送り、早い方を採用
+    3. Micro-partitioning: 粒度を細かくして fan-out を減らす
+    4. Backend optimization: P99 自体を改善する
+    
+────────────────────────────────────────────────────────────
+5.3 Apdex Score (Application Performance Index)
+────────────────────────────────────────────────────────────
+
+  Threshold (T): 100ms
+  Apdex = (Satisfied + Tolerating/2) / Total
+  Apdex = 0.828
+  Rating: Fair
+
+    Apdex スコア解釈:
+    ┌──────────┬──────────────┐
+    │ Score     │ Rating        │
+    ├──────────┼──────────────┤
+    │ 0.94-1.00│ Excellent     │
+    │ 0.85-0.93│ Good          │
+    │ 0.70-0.84│ Fair          │
+    │ 0.50-0.69│ Poor          │
+    │ 0.00-0.49│ Unacceptable  │
+    └──────────┴──────────────┘
+
+    ★ SLO 設計の考え方:
+    - P50 < 100ms (ユーザー体感の「速い」)
+    - P95 < 500ms (大多数が許容)
+    - P99 < 2000ms (99%のユーザーが不満を感じない)
+    - Error Rate < 0.1% (99.9% SLO)
+    - Error Budget = 1 - SLO = 0.1%
+      → 月間で 43.2 分のダウンタイムまで許容
+    
+
+======================================================================
+Summary: パフォーマンスエンジニアリングの原則
+======================================================================
+
+    1. 計測が先: プロファイリングなしの最適化は時間の無駄
+    2. Amdahl の法則: ボトルネック以外を最適化しても効果は小さい
+    3. キャッシュは銀の弾丸: L1 → RAM で 100x, RAM → Disk で 1000x
+    4. 確率的データ構造: 正確さを少し犠牲に → 桁違いの効率
+    5. Tail Latency: P99 こそが本当のユーザー体験
+    6. Little's Law: L = λW を使ってリソースサイジング
+
+    推奨書籍:
+    - "Systems Performance" by Brendan Gregg
+    - "High Performance Python" by Gorelick & Ozsvald
+    - "The Art of Capacity Planning" by John Allspaw
+    
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・N+1問題 (ORMの罠, eager loading, DataLoader, IN句バッチ)
+    ・キャッシュ戦略 LRU (Cache-Aside, Read-Through, Write-Through)
+    ・Rate Limiting (Token Bucket, Sliding Window, 429レスポンス)
+    ・ベンチマーク基礎 (warmup, P50/P95/P99, 統計的に正しい計測)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・Bloom Filter (偽陽性あり偽陰性なし, DB/CDNでの活用)
+    ・Tail Latency (Fan-out amplification, Hedged Requests)
+    ・Apdex Score (SLO設計, Satisfied/Tolerating/Frustrated)
+    ・CPU cache効果 (Row-major vs Column-major, Cache Line 64B)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・HyperLogLog (12KBで数十億のユニーク推定, Redis PFCOUNT)
+    ・Count-Min Sketch (頻度推定, Top-K/Heavy Hitter検出)
+    ・LFU キャッシュ (頻度ベース置換, LRUとの使い分け)
+    ・Cache Stampede対策 (Probabilistic Early Expiration, Lock, Stale-while-revalidate)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・__slots__最適化 (100万オブジェクトで63%メモリ削減)
+    ・メモリプロファイリング (tracemalloc, SoA vs AoS レイアウト)
+    ・Fan-out amplification (100台fan-outでP50≈P99, Jeff Dean論文)
+

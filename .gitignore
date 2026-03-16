@@ -1,1 +1,4 @@
 projects/knowledge_ai/.venv
+.DS_Store
+projects/knowledge_ai/data
+projects/knowledge_ai/mlruns

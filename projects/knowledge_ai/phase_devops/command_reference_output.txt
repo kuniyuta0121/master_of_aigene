@@ -1,0 +1,1094 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  プロフェッショナル コマンドリファレンス                               ║
+║  UNIX / Docker / K8s / Git / AWS                                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📋 目次:
+  1. ファイル・ディレクトリ操作
+  2. テキスト処理 (grep / sed / awk)
+  3. プロセス・システム管理
+  4. ネットワーク
+  5. パーミッション・ユーザー管理
+  6. パイプ・リダイレクト・シェルスクリプト
+  7. Docker コマンド
+  8. Docker Compose
+  9. Dockerfile ベストプラクティス
+  10. Kubernetes (kubectl)
+  11. Git (上級)
+  12. AWS CLI / gcloud
+  13. 便利ツール・Tips
+  14. 面接で問われる実践シナリオ
+
+======================================================================
+  1. ファイル・ディレクトリ操作
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  基本操作                                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ ls -alh                    # 全ファイル + 人間可読サイズ          │
+│ ls -lt                     # 更新日時順                          │
+│ ls -lS                     # サイズ順                            │
+│ tree -L 2                  # ディレクトリツリー (2階層)           │
+│ tree -I 'node_modules|.git' # 除外パターン付き                   │
+│                                                                   │
+│ cp -r src/ dst/            # ディレクトリごとコピー               │
+│ cp -a src/ dst/            # パーミッション・タイムスタンプ保持    │
+│ mv file.txt dir/           # 移動 (リネームも同じ)               │
+│ rm -rf dir/                # 再帰強制削除 ⚠️ 取り消し不可         │
+│ mkdir -p a/b/c             # 中間ディレクトリも一括作成           │
+│                                                                   │
+│ ln -s /path/to/file link   # シンボリックリンク作成               │
+│ readlink -f link           # シンボリックリンクの実体パス         │
+├─────────────────────────────────────────────────────────────────┤
+│  検索                                                            │
+├─────────────────────────────────────────────────────────────────┤
+│ find . -name "*.py"                    # 名前で検索              │
+│ find . -name "*.log" -mtime +7 -delete # 7日前のlogを削除        │
+│ find . -size +100M                     # 100MB超のファイル       │
+│ find . -type f -perm 777               # パーミッション777       │
+│ find . -name "*.py" -exec grep -l "TODO" {} \;  # 中身も検索     │
+│                                                                   │
+│ locate filename             # DB検索 (高速, updatedb要)          │
+│ which python                # コマンドのパス                      │
+│ whereis python              # バイナリ・マニュアル・ソースの場所   │
+│ type ls                     # コマンドの種類 (alias/builtin/file) │
+├─────────────────────────────────────────────────────────────────┤
+│  ファイル内容                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ cat file.txt                # 全表示                             │
+│ less file.txt               # ページャー (q:終了, /:検索, n:次)  │
+│ head -n 20 file.txt         # 先頭20行                           │
+│ tail -n 20 file.txt         # 末尾20行                           │
+│ tail -f /var/log/app.log    # ★リアルタイム監視 (SRE必須)        │
+│ tail -F /var/log/app.log    # ログローテーション対応の監視         │
+│                                                                   │
+│ wc -l file.txt              # 行数                               │
+│ wc -w file.txt              # 単語数                             │
+│ diff file1 file2            # 差分表示                           │
+│ diff -u file1 file2         # unified diff (Git形式)             │
+│ md5sum file                 # MD5ハッシュ (改ざん検知)            │
+│ sha256sum file              # SHA-256ハッシュ (より安全)          │
+│ file image.dat              # ファイルタイプ判定                  │
+│ stat file.txt               # メタデータ詳細                     │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  2. テキスト処理 (grep / sed / awk)
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  grep — パターン検索 (★最重要コマンドの1つ)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ grep "ERROR" app.log              # 基本検索                    │
+│ grep -i "error" app.log           # 大小文字無視                │
+│ grep -r "TODO" src/               # 再帰検索                    │
+│ grep -rn "TODO" src/              # 行番号付き                  │
+│ grep -c "ERROR" app.log           # マッチ行数カウント          │
+│ grep -l "import os" *.py          # ファイル名だけ表示          │
+│ grep -v "DEBUG" app.log           # NOT マッチ (除外)           │
+│ grep -A 3 "ERROR" app.log         # マッチ行 + 後3行           │
+│ grep -B 3 "ERROR" app.log         # マッチ行 + 前3行           │
+│ grep -C 3 "ERROR" app.log         # マッチ行 + 前後3行         │
+│ grep -E "ERROR|WARN" app.log      # 正規表現 (OR)              │
+│ grep -P '\d{4}-\d{2}-\d{2}' log   # Perl正規表現 (日付パターン)│
+│                                                                   │
+│ # ★ ripgrep (rg) — grep の高速版 (Rust製, .gitignore自動対応)   │
+│ rg "TODO" src/                    # grep -rn と同等だが10倍速   │
+│ rg -t py "import"                 # ファイルタイプ指定           │
+│ rg -g '*.py' "class"              # glob指定                    │
+├─────────────────────────────────────────────────────────────────┤
+│  sed — ストリームエディタ (ファイル書き換え)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ sed 's/old/new/' file              # 最初の1つだけ置換          │
+│ sed 's/old/new/g' file             # 全置換                     │
+│ sed -i 's/old/new/g' file          # ★ファイルを直接書き換え    │
+│ sed -i.bak 's/old/new/g' file      # バックアップ付き書き換え   │
+│ sed -n '10,20p' file               # 10〜20行目だけ表示         │
+│ sed '/^#/d' file                   # コメント行を削除           │
+│ sed '/^$/d' file                   # 空行を削除                 │
+│ sed 's/[[:space:]]*$//' file       # 行末の空白を削除           │
+│                                                                   │
+│ # 実用例: 環境変数の置換                                         │
+│ sed "s/DB_HOST=.*/DB_HOST=${NEW_HOST}/" .env                     │
+├─────────────────────────────────────────────────────────────────┤
+│  awk — カラム処理 (構造化テキスト解析)                            │
+├─────────────────────────────────────────────────────────────────┤
+│ awk '{print $1}' file              # 1列目                      │
+│ awk '{print $1, $3}' file          # 1列目と3列目               │
+│ awk -F: '{print $1}' /etc/passwd   # 区切り文字指定 (:)         │
+│ awk '{sum+=$1} END{print sum}'     # 合計                       │
+│ awk '{sum+=$1} END{print sum/NR}'  # 平均                       │
+│ awk '$3 > 100 {print $0}' file     # 3列目が100超の行           │
+│ awk 'NR>=10 && NR<=20' file        # 10〜20行目                 │
+│ awk '!seen[$0]++' file             # 重複行の削除 (順序保持)     │
+│                                                                   │
+│ # 実用例: アクセスログの集計                                     │
+│ awk '{print $1}' access.log | sort | uniq -c | sort -rn | head  │
+│ # → IPアドレス別アクセス数 TOP10                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  その他テキストツール                                            │
+├─────────────────────────────────────────────────────────────────┤
+│ sort file                  # ソート                              │
+│ sort -n file               # 数値ソート                          │
+│ sort -k2 -t, file.csv      # 2列目でソート (CSV)                │
+│ sort -u file               # ソート + 重複削除                   │
+│ uniq                       # 連続する重複行を削除                │
+│ uniq -c                    # 出現回数カウント                    │
+│ cut -d: -f1 /etc/passwd    # 区切り文字で列抽出                  │
+│ tr 'a-z' 'A-Z'             # 文字変換 (小→大)                   │
+│ tr -d ''                 # CR削除 (Windows→Unix改行)          │
+│ paste file1 file2           # 2ファイルを列方向に結合            │
+│ column -t -s, file.csv     # CSVを整形表示                       │
+│ jq '.key' file.json        # ★JSON処理 (API開発必須)            │
+│ jq '.[] | .name' data.json # 配列から name を抽出                │
+│ jq -r '.token' resp.json   # 生の値 (引用符なし)                │
+│ yq '.spec' deploy.yaml     # YAML処理 (K8s設定で必須)           │
+│ xargs                      # 標準入力→引数変換                   │
+│ find . -name "*.tmp" | xargs rm  # 検索結果を一括削除            │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  3. プロセス・システム管理
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  プロセス管理                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ ps aux                     # 全プロセス一覧                      │
+│ ps aux | grep python       # Python プロセスを検索               │
+│ ps -ef --forest            # プロセスツリー表示 (Linux)          │
+│ pstree                     # プロセスツリー (macOS: brew install)│
+│ top                        # リアルタイム監視 (q:終了)           │
+│ htop                       # ★top の高機能版 (色付き, マウス対応)│
+│                                                                   │
+│ kill PID                   # SIGTERM (graceful shutdown)         │
+│ kill -9 PID                # SIGKILL (強制終了, 最終手段)        │
+│ kill -HUP PID              # SIGHUP (設定リロード, nginx等)      │
+│ killall python             # 名前で一括 kill                     │
+│ pkill -f "python app.py"   # コマンドライン全体でマッチ          │
+│                                                                   │
+│ nohup ./script.sh &        # ログアウト後も継続実行              │
+│ disown %1                  # バックグラウンドジョブを切り離す     │
+│ jobs                       # バックグラウンドジョブ一覧           │
+│ fg %1                      # フォアグラウンドに戻す              │
+│ bg %1                      # バックグラウンド実行を再開          │
+│ Ctrl+Z → bg                # 実行中プロセスをバックグラウンドへ  │
+│                                                                   │
+│ lsof -i :8080              # ★ポート8080を使っているプロセス      │
+│ lsof -p PID                # プロセスが開いているファイル         │
+│ fuser 8080/tcp              # ポートを使用中のPID (Linux)        │
+├─────────────────────────────────────────────────────────────────┤
+│  システムリソース監視 (SRE必須)                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ free -h                    # メモリ使用量 (Linux)                │
+│ vm_stat                    # メモリ使用量 (macOS)                │
+│ df -h                      # ディスク使用量                      │
+│ du -sh *                   # ディレクトリ別サイズ                │
+│ du -sh * | sort -rh | head # ★大きいディレクトリ TOP10           │
+│ ncdu /                     # ディスク使用量の対話式ビューア       │
+│                                                                   │
+│ uptime                     # 稼働時間 + ロードアベレージ         │
+│ w                          # ログイン中のユーザーと負荷          │
+│ vmstat 1 5                 # 仮想メモリ統計 (1秒間隔, 5回)       │
+│ iostat -x 1 5              # ディスクI/O統計                     │
+│ mpstat 1 5                 # CPU統計                             │
+│ sar -u 1 5                 # システムアクティビティ              │
+│ dmesg | tail               # カーネルログ (ハードウェアエラー)    │
+│                                                                   │
+│ strace -p PID              # ★システムコール追跡 (Linux)         │
+│ dtruss -p PID              # システムコール追跡 (macOS)          │
+│ ltrace -p PID              # ライブラリコール追跡                │
+├─────────────────────────────────────────────────────────────────┤
+│  シグナル一覧 (面接で問われる)                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ SIGTERM (15)  — 正常終了要求 (デフォルト kill)                    │
+│ SIGKILL (9)   — 強制終了 (キャッチ不可)                          │
+│ SIGINT  (2)   — Ctrl+C                                           │
+│ SIGHUP  (1)   — 端末切断 / 設定リロード                          │
+│ SIGUSR1 (10)  — ユーザー定義 (ログレベル変更等)                   │
+│ SIGSTOP       — 一時停止 (キャッチ不可)                          │
+│ SIGCONT       — 再開                                             │
+│ SIGPIPE       — パイプの読み手がいない                            │
+│ SIGCHLD       — 子プロセス終了通知                               │
+│                                                                   │
+│ ★ K8s の Pod 停止シーケンス:                                     │
+│   1. SIGTERM → アプリに送信                                      │
+│   2. terminationGracePeriodSeconds 待機 (デフォルト30秒)          │
+│   3. SIGKILL → 強制終了                                          │
+│   → アプリは SIGTERM をハンドルして graceful shutdown すべき       │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  4. ネットワーク
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  接続・通信                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ curl https://api.example.com       # HTTP GET                   │
+│ curl -s URL | jq '.'              # API レスポンスを整形         │
+│ curl -X POST -H "Content-Type: application/json" \              │
+│      -d '{"key":"val"}' URL        # POST (JSON)                │
+│ curl -o file.zip URL               # ファイルダウンロード        │
+│ curl -I URL                        # ヘッダーのみ取得           │
+│ curl -w "%{http_code}" -s -o /dev/null URL  # ステータスコード   │
+│ curl -u user:pass URL              # Basic認証                   │
+│ curl -k URL                        # SSL証明書検証スキップ       │
+│ curl --resolve host:443:IP URL     # DNS解決をオーバーライド     │
+│                                                                   │
+│ wget URL                           # ファイルダウンロード        │
+│ wget -r -l 2 URL                   # 再帰ダウンロード (2階層)   │
+│                                                                   │
+│ ssh user@host                      # リモート接続               │
+│ ssh -i key.pem user@host           # 鍵指定                     │
+│ ssh -L 8080:localhost:3000 host    # ★ポートフォワード (ローカル)│
+│ ssh -R 8080:localhost:3000 host    # リバースポートフォワード     │
+│ ssh -D 1080 host                   # SOCKSプロキシ               │
+│ ssh-keygen -t ed25519              # 鍵生成 (Ed25519推奨)        │
+│ ssh-copy-id user@host              # 公開鍵をリモートにコピー    │
+│                                                                   │
+│ scp file.txt user@host:/path/      # ファイル転送                │
+│ rsync -avz src/ user@host:dst/     # ★差分同期 (scpより優秀)    │
+│ rsync -avz --delete src/ dst/      # ミラーリング (削除も同期)   │
+├─────────────────────────────────────────────────────────────────┤
+│  ネットワーク診断 (SRE面接で頻出)                                │
+├─────────────────────────────────────────────────────────────────┤
+│ ping host                          # 疎通確認 (ICMP)            │
+│ traceroute host                    # 経路追跡                    │
+│ mtr host                           # ★ping + traceroute (継続)  │
+│                                                                   │
+│ dig example.com                    # DNS問い合わせ               │
+│ dig +short example.com             # IPアドレスだけ              │
+│ dig @8.8.8.8 example.com           # DNSサーバー指定             │
+│ dig example.com MX                 # MXレコード                  │
+│ dig example.com +trace             # DNS解決の全過程             │
+│ nslookup example.com               # DNS問い合わせ (旧式)       │
+│ host example.com                   # DNS簡易問い合わせ           │
+│                                                                   │
+│ netstat -tlnp                      # ★LISTEN中のポート一覧      │
+│ ss -tlnp                           # netstat の後継 (高速)      │
+│ ss -s                              # ソケット統計サマリー        │
+│                                                                   │
+│ nc -zv host 80                     # ポート疎通確認              │
+│ nc -l 8080                         # ポート8080でリッスン        │
+│ telnet host 80                     # ポート疎通 (旧式)           │
+│                                                                   │
+│ tcpdump -i eth0 port 80            # ★パケットキャプチャ         │
+│ tcpdump -i any -w capture.pcap     # ファイルに保存              │
+│ tcpdump host 10.0.0.1 and port 443 # フィルタ条件               │
+│ nmap -p 1-1000 host                # ポートスキャン              │
+│                                                                   │
+│ ip addr show                       # IPアドレス表示 (Linux)      │
+│ ifconfig                           # IPアドレス表示 (macOS/旧式) │
+│ ip route show                      # ルーティングテーブル        │
+│ iptables -L -n                     # ファイアウォールルール      │
+│                                                                   │
+│ openssl s_client -connect host:443 # SSL/TLS接続テスト           │
+│ openssl x509 -in cert.pem -text    # 証明書の内容表示            │
+│ openssl req -x509 -newkey rsa:2048 # 自己署名証明書生成          │
+├─────────────────────────────────────────────────────────────────┤
+│  ★ トラブルシューティング手順 (SRE面接で問われる)                │
+├─────────────────────────────────────────────────────────────────┤
+│  「サービスに繋がらない」と言われたら:                            │
+│  1. ping host           → ネットワーク到達性                     │
+│  2. dig host             → DNS解決できるか                       │
+│  3. curl -v http://host  → HTTP レベルの問題                     │
+│  4. ss -tlnp             → サービスがLISTENしてるか              │
+│  5. iptables -L          → ファイアウォールでブロックされてないか │
+│  6. tail -f /var/log/app → アプリのログ確認                      │
+│  7. strace -p PID        → システムコールレベルで何が起きてるか  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  5. パーミッション・ユーザー管理
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  パーミッション                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ chmod 755 script.sh        # rwxr-xr-x (実行可能スクリプト)     │
+│ chmod 644 file.txt         # rw-r--r-- (通常ファイル)           │
+│ chmod 600 id_rsa           # rw------- (秘密鍵, SSH要件)        │
+│ chmod +x script.sh         # 実行権限を追加                      │
+│ chmod -R 755 dir/          # ディレクトリ再帰的に変更            │
+│                                                                   │
+│ ★ パーミッション数値の覚え方:                                    │
+│   r=4, w=2, x=1                                                  │
+│   755 = rwx(7) r-x(5) r-x(5) = Owner全部, Group/Other読み+実行  │
+│   644 = rw-(6) r--(4) r--(4) = Owner読み書き, 他は読みのみ       │
+│   600 = rw-(6) ---(0) ---(0) = Ownerのみ読み書き                 │
+│                                                                   │
+│ chown user:group file      # 所有者変更                          │
+│ chown -R user:group dir/   # 再帰的に所有者変更                  │
+│ chgrp group file           # グループのみ変更                    │
+│                                                                   │
+│ umask 022                  # デフォルトパーミッション設定         │
+│                            # 新規ファイル: 666-022=644           │
+│                            # 新規ディレクトリ: 777-022=755       │
+├─────────────────────────────────────────────────────────────────┤
+│  ユーザー管理                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ whoami                     # 現在のユーザー名                    │
+│ id                         # UID, GID, 所属グループ              │
+│ groups                     # 所属グループ一覧                    │
+│ sudo -u user command       # 別ユーザーで実行                    │
+│ su - user                  # ユーザー切り替え                    │
+│ sudo !!                    # 直前のコマンドをsudoで再実行        │
+│                                                                   │
+│ useradd -m -s /bin/bash user  # ユーザー追加                     │
+│ usermod -aG docker user       # グループに追加 (Docker権限等)    │
+│ passwd user                   # パスワード変更                   │
+│ /etc/passwd                   # ユーザー情報 (★構造を覚える)     │
+│ /etc/shadow                   # パスワードハッシュ               │
+│ /etc/group                    # グループ情報                     │
+│                                                                   │
+│ visudo                     # sudoers編集 (直接編集禁止)          │
+│ # user ALL=(ALL) NOPASSWD: /usr/bin/docker  # 特定コマンドのみ   │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  6. パイプ・リダイレクト・シェルスクリプト
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  リダイレクト                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ cmd > file                 # stdout をファイルに (上書き)        │
+│ cmd >> file                # stdout をファイルに (追記)          │
+│ cmd 2> error.log           # stderr をファイルに                 │
+│ cmd > out.log 2>&1         # stdout + stderr を同じファイルに    │
+│ cmd &> all.log             # 上と同じ (bash簡略記法)             │
+│ cmd 2>/dev/null            # stderr を捨てる                     │
+│ cmd > /dev/null 2>&1       # 全出力を捨てる                     │
+│ cmd < input.txt            # ファイルからstdinに                 │
+│ cmd <<EOF                  # ヒアドキュメント                    │
+│ line1                                                             │
+│ line2                                                             │
+│ EOF                                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  パイプ + コマンド連結                                           │
+├─────────────────────────────────────────────────────────────────┤
+│ cmd1 | cmd2                # stdout → stdin に接続              │
+│ cmd1 | tee file | cmd2     # ★分岐 (ファイルに保存しつつ次へ)    │
+│ cmd1 && cmd2               # cmd1 成功時のみ cmd2 実行           │
+│ cmd1 || cmd2               # cmd1 失敗時のみ cmd2 実行           │
+│ cmd1 ; cmd2                # 結果に関わらず順次実行              │
+│ (cmd1 ; cmd2)              # サブシェルで実行                    │
+│ cmd &                      # バックグラウンド実行                │
+│                                                                   │
+│ # ★ 実用パイプライン例                                           │
+│ cat access.log | grep "POST" | awk '{print $7}' | sort | uniq -c | sort -rn | head -10
+│ # → POST リクエストのエンドポイント TOP10                        │
+│                                                                   │
+│ kubectl get pods | grep -v Running | awk '{print $1}' | xargs kubectl describe pod
+│ # → Running でない Pod の詳細を一括表示                          │
+├─────────────────────────────────────────────────────────────────┤
+│  変数・条件分岐・ループ (シェルスクリプト)                        │
+├─────────────────────────────────────────────────────────────────┤
+│ VAR="value"                # 変数 (=の前後にスペース不可)        │
+│ echo "$VAR"                # 変数展開 (ダブルクォート内)         │
+│ echo '${VAR}'              # リテラル (シングルクォートは展開なし)│
+│ export VAR="value"         # 環境変数 (子プロセスに引き継ぐ)     │
+│ ${VAR:-default}            # デフォルト値                        │
+│ ${VAR:?error msg}          # 未定義ならエラー                    │
+│ $(command)                 # コマンド置換                        │
+│ $?                         # 直前のコマンドの終了コード          │
+│ $$                         # 現在のPID                           │
+│ $!                         # 最後のバックグラウンドPID           │
+│                                                                   │
+│ # for ループ                                                     │
+│ for f in *.py; do echo "$f"; done                                │
+│ for i in {1..10}; do echo $i; done                               │
+│ for host in web{1..5}; do ssh $host uptime; done                 │
+│                                                                   │
+│ # while ループ                                                   │
+│ while read line; do echo "$line"; done < file.txt                │
+│ kubectl get pods -w | while read line; do echo "$(date): $line"; done
+│                                                                   │
+│ # if 条件分岐                                                    │
+│ if [ -f "file.txt" ]; then echo "exists"; fi                     │
+│ if [ -d "dir" ]; then echo "is directory"; fi                    │
+│ if [ -z "$VAR" ]; then echo "empty"; fi                          │
+│ if [ "$VAR" = "value" ]; then echo "match"; fi                   │
+│ if command -v docker &>/dev/null; then echo "installed"; fi      │
+│                                                                   │
+│ # ★ set オプション (スクリプト冒頭に書くべき)                    │
+│ set -e              # エラーで即座に終了                          │
+│ set -u              # 未定義変数でエラー                          │
+│ set -o pipefail     # パイプ中のエラーを検知                     │
+│ set -euo pipefail   # ★ 上3つの組み合わせ (ベストプラクティス)   │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  7. Docker コマンド
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  イメージ操作                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ docker build -t myapp:1.0 .            # イメージビルド          │
+│ docker build -t myapp:1.0 -f Dockerfile.prod .  # ファイル指定   │
+│ docker build --no-cache -t myapp .     # キャッシュなしビルド    │
+│ docker build --target builder -t myapp . # マルチステージの途中で│
+│ docker buildx build --platform linux/amd64,linux/arm64 -t myapp . # マルチアーキ │
+│                                                                   │
+│ docker images                          # イメージ一覧            │
+│ docker image ls                        # 同上                    │
+│ docker image prune                     # 未使用イメージ削除      │
+│ docker image prune -a                  # 全未使用イメージ削除    │
+│ docker rmi myapp:1.0                   # イメージ削除            │
+│                                                                   │
+│ docker tag myapp:1.0 registry/myapp:1.0  # タグ付け              │
+│ docker push registry/myapp:1.0           # レジストリにプッシュ  │
+│ docker pull nginx:latest                 # イメージ取得          │
+│ docker save myapp:1.0 > myapp.tar        # tar にエクスポート    │
+│ docker load < myapp.tar                  # tar からインポート    │
+│                                                                   │
+│ docker history myapp:1.0               # レイヤー履歴            │
+│ docker inspect myapp:1.0               # イメージ詳細 (JSON)     │
+│ docker inspect --format '{{.Config.Env}}' myapp  # 特定フィールド│
+├─────────────────────────────────────────────────────────────────┤
+│  コンテナ操作                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ docker run -d --name app myapp:1.0     # バックグラウンド起動    │
+│ docker run -it ubuntu bash             # インタラクティブ起動    │
+│ docker run --rm myapp:1.0              # 終了後自動削除          │
+│ docker run -p 8080:3000 myapp          # ★ポートマッピング       │
+│ docker run -v /host:/container myapp   # ★ボリュームマウント     │
+│ docker run -v $(pwd):/app myapp        # カレントディレクトリ    │
+│ docker run -e DB_HOST=localhost myapp  # 環境変数               │
+│ docker run --env-file .env myapp       # 環境変数ファイル        │
+│ docker run --network mynet myapp       # ネットワーク指定        │
+│ docker run --memory 512m --cpus 1.5 myapp  # リソース制限        │
+│ docker run --restart unless-stopped myapp  # 自動再起動          │
+│ docker run --user 1000:1000 myapp      # 実行ユーザー指定        │
+│ docker run --read-only myapp           # 読み取り専用            │
+│                                                                   │
+│ docker ps                              # 実行中コンテナ          │
+│ docker ps -a                           # 全コンテナ (停止含む)   │
+│ docker ps --format "table {{.Names}}	{{.Status}}	{{.Ports}}"   │
+│                                                                   │
+│ docker stop app                        # 停止 (SIGTERM→30s→SIGKILL) │
+│ docker start app                       # 起動                    │
+│ docker restart app                     # 再起動                  │
+│ docker rm app                          # コンテナ削除            │
+│ docker rm -f app                       # 強制削除 (実行中でも)   │
+│ docker container prune                 # 停止済み一括削除        │
+├─────────────────────────────────────────────────────────────────┤
+│  ★ デバッグ・トラブルシューティング                              │
+├─────────────────────────────────────────────────────────────────┤
+│ docker logs app                        # ログ表示                │
+│ docker logs -f app                     # ★リアルタイムログ       │
+│ docker logs --since 1h app             # 直近1時間のログ         │
+│ docker logs --tail 100 app             # 末尾100行              │
+│                                                                   │
+│ docker exec -it app bash               # ★コンテナ内にシェル接続│
+│ docker exec -it app sh                 # bash がない場合 (alpine)│
+│ docker exec app cat /etc/os-release    # 非対話的にコマンド実行  │
+│                                                                   │
+│ docker stats                           # ★リソース使用量リアルタイム │
+│ docker stats --no-stream               # スナップショット       │
+│ docker top app                         # コンテナ内プロセス      │
+│ docker inspect app                     # コンテナ詳細 (JSON)     │
+│ docker diff app                        # ファイルシステム変更差分│
+│ docker cp app:/path/file ./            # コンテナからファイルコピー │
+│ docker cp ./file app:/path/            # コンテナへファイルコピー │
+│ docker events                          # Dockerイベントストリーム│
+├─────────────────────────────────────────────────────────────────┤
+│  ネットワーク                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ docker network ls                      # ネットワーク一覧        │
+│ docker network create mynet            # ネットワーク作成        │
+│ docker network create --driver overlay mynet  # Swarmオーバーレイ│
+│ docker network inspect mynet           # ネットワーク詳細        │
+│ docker network connect mynet app       # コンテナを接続          │
+│ docker network disconnect mynet app    # コンテナを切断          │
+│                                                                   │
+│ ★ ネットワークの種類:                                            │
+│   bridge  — デフォルト (コンテナ間通信)                           │
+│   host    — ホストのネットワークを直接使用                        │
+│   none    — ネットワークなし                                      │
+│   overlay — 複数ホスト間 (Swarm/K8s)                             │
+├─────────────────────────────────────────────────────────────────┤
+│  ボリューム                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ docker volume ls                       # ボリューム一覧          │
+│ docker volume create mydata            # ボリューム作成          │
+│ docker volume inspect mydata           # ボリューム詳細          │
+│ docker volume rm mydata                # ボリューム削除          │
+│ docker volume prune                    # 未使用ボリューム一括削除│
+│                                                                   │
+│ ★ マウントの種類:                                                │
+│   -v mydata:/app/data     — Named Volume (Docker管理, 推奨)      │
+│   -v /host/path:/app      — Bind Mount (ホストのパス直指定)      │
+│   --tmpfs /app/tmp        — tmpfs (メモリ上, 一時データ用)        │
+├─────────────────────────────────────────────────────────────────┤
+│  クリーンアップ                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ docker system df                       # Docker のディスク使用量 │
+│ docker system prune                    # 未使用リソース一括削除  │
+│ docker system prune -a --volumes       # ★完全クリーンアップ     │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  8. Docker Compose
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Docker Compose (マルチコンテナ管理)                             │
+├─────────────────────────────────────────────────────────────────┤
+│ docker compose up                      # 全サービス起動          │
+│ docker compose up -d                   # バックグラウンド起動    │
+│ docker compose up --build              # ビルドしてから起動      │
+│ docker compose up -d --scale web=3     # webサービスを3インスタンス│
+│ docker compose down                    # 全停止 + コンテナ削除   │
+│ docker compose down -v                 # ボリュームも削除        │
+│ docker compose down --rmi all          # イメージも削除          │
+│                                                                   │
+│ docker compose ps                      # サービス状態            │
+│ docker compose logs                    # 全サービスのログ        │
+│ docker compose logs -f web             # 特定サービスのログ追跡  │
+│ docker compose exec web bash           # コンテナにシェル接続    │
+│ docker compose run web pytest          # 一時コンテナでコマンド  │
+│                                                                   │
+│ docker compose config                  # 設定ファイルの検証      │
+│ docker compose pull                    # 全イメージ更新          │
+│ docker compose restart web             # 特定サービス再起動      │
+│ docker compose stop                    # 全サービス停止 (削除なし)│
+│                                                                   │
+│ # ★ 複数ファイル                                                 │
+│ docker compose -f docker-compose.yml -f docker-compose.prod.yml up │
+│                                                                   │
+│ # ★ profiles (開発用サービスの切り替え)                          │
+│ docker compose --profile debug up      # debugプロファイルも起動 │
+├─────────────────────────────────────────────────────────────────┤
+│  docker-compose.yml テンプレート                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ services:                                                         │
+│   web:                                                            │
+│     build: .                         # Dockerfile からビルド     │
+│     ports: ["8080:3000"]             # ポートマッピング          │
+│     environment:                     # 環境変数                  │
+│       - DB_HOST=db                                                │
+│     depends_on:                      # 起動順序                  │
+│       db:                                                         │
+│         condition: service_healthy                                │
+│     volumes:                         # マウント                  │
+│       - ./src:/app/src               # 開発用: ホットリロード    │
+│     healthcheck:                     # ヘルスチェック            │
+│       test: ["CMD", "curl", "-f", "http://localhost:3000/health"] │
+│       interval: 10s                                               │
+│       timeout: 5s                                                 │
+│       retries: 3                                                  │
+│   db:                                                             │
+│     image: postgres:16               # 公式イメージ              │
+│     environment:                                                  │
+│       POSTGRES_PASSWORD: secret                                   │
+│     volumes:                                                      │
+│       - db-data:/var/lib/postgresql/data  # データ永続化         │
+│     healthcheck:                                                  │
+│       test: ["CMD", "pg_isready"]                                │
+│ volumes:                                                          │
+│   db-data:                           # Named Volume 定義         │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  9. Dockerfile ベストプラクティス
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Dockerfile ベストプラクティス (面接で問われる)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  # ★ マルチステージビルド (イメージサイズ削減)                    │
+│  FROM node:20-slim AS builder                                     │
+│  WORKDIR /app                                                     │
+│  COPY package*.json ./                                            │
+│  RUN npm ci --production     # ← ci は install より再現性が高い │
+│  COPY . .                                                         │
+│  RUN npm run build                                                │
+│                                                                   │
+│  FROM gcr.io/distroless/nodejs20  # ★ distroless (シェルなし)    │
+│  WORKDIR /app                                                     │
+│  COPY --from=builder /app/dist ./dist                             │
+│  COPY --from=builder /app/node_modules ./node_modules             │
+│  USER nonroot                     # ★ root で実行しない          │
+│  EXPOSE 3000                                                      │
+│  CMD ["dist/main.js"]                                             │
+│                                                                   │
+│  ★ キャッシュ効率を上げるルール:                                  │
+│    1. 変更頻度の低いものを先に COPY                               │
+│    2. package.json → npm ci → COPY . . の順序                    │
+│    3. .dockerignore で node_modules, .git 等を除外               │
+│                                                                   │
+│  ★ セキュリティ:                                                  │
+│    - USER nonroot (root禁止)                                      │
+│    - COPY --chown=nonroot:nonroot                                │
+│    - --read-only で実行                                           │
+│    - trivy image scan でCVEチェック                               │
+│    - Secret はビルド引数に入れない (BuildKit --secret を使う)     │
+│                                                                   │
+│  ★ レイヤー数を減らす:                                            │
+│    × RUN apt update                                               │
+│    × RUN apt install -y curl                                     │
+│    ○ RUN apt update && apt install -y --no-install-recommends \  │
+│          curl && rm -rf /var/lib/apt/lists/*                      │
+│                                                                   │
+│  ★ .dockerignore (必須):                                          │
+│    .git                                                           │
+│    node_modules                                                   │
+│    *.md                                                           │
+│    .env                                                           │
+│    __pycache__                                                    │
+│    .venv                                                          │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  10. Kubernetes (kubectl)
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  kubectl 基本 (★ k=kubectl のエイリアス推奨)                    │
+├─────────────────────────────────────────────────────────────────┤
+│ kubectl get pods                       # Pod一覧                 │
+│ kubectl get pods -o wide               # IPアドレス・ノード付き  │
+│ kubectl get pods -A                    # 全namespace              │
+│ kubectl get pods -w                    # ★ウォッチモード (変更検知) │
+│ kubectl get pods --sort-by=.metadata.creationTimestamp            │
+│ kubectl get pods -o json | jq '.items[].metadata.name'           │
+│                                                                   │
+│ kubectl get all                        # Pod/Svc/Deploy/RS 一括  │
+│ kubectl get deploy,svc,ingress         # 複数リソース指定        │
+│ kubectl get events --sort-by=.lastTimestamp  # ★イベント (障害調査) │
+│                                                                   │
+│ kubectl describe pod myapp-xxx         # ★詳細 (トラブルシュート) │
+│ kubectl describe node node-1           # ノード詳細              │
+│                                                                   │
+│ kubectl apply -f manifest.yaml         # ★宣言的適用 (推奨)      │
+│ kubectl delete -f manifest.yaml        # マニフェストで削除      │
+│ kubectl create deployment web --image=nginx  # 命令的作成        │
+│ kubectl delete pod myapp-xxx           # Pod削除 (再作成される)  │
+├─────────────────────────────────────────────────────────────────┤
+│  ★ デバッグ・トラブルシューティング                              │
+├─────────────────────────────────────────────────────────────────┤
+│ kubectl logs myapp-xxx                 # ログ                    │
+│ kubectl logs -f myapp-xxx              # リアルタイムログ        │
+│ kubectl logs myapp-xxx -c sidecar      # 特定コンテナのログ      │
+│ kubectl logs myapp-xxx --previous      # ★前回クラッシュ時のログ │
+│ kubectl logs -l app=myapp --all-containers  # ラベルで一括       │
+│                                                                   │
+│ kubectl exec -it myapp-xxx -- bash     # ★コンテナにシェル接続   │
+│ kubectl exec myapp-xxx -- cat /etc/resolv.conf  # DNS確認        │
+│ kubectl exec myapp-xxx -- nslookup myservice    # サービス名解決 │
+│                                                                   │
+│ kubectl port-forward pod/myapp-xxx 8080:3000    # ★ポートフォワード │
+│ kubectl port-forward svc/myapp 8080:80          # Service経由    │
+│                                                                   │
+│ kubectl top pods                       # ★Pod CPU/メモリ使用量   │
+│ kubectl top nodes                      # ノード CPU/メモリ使用量 │
+│                                                                   │
+│ # デバッグ用一時Pod                                               │
+│ kubectl run debug --rm -it --image=busybox -- sh                 │
+│ kubectl run debug --rm -it --image=nicolaka/netshoot -- bash     │
+│ # → netshoot: curl, dig, tcpdump, iperf 等が入ったデバッグ用イメージ │
+│                                                                   │
+│ # ★ トラブルシューティングフローチャート                         │
+│ Pod が Running にならない:                                        │
+│   1. kubectl describe pod → Events セクションを確認              │
+│   2. ImagePullBackOff → イメージ名/レジストリ認証を確認          │
+│   3. CrashLoopBackOff → kubectl logs --previous でクラッシュログ │
+│   4. Pending → kubectl describe → リソース不足/Node Affinity     │
+│   5. OOMKilled → resources.limits.memory を増やす                │
+├─────────────────────────────────────────────────────────────────┤
+│  スケーリング・更新                                              │
+├─────────────────────────────────────────────────────────────────┤
+│ kubectl scale deploy myapp --replicas=5     # 手動スケール       │
+│ kubectl autoscale deploy myapp --min=2 --max=10 --cpu-percent=80 │
+│ kubectl rollout status deploy myapp         # ロールアウト状態   │
+│ kubectl rollout history deploy myapp        # デプロイ履歴       │
+│ kubectl rollout undo deploy myapp           # ★ロールバック       │
+│ kubectl rollout undo deploy myapp --to-revision=3                │
+│ kubectl rollout restart deploy myapp        # Pod再起動 (設定変更時) │
+│                                                                   │
+│ kubectl set image deploy myapp web=myapp:2.0  # イメージ更新     │
+│ kubectl patch deploy myapp -p '{"spec":{"replicas":3}}'          │
+│ kubectl edit deploy myapp                     # エディタで編集   │
+├─────────────────────────────────────────────────────────────────┤
+│  設定・シークレット                                              │
+├─────────────────────────────────────────────────────────────────┤
+│ kubectl create configmap myconfig --from-file=config.yaml        │
+│ kubectl create configmap myconfig --from-literal=key=value       │
+│ kubectl create secret generic mysecret --from-literal=password=xxx │
+│ kubectl get secret mysecret -o jsonpath='{.data.password}' | base64 -d │
+│                                                                   │
+│ kubectl get configmap myconfig -o yaml       # 内容確認          │
+├─────────────────────────────────────────────────────────────────┤
+│  namespace・コンテキスト                                         │
+├─────────────────────────────────────────────────────────────────┤
+│ kubectl get ns                              # namespace一覧      │
+│ kubectl create ns staging                   # namespace作成      │
+│ kubectl -n staging get pods                 # namespace指定      │
+│                                                                   │
+│ kubectl config get-contexts                 # コンテキスト一覧   │
+│ kubectl config use-context prod-cluster     # ★クラスタ切り替え  │
+│ kubectl config set-context --current --namespace=staging         │
+│                                                                   │
+│ # ★ kubectx / kubens (便利ツール)                                │
+│ kubectx prod-cluster                        # コンテキスト切替   │
+│ kubens staging                              # namespace切替      │
+├─────────────────────────────────────────────────────────────────┤
+│  Helm (K8sパッケージマネージャー)                                │
+├─────────────────────────────────────────────────────────────────┤
+│ helm repo add bitnami https://charts.bitnami.com/bitnami         │
+│ helm search repo nginx                      # チャート検索       │
+│ helm install myrelease bitnami/nginx        # インストール       │
+│ helm upgrade myrelease bitnami/nginx        # アップグレード     │
+│ helm rollback myrelease 1                   # ロールバック       │
+│ helm list                                   # リリース一覧       │
+│ helm uninstall myrelease                    # アンインストール   │
+│ helm template myrelease bitnami/nginx       # マニフェスト確認   │
+│ helm values bitnami/nginx                   # デフォルト値確認   │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  11. Git (上級)
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  日常操作                                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ git status                             # 状態確認                │
+│ git diff                               # 未ステージの差分        │
+│ git diff --staged                      # ステージ済みの差分      │
+│ git diff HEAD~3                        # 3コミット前との差分     │
+│ git add -p                             # ★ハンク単位でステージ   │
+│ git commit -m "msg"                    # コミット                │
+│ git commit --amend                     # 直前コミット修正        │
+│ git push origin feature                # プッシュ                │
+│ git pull --rebase origin main          # ★リベースで取り込み     │
+│                                                                   │
+│ git stash                              # 変更を一時退避          │
+│ git stash pop                          # 退避した変更を復元      │
+│ git stash list                         # stash一覧               │
+│ git stash show -p stash@{0}            # stashの中身を確認       │
+│ git stash drop stash@{0}               # stash削除               │
+├─────────────────────────────────────────────────────────────────┤
+│  ブランチ操作                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ git branch                             # ローカルブランチ一覧    │
+│ git branch -a                          # リモート含む全ブランチ  │
+│ git branch -d feature                  # ブランチ削除            │
+│ git checkout -b feature                # 新ブランチ作成+切替     │
+│ git switch -c feature                  # 同上 (新しい書き方)     │
+│ git switch main                        # ブランチ切替            │
+│                                                                   │
+│ git merge feature                      # マージ                  │
+│ git merge --no-ff feature              # ★Fast-forward禁止      │
+│ git rebase main                        # ★リベース (履歴を直線に)│
+│ git rebase -i HEAD~5                   # インタラクティブリベース│
+│   # squash: 複数コミットを1つに                                  │
+│   # reword: コミットメッセージ変更                               │
+│   # drop:   コミット削除                                         │
+│                                                                   │
+│ git cherry-pick abc1234                # 特定コミットだけ取り込み│
+├─────────────────────────────────────────────────────────────────┤
+│  ★ 調査・デバッグ                                                │
+├─────────────────────────────────────────────────────────────────┤
+│ git log --oneline --graph              # ★ツリー表示             │
+│ git log --oneline -20                  # 直近20コミット          │
+│ git log --author="name"                # 特定著者のコミット      │
+│ git log -p -- path/to/file             # ファイルの変更履歴      │
+│ git log -S "keyword"                   # ★キーワードが追加/削除されたコミット │
+│ git log --since="2024-01-01"           # 日付フィルタ            │
+│                                                                   │
+│ git blame path/to/file                 # ★各行の最終変更者       │
+│ git blame -L 10,20 file               # 10〜20行目だけ          │
+│ git show abc1234                       # コミットの内容表示      │
+│ git show abc1234:path/to/file          # 特定コミットのファイル  │
+│                                                                   │
+│ git bisect start                       # ★バグ導入コミットを二分探索 │
+│ git bisect bad                         # 現在はバグあり          │
+│ git bisect good abc1234                # このコミットは正常      │
+│ git bisect reset                       # bisect終了              │
+│                                                                   │
+│ git reflog                             # ★全操作の履歴 (復旧の最終手段) │
+│ git reflog | head -20                  # 直近20操作              │
+├─────────────────────────────────────────────────────────────────┤
+│  リモート操作                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ git remote -v                          # リモート一覧            │
+│ git remote add upstream URL            # upstream追加            │
+│ git fetch --all --prune                # 全リモート取得 + 削除済み反映 │
+│ git push origin --delete feature       # リモートブランチ削除    │
+│ git push --force-with-lease            # ★安全な強制プッシュ     │
+│ # force-with-lease: 他人のプッシュを上書きしない                 │
+│                                                                   │
+│ git tag v1.0.0                         # タグ作成                │
+│ git tag -a v1.0.0 -m "Release 1.0"    # 注釈付きタグ            │
+│ git push origin v1.0.0                 # タグをプッシュ          │
+│ git push origin --tags                 # 全タグをプッシュ        │
+├─────────────────────────────────────────────────────────────────┤
+│  ★ トラブル復旧                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ git reset --soft HEAD~1                # コミット取消 (変更は保持) │
+│ git reset --mixed HEAD~1               # ステージも取消          │
+│ git reset --hard HEAD~1                # ⚠️全部取消 (変更も消える) │
+│ git checkout -- file                   # ファイルの変更を取消    │
+│ git restore file                       # 同上 (新しい書き方)     │
+│ git clean -fd                          # 未追跡ファイル削除      │
+│                                                                   │
+│ # ★ 「やべ、間違えた」復旧パターン                               │
+│ # コミットメッセージ間違えた → git commit --amend                 │
+│ # 間違ったブランチにコミットした:                                 │
+│   git stash → git switch correct-branch → git stash pop          │
+│ # push した後に戻したい → git revert abc1234 (新コミットで打消し)│
+│ # 全部壊した → git reflog で正常なHEADを探す → git reset --hard  │
+├─────────────────────────────────────────────────────────────────┤
+│  .gitconfig 推奨設定                                             │
+├─────────────────────────────────────────────────────────────────┤
+│ [alias]                                                           │
+│   s = status                                                      │
+│   co = checkout                                                   │
+│   br = branch                                                     │
+│   lg = log --oneline --graph --all                                │
+│   unstage = reset HEAD --                                         │
+│   last = log -1 HEAD                                              │
+│   d = diff                                                        │
+│   ds = diff --staged                                              │
+│ [pull]                                                            │
+│   rebase = true             # pull 時に常にリベース              │
+│ [push]                                                            │
+│   autoSetupRemote = true    # push 時に自動で upstream 設定      │
+│ [init]                                                            │
+│   defaultBranch = main                                            │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  12. AWS CLI / gcloud
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  AWS CLI (よく使うもの)                                          │
+├─────────────────────────────────────────────────────────────────┤
+│ aws configure                          # 認証設定                │
+│ aws sts get-caller-identity            # ★現在のユーザー確認     │
+│                                                                   │
+│ # S3                                                              │
+│ aws s3 ls                              # バケット一覧            │
+│ aws s3 ls s3://bucket/prefix/          # オブジェクト一覧        │
+│ aws s3 cp file.txt s3://bucket/        # アップロード            │
+│ aws s3 sync ./dir s3://bucket/dir      # ★ディレクトリ同期      │
+│ aws s3 rm s3://bucket/file.txt         # 削除                    │
+│ aws s3 presign s3://bucket/file --expires-in 3600  # 署名付きURL │
+│                                                                   │
+│ # EC2                                                             │
+│ aws ec2 describe-instances --query 'Reservations[].Instances[].[InstanceId,State.Name,PublicIpAddress]' --output table │
+│ aws ec2 start-instances --instance-ids i-xxx                     │
+│ aws ec2 stop-instances --instance-ids i-xxx                      │
+│                                                                   │
+│ # ECS                                                             │
+│ aws ecs list-clusters                  # クラスタ一覧            │
+│ aws ecs list-services --cluster mycluster                        │
+│ aws ecs update-service --cluster mycluster --service myservice --force-new-deployment │
+│                                                                   │
+│ # CloudWatch Logs                                                │
+│ aws logs tail /ecs/myservice --follow  # ★リアルタイムログ       │
+│ aws logs filter-log-events --log-group /ecs/myservice --filter-pattern "ERROR" │
+│                                                                   │
+│ # Lambda                                                          │
+│ aws lambda invoke --function-name myFunc out.json                │
+│ aws lambda list-functions --query 'Functions[].FunctionName'     │
+│                                                                   │
+│ # ECR                                                             │
+│ aws ecr get-login-password | docker login --username AWS --password-stdin ACCOUNT.dkr.ecr.REGION.amazonaws.com │
+│ docker push ACCOUNT.dkr.ecr.REGION.amazonaws.com/myapp:latest   │
+│                                                                   │
+│ # SSM (セッションマネージャー)                                    │
+│ aws ssm start-session --target i-xxx   # ★SSH不要のシェル接続    │
+├─────────────────────────────────────────────────────────────────┤
+│  gcloud CLI (Google Cloud)                                       │
+├─────────────────────────────────────────────────────────────────┤
+│ gcloud auth login                      # 認証                    │
+│ gcloud config set project myproject    # プロジェクト設定        │
+│ gcloud config list                     # 現在の設定確認          │
+│                                                                   │
+│ gcloud compute instances list          # VM一覧                  │
+│ gcloud run deploy --source .           # Cloud Run デプロイ      │
+│ gcloud container clusters get-credentials mycluster --zone us-central1 │
+│ gcloud logging read "severity=ERROR" --limit 50 --format json    │
+│ gsutil ls gs://bucket/                 # GCS一覧                 │
+│ gsutil cp file.txt gs://bucket/        # GCSアップロード         │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  13. 便利ツール・Tips
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  ★ 必須ツール (インストール推奨)                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ brew install (macOS) / apt install (Ubuntu):                     │
+│   jq           — JSON処理                                        │
+│   yq           — YAML処理                                        │
+│   ripgrep (rg) — 高速 grep (Rust製)                              │
+│   fd           — 高速 find (Rust製)                              │
+│   bat          — 色付き cat                                      │
+│   exa / eza    — 色付き ls                                       │
+│   fzf          — ★ファジー検索 (Ctrl+R 履歴検索が革命的)         │
+│   htop         — 高機能 top                                      │
+│   ncdu         — ディスク使用量ビューア                           │
+│   tldr         — man の簡易版 (例付き)                            │
+│   httpie (http)— curl の人間向け版                               │
+│   lazygit      — Git TUI                                         │
+│   lazydocker   — Docker TUI                                      │
+│   k9s          — ★Kubernetes TUI (kubectl不要に)                 │
+│   kubectx/kubens — K8sコンテキスト/namespace切替                  │
+│   stern        — 複数Pod のログを同時に見る                       │
+│   direnv       — ディレクトリ別の環境変数自動ロード               │
+│   mise (asdf)  — ★言語バージョン管理 (Python/Node/Go/Java/Rust)  │
+├─────────────────────────────────────────────────────────────────┤
+│  シェル設定 Tips                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ # .zshrc / .bashrc に追加推奨                                    │
+│                                                                   │
+│ # エイリアス                                                      │
+│ alias k='kubectl'                                                │
+│ alias kgp='kubectl get pods'                                     │
+│ alias kgs='kubectl get svc'                                      │
+│ alias kgd='kubectl get deploy'                                   │
+│ alias kl='kubectl logs -f'                                       │
+│ alias ke='kubectl exec -it'                                      │
+│ alias dc='docker compose'                                        │
+│ alias dps='docker ps --format "table {{.Names}}	{{.Status}}	{{.Ports}}"' │
+│ alias g='git'                                                    │
+│ alias gs='git status'                                            │
+│ alias gl='git log --oneline --graph -20'                         │
+│ alias gd='git diff'                                              │
+│ alias gp='git pull --rebase'                                     │
+│ alias ll='ls -alh'                                               │
+│                                                                   │
+│ # ★ fzf 統合 (Ctrl+R で履歴をファジー検索)                       │
+│ [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh                           │
+│                                                                   │
+│ # ★ direnv (プロジェクト別の環境変数)                             │
+│ eval "$(direnv hook zsh)"                                        │
+│                                                                   │
+│ # プロンプトにGitブランチ表示 (starship推奨)                     │
+│ eval "$(starship init zsh)"                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  ★ ショートカット (知らないと損するもの)                         │
+├─────────────────────────────────────────────────────────────────┤
+│ Ctrl+R         — 履歴検索 (fzf入れると最強)                      │
+│ Ctrl+A         — 行頭に移動                                      │
+│ Ctrl+E         — 行末に移動                                      │
+│ Ctrl+W         — 1単語削除                                       │
+│ Ctrl+U         — 行頭まで削除                                    │
+│ Ctrl+K         — 行末まで削除                                    │
+│ Ctrl+L         — 画面クリア                                      │
+│ Ctrl+Z         — プロセスを一時停止 (fg で復帰)                   │
+│ Alt+.          — 直前のコマンドの最後の引数を挿入                │
+│ !!             — 直前のコマンドを再実行                           │
+│ !$             — 直前の最後の引数                                │
+│ cd -           — 直前のディレクトリに戻る                        │
+│ pushd / popd   — ディレクトリスタック                            │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+  14. 面接で問われる実践シナリオ
+======================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  ★ 面接で問われる実践シナリオ                                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Q: 「本番サービスが遅い。原因を特定せよ」                       │
+│  A: 1. top/htop → CPU/メモリのボトルネック確認                   │
+│     2. iostat → ディスクI/O確認                                  │
+│     3. ss -tlnp → コネクション数確認                             │
+│     4. kubectl top pods → Pod リソース使用量                     │
+│     5. kubectl logs → アプリケーションエラー確認                 │
+│     6. tcpdump → ネットワークレベルの遅延確認                    │
+│                                                                   │
+│  Q: 「ディスクが100%になった。対処せよ」                         │
+│  A: 1. df -h → どのパーティションか特定                          │
+│     2. du -sh /* | sort -rh | head → 大きいディレクトリ特定      │
+│     3. find / -size +100M -type f → 巨大ファイル探索             │
+│     4. journalctl --vacuum-size=500M → ジャーナルログ削除        │
+│     5. docker system prune → Docker の不要データ削除             │
+│     6. logrotate の設定確認                                       │
+│                                                                   │
+│  Q: 「特定のポートに接続できない」                               │
+│  A: 1. ss -tlnp | grep PORT → プロセスがLISTENしてるか          │
+│     2. iptables -L / security group → ファイアウォール確認       │
+│     3. curl -v localhost:PORT → ローカルでは繋がるか             │
+│     4. dig / nslookup → DNS解決できるか                          │
+│     5. traceroute → ネットワーク経路に問題ないか                 │
+│                                                                   │
+│  Q: 「デプロイ後にエラー率が上がった。ロールバックせよ」         │
+│  A: 1. kubectl rollout undo deploy myapp → 即ロールバック        │
+│     2. kubectl rollout status → ロールバック完了確認             │
+│     3. kubectl logs -l app=myapp --previous → 旧Podのログ       │
+│     4. 原因特定後: git revert → 新コミットでプッシュ             │
+│                                                                   │
+│  Q: 「コンテナが OOMKilled で死に続ける」                        │
+│  A: 1. kubectl describe pod → OOMKilled 確認                    │
+│     2. kubectl top pod → 実際のメモリ使用量確認                  │
+│     3. resources.limits.memory を段階的に引き上げ                │
+│     4. アプリのメモリリークを調査 (heap dump, profiler)           │
+│     5. JVM なら: -XX:MaxRAMPercentage=75 を設定                  │
+│                                                                   │
+│  Q: 「秘密鍵が Git にコミットされた」                            │
+│  A: 1. 即座に秘密鍵をローテーション (最優先)                     │
+│     2. git filter-branch or BFG Repo-Cleaner で履歴から削除      │
+│     3. git push --force-with-lease                               │
+│     4. .gitignore と pre-commit hook (gitleaks) を設定           │
+│     5. インシデントレポート作成                                   │
+└─────────────────────────────────────────────────────────────────┘
+
+
+======================================================================
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 毎日使う】
+    grep / find / less / tail -f / ps / lsof
+    git (add/commit/push/pull/log/diff/stash)
+    docker (run/ps/logs/exec/build)
+    kubectl (get/describe/logs/exec/apply)
+    curl / jq
+
+  【Tier 2: 週1で使う】
+    sed / awk / sort / uniq / xargs
+    docker compose (up/down/logs)
+    kubectl (rollout/scale/port-forward)
+    ssh / scp / rsync
+    aws s3 / aws logs
+
+  【Tier 3: トラブル時に使う】
+    tcpdump / strace / netstat (ss)
+    dig / traceroute / mtr
+    docker stats / docker inspect
+    kubectl top / kubectl events
+    git bisect / git reflog
+
+  【Tier 4: 知っていると差がつく】
+    fzf / ripgrep / fd / bat / k9s
+    git add -p / git log -S
+    docker buildx (マルチアーキ)
+    stern (K8s マルチPodログ)
+    aws ssm start-session
+

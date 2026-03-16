@@ -1,0 +1,1731 @@
+#!/usr/bin/env python3
+"""
+Frontend Engineering - 深掘り解説
+"""
+import textwrap
+
+SEP = "=" * 70
+THIN = "-" * 70
+
+def title(text):
+    print(f"\n{SEP}\n  {text}\n{SEP}")
+
+def heading(text):
+    print(f"\n{THIN}\n  {text}\n{THIN}")
+
+def p(text):
+    for line in textwrap.dedent(text).strip().split("\n"):
+        print(f"  {line}")
+
+def interview(text):
+    print()
+    print("  【面接向けに整理すると】")
+    for line in textwrap.dedent(text).strip().split("\n"):
+        print(f"  {line}")
+
+def misconception(wrong, right):
+    print(f"\n  ⚠ よくある誤解: {wrong}")
+    print(f"  → 正確には: {right}")
+
+
+# =====================================================================
+#  第1章: ブラウザレンダリング
+# =====================================================================
+
+def chapter1_browser_rendering():
+    title("第1章: ブラウザレンダリングの仕組み")
+
+    heading("1.1 DOM と CSSOM")
+    p("""
+    まず全体像:
+    ブラウザはHTML文字列をそのまま描画しているわけではない。
+    内部では「構造の木」と「見た目の木」を作ってから画面を組み立てる。
+
+    DOM（Document Object Model）:
+    - HTMLを解析して得る構造木
+    - 各タグがノードとして表現される
+
+    例: <div><p>Hello</p></div>
+      document
+       └─ html
+           └─ body
+               └─ div
+                   └─ p
+                       └─ "Hello"
+
+    CSSOM（CSS Object Model）:
+    - CSSルールを解析して得るスタイル木
+    - セレクタの適用結果を計算する土台
+
+    なぜ2つ必要か:
+    - DOMは「何があるか」を管理
+    - CSSOMは「どう見せるか」を管理
+    この分離があるから、同じ構造に対してテーマ切り替えやレスポンシブ対応が可能になる。
+    """)
+
+    misconception(
+        "DOMはHTMLファイルそのもの",
+        "DOMはHTMLを解析した結果のオブジェクト。JSで動的に変更するとDOMは変わるがHTMLファイルは変わらない"
+    )
+
+    heading("1.2 レンダーツリーとCRP（Critical Rendering Path）")
+    p("""
+        この節の狙い: 「1.2 レンダーツリーとCRP（Critical Rendering Path）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        CRP（クリティカルレンダリングパス）= ページが画面に描画されるまでの
+        一連の処理ステップ。料理に例えると:
+
+        1. HTML解析 → DOM構築      （レシピを読む）
+        2. CSS解析  → CSSOM構築     （盛り付けの指示を読む）
+        3. DOM + CSSOM → レンダーツリー （実際に作る料理リストを決定）
+        4. Layout（レイアウト）      （皿のどこに何を置くか計算）
+        5. Paint（ペイント）         （実際に盛り付ける）
+        6. Composite（コンポジット）  （完成品をテーブルに出す）
+
+        【レンダーツリーの重要ポイント】
+        - display:none の要素はレンダーツリーに含まれない
+        - visibility:hidden の要素は含まれる（空間は確保される）
+        - <head> はレンダーツリーに含まれない
+    """)
+
+    p("""
+        CRPの各ステップの所要時間イメージ:
+
+          DNS解決       ~50ms   ドメイン名→IPアドレス
+          TCP接続      ~100ms   3ウェイハンドシェイク
+          TLS          ~100ms   暗号化の準備（HTTPS時）
+          サーバー応答  ~200ms   HTML生成・送信
+          HTML解析       ~50ms   DOMツリー構築
+          CSS解析        ~30ms   CSSOMツリー構築
+          レンダーツリー  ~10ms   DOM+CSSOMの合成
+          Layout         ~10ms   位置・サイズ計算
+          Paint          ~20ms   ピクセル描画
+          Composite       ~5ms   レイヤー合成
+          ─────────────────────
+          合計          ~575ms
+    """)
+
+    heading("1.3 レンダリングをブロックするリソース")
+    p("""
+        まず全体像: この節では「1.3 レンダリングをブロックするリソース」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        【CSSはレンダリングブロッキング】
+        ブラウザはCSSOMが完成するまでレンダーツリーを作れない。
+        → 対策: クリティカルCSSをインライン化し、残りは非同期ロード
+
+        【JSはパーサーブロッキング】
+        <script> タグに出会うとHTML解析を停止してJSを実行する。
+        → 対策: async属性（ダウンロード並列、実行はすぐ）
+                defer属性（ダウンロード並列、実行はDOM構築後）
+
+        async vs defer の違い:
+          <script async> → ダウンロード完了次第すぐ実行。順序保証なし。
+                          Analyticsなど独立したスクリプト向き。
+          <script defer> → DOM構築完了後、DOMContentLoadedの直前に実行。
+                          順序が保証される。アプリケーションコード向き。
+    """)
+
+    misconception(
+        "asyncとdeferは同じ",
+        "asyncは到着順に即実行（順序不定）、deferはDOM構築後に宣言順実行"
+    )
+
+    heading("1.4 Layout / Paint / Composite の違い")
+    p("""
+        先に結論: 「1.4 Layout / Paint / Composite の違い」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        【Layout（リフロー）】
+        要素の幾何学的情報（位置・サイズ）を計算する。
+        width/height/margin/padding/topなどを変更すると発生。
+        コストが最も高い。親要素が変わると子も再計算が必要。
+
+        【Paint（リペイント）】
+        ピクセルを実際に描画する。color/background/shadowなどの変更で発生。
+        Layoutより軽いがそれでもコストあり。
+
+        【Composite（コンポジット）】
+        GPUレイヤーを合成するだけ。transform/opacityの変更はここだけで済む。
+        最も軽い。だからアニメーションにはtransformを使うべき。
+
+        コスト順: Layout > Paint > Composite
+
+        例: 要素を右に100px動かしたい場合
+          NG: left: 100px → Layout + Paint + Composite
+          OK: transform: translateX(100px) → Compositeのみ！
+    """)
+
+    interview("""
+        Q: ブラウザのレンダリングパイプラインを説明してください。
+        A: HTMLとCSSをそれぞれDOMとCSSOMに解析し、両者を合成して
+           レンダーツリーを構築します。次にLayout（位置計算）→
+           Paint（描画）→ Composite（合成）の順で画面に反映します。
+           パフォーマンスのコツは、アニメーションにtransform/opacityを
+           使ってCompositeのみで処理すること、CSSのインライン化や
+           JSのdefer/asyncで初期ロードをブロックしないことです。
+    """)
+
+
+# =====================================================================
+#  第2章: JavaScript エンジン
+# =====================================================================
+
+def chapter2_js_engine():
+    title("第2章: JavaScriptエンジンの内部")
+
+    heading("2.1 V8エンジンの仕組み")
+    p("""
+        先に結論: 「2.1 V8エンジンの仕組み」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        V8はGoogleが開発したJSエンジン（Chrome/Node.jsで使用）。
+
+        処理フロー:
+          JSコード → パーサー → AST（抽象構文木）
+           → Ignition（インタプリタ）→ バイトコード実行
+           → TurboFan（JITコンパイラ）→ 最適化された機械語
+
+        【なぜ2段階？】
+        最初からコンパイルすると起動が遅い。まずインタプリタで素早く開始し、
+        「ホットスポット」（繰り返し実行される部分）だけをJITコンパイルする。
+        Pythonのインタプリタ実行と、C言語のコンパイル実行のいいとこ取り。
+
+        【デオプティマイゼーション】
+        TurboFanは「この変数は常にNumber型だろう」と仮定して最適化する。
+        その仮定が崩れると最適化を取り消し（デオプト）、バイトコードに戻る。
+        → 型が変わる変数を作ると性能が落ちる理由。
+    """)
+
+    heading("2.2 イベントループ")
+    p("""
+        まず全体像: この節では「2.2 イベントループ」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        JSはシングルスレッド。では非同期処理をどう実現するのか？
+        答えは「イベントループ」という仕組み。
+
+        【レストランの例え】
+        シェフ（JSスレッド）は1人。でもウェイター（Web API）が複数いる。
+        シェフは料理（同期処理）に専念し、注文受付（I/O待ち）はウェイターに
+        任せる。ウェイターが注文を持ってきたら、シェフのタスクリストに追加。
+        シェフは手が空いたらリストから次の仕事を取る。
+
+        処理の流れ:
+          1. コールスタック（同期コード実行）
+          2. 非同期APIを呼ぶとWeb API層に委譲
+          3. 完了したらコールバックをタスクキューに追加
+          4. コールスタックが空になったらキューからコールバックを取得
+          5. 1に戻る
+
+        コールスタックが空にならない限り、タスクキューは処理されない。
+        これが「重い同期処理はUIをフリーズさせる」理由。
+    """)
+
+    heading("2.3 マイクロタスク vs マクロタスク")
+    p("""
+        この節の狙い: 「2.3 マイクロタスク vs マクロタスク」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        タスクキューは実は2種類ある:
+
+        【マイクロタスクキュー（優先度: 高）】
+        - Promise.then / catch / finally
+        - queueMicrotask()
+        - MutationObserver
+
+        【マクロタスクキュー（優先度: 低）】
+        - setTimeout / setInterval
+        - setImmediate (Node.js)
+        - I/O コールバック
+        - UIレンダリング
+
+        実行順序:
+          1. コールスタックの全コードを実行
+          2. マイクロタスクキューを全て空にする
+          3. 必要ならUIレンダリング
+          4. マクロタスクキューから1つだけ取り出して実行
+          5. 2に戻る
+
+        重要: マイクロタスクは「全て」処理してからマクロタスクに進む。
+    """)
+
+    p("""
+        実行順序クイズ:
+
+          console.log('1');                    // 同期
+          setTimeout(() => console.log('2'));   // マクロタスク
+          Promise.resolve().then(() => {
+            console.log('3');                  // マイクロタスク
+          });
+          console.log('4');                    // 同期
+
+        答え: 1, 4, 3, 2
+        理由: 同期(1,4) → マイクロ(3) → マクロ(2)
+    """)
+
+    misconception(
+        "setTimeoutは正確な時間後に実行される",
+        "setTimeoutはマクロタスクキューに入るだけ。コールスタックやマイクロタスクが忙しければ遅延する"
+    )
+
+    heading("2.4 クロージャ")
+    p("""
+        この節の狙い: 「2.4 クロージャ」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        クロージャ（closure）= 関数が「自分が作られた時の変数環境」を
+        覚えている仕組み。
+
+        【なぜ必要？】
+        データのプライバシーとカプセル化を実現するため。
+        Pythonのクラスを使わずに、状態を持つ関数を作れる。
+
+        例:
+          function createCounter() {
+            let count = 0;              // この変数は外からアクセス不可
+            return {
+              increment: () => ++count, // でもここからはアクセスできる
+              getCount: () => count,
+            };
+          }
+          const counter = createCounter();
+          counter.increment(); // 1
+          counter.increment(); // 2
+          // count にはアクセスできない → カプセル化！
+
+        【メモリリークの注意】
+        クロージャは外部変数への参照を保持し続ける。
+        不要になったクロージャを解放しないとメモリリークになる。
+        特にイベントリスナーの登録時に注意。removeEventListenerを忘れずに。
+    """)
+
+    heading("2.5 プロトタイプチェーン")
+    p("""
+        まず全体像: この節では「2.5 プロトタイプチェーン」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        JSにはクラスベースの継承はない（class構文はシンタックスシュガー）。
+        代わりにプロトタイプチェーンで継承を実現する。
+
+        全てのオブジェクトは __proto__（内部プロパティ [[Prototype]]）を持ち、
+        プロパティが見つからないとプロトタイプを辿って探す。
+
+          const dog = { bark: () => 'Woof!' };
+          const myDog = Object.create(dog);  // dogをプロトタイプにする
+          myDog.name = 'Pochi';
+
+          myDog.name;   // 'Pochi' — 自分のプロパティ
+          myDog.bark(); // 'Woof!'  — プロトタイプから見つかる
+          myDog.fly;    // undefined — チェーンの末端(null)まで見つからない
+
+        class構文は内部的にこの仕組みを使っている:
+          class Animal { constructor(name) { this.name = name; } }
+          class Dog extends Animal { bark() { return 'Woof!'; } }
+          // Dog.prototype.__proto__ === Animal.prototype
+    """)
+
+    interview("""
+        Q: イベントループとタスクキューの違いを説明してください。
+        A: イベントループはJS実行の制御機構で、コールスタックが空のときに
+           キューからタスクを取り出します。キューにはマイクロタスク（Promise等、
+           優先処理）とマクロタスク（setTimeout等）の2種類があり、
+           マイクロタスクを全て処理してからマクロタスクに移ります。
+           この仕組みにより、シングルスレッドでも非同期処理が可能です。
+    """)
+
+
+# =====================================================================
+#  第3章: React 深掘り
+# =====================================================================
+
+def chapter3_react_deep():
+    title("第3章: React深掘り")
+
+    heading("3.1 仮想DOM（Virtual DOM）")
+    p("""
+        この節の狙い: 「3.1 仮想DOM（Virtual DOM）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        仮想DOMとは、実際のDOMの「軽量コピー」をメモリ上にJSオブジェクトで
+        保持する仕組み。実DOMの操作は遅い（ブラウザがLayout/Paintを行うため）
+        ので、まずメモリ上の仮想DOMを変更し、差分だけ実DOMに反映する。
+
+        【エクセルの例え】
+        実DOM = 印刷済みの紙（修正するたびに全ページ印刷し直し）
+        仮想DOM = PC上のExcelファイル（自由に編集、変更箇所だけ印刷）
+
+        処理の流れ:
+          1. stateが変わる
+          2. 新しい仮想DOMツリーを生成
+          3. 前の仮想DOMツリーとdiff（差分検出）
+          4. 差分だけ実DOMに適用（Reconciliation）
+
+        diffアルゴリズムのヒューリスティック（O(n)に抑える工夫）:
+          - 異なるタイプの要素は完全に置き換え（<div>→<span>は全再構築）
+          - key属性で子要素を同一視（リスト要素の追跡に必須）
+    """)
+
+    misconception(
+        "仮想DOMは実DOMより常に速い",
+        "仮想DOMにも差分計算のオーバーヘッドがある。単純なDOM操作1回なら直接操作の方が速い。仮想DOMの利点は「大量の変更をバッチ化して最小限のDOM操作にまとめる」こと"
+    )
+
+    heading("3.2 Fiberアーキテクチャ")
+    p("""
+        先に結論: 「3.2 Fiberアーキテクチャ」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Fiber = React 16で導入された新しい内部エンジン。
+
+        【旧アーキテクチャ(Stack)の問題】
+        再帰的にコンポーネントツリーを処理するため、一度始めると止められない。
+        大きなツリーの更新中はUIがフリーズする（メインスレッド占有）。
+
+        【Fiberの解決策: 分割可能なレンダリング】
+        各コンポーネントを「Fiberノード」というデータ構造で表現し、
+        処理を小さな単位（Unit of Work）に分割。各単位の間に
+        ブラウザに制御を戻せる（requestIdleCallback的な仕組み）。
+
+        Fiberの主な機能:
+          - Interruptible rendering: レンダリングを中断・再開できる
+          - Priority scheduling: 緊急度に応じて更新を優先順位付け
+          - Concurrent features: Suspense、Transitionの基盤
+
+        優先度の例:
+          高: ユーザー入力（クリック、タイプ）→ 即座に応答
+          中: データ取得完了 → 画面更新
+          低: 画面外の要素の事前レンダリング
+    """)
+
+    heading("3.3 Hooksの内部メカニズム")
+    p("""
+        先に結論: 「3.3 Hooksの内部メカニズム」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        HooksはFiberノード内の「連結リスト」として管理される。
+        これが「Hooksを条件分岐内で呼んではいけない」理由。
+
+        内部的な仕組み:
+          Fiber {
+            memoizedState: Hook1 → Hook2 → Hook3  // 連結リスト
+          }
+
+        毎回のレンダーで同じ順番でHooksを呼ぶことで、
+        前回の値と対応付ける。順番が変わると値がズレてバグになる。
+
+        【useStateの内部】
+          1. 初回レンダー: initialValueを保存、setterを返す
+          2. setter呼び出し: 新しい値をキューに追加、再レンダーを予約
+          3. 再レンダー: キューから最新の値を取得して返す
+
+        【useEffectの内部】
+          1. deps（依存配列）を前回と浅い比較（===）
+          2. 変わっていればeffect関数をスケジュール
+          3. レンダー後（DOM更新後）にeffect実行
+          4. 次のeffect実行前に前のcleanup関数を実行
+
+        useLayoutEffect との違い:
+          useEffect → 画面描画後に非同期実行（ほとんどの場合はこちら）
+          useLayoutEffect → DOM更新後、画面描画前に同期実行
+                           （レイアウト計測やDOM操作が必要な場合のみ）
+    """)
+
+    heading("3.4 レンダリング最適化")
+    p("""
+        この節の狙い: 「3.4 レンダリング最適化」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        Reactで再レンダーが起きるタイミング:
+          1. stateが変わった
+          2. propsが変わった
+          3. 親コンポーネントが再レンダーされた
+          4. Contextの値が変わった
+
+        【重要: 3に注意】
+        親が再レンダーすると子は全て再レンダーされる（propsが同じでも！）。
+        これが不要な再レンダーの主な原因。
+
+        最適化の道具:
+          React.memo(Component)
+            → propsが変わらなければ再レンダーをスキップ（浅い比較）
+            → 使い所: 重い計算を含むコンポーネント、リストの各アイテム
+
+          useMemo(factory, deps)
+            → 計算結果をメモ化。depsが変わらなければ前回の結果を再利用
+            → 使い所: 重い計算、子に渡すオブジェクト/配列の参照安定化
+
+          useCallback(fn, deps)
+            → 関数のメモ化。useMemo(() => fn, deps) と同じ
+            → 使い所: React.memoなコンポーネントに渡すコールバック
+
+        【最適化の注意点】
+        全てにmemo/useMemo/useCallbackをつけるのは逆効果！
+        メモ化自体にもメモリ・比較コストがかかる。
+        プロファイリングで問題を特定してから最適化すること。
+    """)
+
+    misconception(
+        "useMemoはどこでも使うべき",
+        "メモ化にはメモリと比較のコストがかかる。軽い計算にuseMemoを使うと逆に遅くなることもある。React Profilerで計測してから判断すべき"
+    )
+
+    heading("3.5 Suspenseとストリーミング")
+    p("""
+        先に結論: 「3.5 Suspenseとストリーミング」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Suspense = コンポーネントが「まだ準備できていない」ことを
+        Reactに伝え、代わりにフォールバックUIを表示する仕組み。
+
+          <Suspense fallback={<Loading />}>
+            <UserProfile />  ← データ取得中はPromiseをthrow
+          </Suspense>
+
+        React 18以降のSSRストリーミング:
+          1. サーバーがHTML骨格を即座に送信（<Suspense>にフォールバック）
+          2. データ取得完了後、実コンテンツをHTMLチャンクで後追い送信
+          3. クライアントが受信してDOMを差し替え（Selective Hydration）
+
+        メリット: TTFB（最初のバイトまでの時間）が大幅に短縮される。
+        全データの取得を待たずにユーザーは部分的にページを閲覧できる。
+
+        useTransition:
+          低優先度の更新をマークする。Suspenseと組み合わせて
+          「古い画面を表示したまま、バックグラウンドで新画面を準備」できる。
+    """)
+
+    interview("""
+        Q: React.memoとuseMemoの違いは？
+        A: React.memoはコンポーネントのメモ化（propsが同じなら再レンダー
+           スキップ）。useMemoは値のメモ化（依存配列が同じなら再計算
+           スキップ）。両方とも浅い比較を使い、使いすぎると逆にコストが
+           増えるため、プロファイリングで問題を確認してから適用します。
+    """)
+
+
+# =====================================================================
+#  第4章: Next.js
+# =====================================================================
+
+def chapter4_nextjs():
+    title("第4章: Next.js アーキテクチャ")
+
+    heading("4.1 レンダリング戦略: SSR / SSG / ISR / RSC")
+    p("""
+        まず全体像: この節では「4.1 レンダリング戦略: SSR / SSG / ISR / RSC」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Next.jsは4つのレンダリング戦略を使い分けられる。
+
+        【CSR (Client-Side Rendering)】
+        ブラウザでJSを実行してHTMLを生成。SPAの基本。
+        長所: サーバー負荷なし、リッチなインタラクション
+        短所: 初期表示が遅い、SEO不利（空のHTMLが返る）
+        用途: ダッシュボード、管理画面
+
+        【SSR (Server-Side Rendering)】
+        リクエストごとにサーバーでHTMLを生成。
+        長所: SEO良好、最新データを反映
+        短所: リクエストのたびにサーバー処理が必要、TTFB遅め
+        用途: SNSのフィード、検索結果ページ
+
+        【SSG (Static Site Generation)】
+        ビルド時にHTMLを事前生成。CDNから配信。
+        長所: 最速（CDNキャッシュ）、SEO最良
+        短所: ビルド時のデータで固定、更新にはリビルドが必要
+        用途: ブログ、ドキュメント、LPページ
+
+        【ISR (Incremental Static Regeneration)】
+        SSGの進化形。指定した秒数後にバックグラウンドで再生成。
+        長所: SSGの速さ + データの鮮度
+        短所: revalidate間隔中は古いデータ
+        用途: ECの商品ページ、ニュースサイト
+
+        判断フロー:
+          データは静的？ → SSG
+          たまに変わる？ → ISR
+          リクエストごとに違う？ → SSR
+          SEO不要でクライアント操作中心？ → CSR
+    """)
+
+    heading("4.2 React Server Components (RSC)")
+    p("""
+        先に結論: 「4.2 React Server Components (RSC)」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        RSC = サーバーでのみ実行されるコンポーネント。
+        JSバンドルに含まれず、クライアントにJSを送らない。
+
+        App Router（Next.js 13+）ではデフォルトで全てServer Component。
+        クライアント側の機能（useState, onClick等）が必要な場合のみ
+        'use client' ディレクティブをファイル先頭に書く。
+
+        Server Component の利点:
+          - バンドルサイズゼロ（JSを送らない）
+          - DB/ファイルシステムに直接アクセスできる
+          - APIキーなどの秘密情報をクライアントに露出しない
+          - 自動コード分割
+
+        境界ルール:
+          Server Component → Client Componentをimportできる
+          Client Component → Server Componentをimportできない
+            （ただしchildren propsとして受け取るのはOK）
+
+        使い分け:
+          Server: データ取得、バックエンドアクセス、表示のみのUI
+          Client: ユーザーインタラクション、hooks、ブラウザAPI使用
+    """)
+
+    heading("4.3 App Router の構造")
+    p("""
+        まず全体像: この節では「4.3 App Router の構造」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        App Routerのファイル規約:
+
+          app/
+          ├── layout.tsx      ← ルートレイアウト（必須、<html>を含む）
+          ├── page.tsx        ← / のページ
+          ├── loading.tsx     ← ローディングUI（Suspense境界を自動生成）
+          ├── error.tsx       ← エラーUI（ErrorBoundaryを自動生成）
+          ├── not-found.tsx   ← 404ページ
+          ├── products/
+          │   ├── page.tsx        ← /products
+          │   ├── [id]/
+          │   │   └── page.tsx    ← /products/123（動的ルート）
+          │   └── layout.tsx      ← products用のネストレイアウト
+          └── api/
+              └── users/
+                  └── route.ts    ← API Route Handler
+
+        【レイアウトのネスト】
+        layout.tsxは自動的にネストされる。親のlayoutが子をラップする。
+        ページ遷移時、共有レイアウトは再レンダーされない（状態保持）。
+        これはPages Routerの_app.tsxにはなかった大きな改善。
+    """)
+
+    heading("4.4 Server Actions")
+    p("""
+        まず全体像: この節では「4.4 Server Actions」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Server Actions = クライアントからサーバーの関数を直接呼べる仕組み。
+        API Routeを手動で作る必要がなくなる。
+
+        使い方:
+          // 'use server' でサーバー関数として宣言
+          async function createUser(formData: FormData) {
+            'use server';
+            const name = formData.get('name');
+            await db.users.create({ data: { name } });
+            revalidatePath('/users');  // キャッシュ更新
+          }
+
+          // フォームから直接呼べる
+          <form action={createUser}>
+            <input name="name" />
+            <button type="submit">作成</button>
+          </form>
+
+        内部的にはPOSTリクエストに変換される。
+        Progressive enhancement: JSが無効でもフォームは動作する。
+
+        注意点:
+          - 引数はシリアライズ可能な値のみ（関数は渡せない）
+          - バリデーションはサーバー側で必ず行う
+          - Optimistic Updates と組み合わせてUX向上が可能
+    """)
+
+    interview("""
+        Q: SSRとSSGの使い分けを説明してください。
+        A: SSGはビルド時にHTMLを生成しCDNから配信するので最速ですが、
+           データが固定されます。頻繁に更新が必要ならISRで定期再生成。
+           リクエストごとに異なるデータ（認証済みユーザー固有の情報等）
+           が必要な場合はSSRを選びます。SEOが不要な管理画面はCSRで十分です。
+    """)
+
+
+# =====================================================================
+#  第5章: 状態管理
+# =====================================================================
+
+def chapter5_state_management():
+    title("第5章: 状態管理")
+
+    heading("5.1 状態管理の全体像")
+    p("""
+        先に結論: 「5.1 状態管理の全体像」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Reactの状態管理は「何をどこに置くか」の設計問題。
+
+        状態の分類:
+          1. ローカルUI状態 → useState（モーダル開閉、フォーム入力）
+          2. 共有UI状態    → Context, Zustand, Jotai（テーマ、言語設定）
+          3. サーバー状態  → React Query, SWR（APIデータ）
+          4. URL状態      → useSearchParams, usePathname（フィルター、ページ）
+          5. フォーム状態  → React Hook Form, useActionState
+
+        最大の誤解: 「全てを1つのストアで管理すべき」
+        → サーバー状態とUI状態は性質が全く違う。分けて管理すべき。
+    """)
+
+    heading("5.2 Redux — 元祖状態管理")
+    p("""
+        まず全体像: この節では「5.2 Redux — 元祖状態管理」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Redux = Flux（Facebookが提唱）を発展させた状態管理ライブラリ。
+        「予測可能な状態管理」を目指す。
+
+        3つの原則:
+          1. Single source of truth — 状態は1つのストアに
+          2. State is read-only — 状態を直接変更しない（Actionを発行）
+          3. Pure functions — Reducerは純粋関数（同じ入力→同じ出力）
+
+        データフロー:
+          UI → dispatch(Action) → Reducer → 新State → UI更新
+
+        Redux Toolkit（現在の推奨）:
+          createSlice() で Action + Reducer を一括定義
+          createAsyncThunk() で非同期処理
+          RTK Query で APIデータ管理（React Query的な機能）
+
+        Reduxが適している場面:
+          - 大規模チーム（厳格なパターンが規律を保つ）
+          - 複雑な状態遷移（undo/redo、デバッグに便利）
+          - 既存のReduxコードベース
+    """)
+
+    heading("5.3 Zustand — 軽量でシンプル")
+    p("""
+        先に結論: 「5.3 Zustand — 軽量でシンプル」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Zustand = ドイツ語で「状態」。Redux的な概念を最小限のAPIで提供。
+
+        特徴:
+          - ボイラープレートが極めて少ない
+          - Providerが不要（Contextのネスト地獄を回避）
+          - TypeScript完全対応
+          - バンドルサイズ約1KB
+
+        使い方:
+          const useStore = create((set) => ({
+            count: 0,
+            increment: () => set((s) => ({ count: s.count + 1 })),
+          }));
+
+          // コンポーネント内
+          const count = useStore((s) => s.count);
+          const increment = useStore((s) => s.increment);
+
+        セレクターで必要な値だけ購読でき、不要な再レンダーを防げる。
+        Reduxと違いActionの概念が不要で、直接set()で状態を更新する。
+    """)
+
+    heading("5.4 Jotai — アトミック状態管理")
+    p("""
+        まず全体像: この節では「5.4 Jotai — アトミック状態管理」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Jotai = 日本語の「状態」。ボトムアップの原子的（atomic）アプローチ。
+
+        考え方:
+          useState の拡張版。個別のatom（原子）を作り、
+          コンポーネント間で共有する。グローバルストアではなく、
+          必要な粒度で状態を定義する。
+
+        使い方:
+          const countAtom = atom(0);  // 原子的な状態
+          const doubleAtom = atom((get) => get(countAtom) * 2);  // 派生状態
+
+          // コンポーネント内
+          const [count, setCount] = useAtom(countAtom);
+
+        Zustand vs Jotai:
+          Zustand: トップダウン（ストアを定義→セレクターで切り出す）
+          Jotai: ボトムアップ（小さなatomを定義→組み合わせる）
+
+        Jotaiが向いている場面:
+          - 多数の独立した小さな状態がある
+          - 状態の依存関係が複雑（派生atomで自動計算）
+          - Suspense統合が欲しい
+    """)
+
+    heading("5.5 サーバー状態: React Query / SWR")
+    p("""
+        この節の狙い: 「5.5 サーバー状態: React Query / SWR」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        サーバー状態 = APIから取得するデータ。UI状態とは根本的に異なる:
+          - 所有者がサーバー側にいる（クライアントはキャッシュを持つだけ）
+          - 他のユーザーが変更する可能性がある（stale = 古くなる）
+          - ローディング/エラー/成功の状態がある
+
+        React Query (TanStack Query):
+          const { data, isLoading, error } = useQuery({
+            queryKey: ['users'],
+            queryFn: () => fetch('/api/users').then(r => r.json()),
+            staleTime: 5 * 60 * 1000,  // 5分間はfreshとみなす
+          });
+
+        自動で行ってくれること:
+          - キャッシュ管理（queryKeyで一意に識別）
+          - バックグラウンド再取得（ウィンドウフォーカス時など）
+          - 重複リクエストの排除
+          - Optimistic Updates（楽観的更新）
+          - ページネーション / 無限スクロール
+
+        SWR (Stale-While-Revalidate):
+          Vercel製。React Queryより軽量でシンプル。
+          名前の通り「古いデータを返しつつ、裏で再検証」する戦略。
+          Next.jsとの統合が自然。機能はReact Queryの方が豊富。
+    """)
+
+    misconception(
+        "useEffectでfetchしてuseStateに入れるのが標準的なデータ取得",
+        "React Query/SWRを使うべき。キャッシュ、ローディング状態、エラーハンドリング、再取得、競合状態の解決を手動で実装するのは車輪の再発明"
+    )
+
+    interview("""
+        Q: どの状態管理ライブラリを選びますか？
+        A: まず状態の種類を分類します。サーバーデータはReact Query/SWRで
+           管理し、ローカルUI状態はuseStateで済ませます。
+           複数コンポーネントで共有するUI状態が多ければZustand（シンプル）
+           またはJotai（粒度が細かい場合）。大規模チームで厳格な規律が
+           必要ならRedux Toolkitを選びます。
+    """)
+
+
+# =====================================================================
+#  第6章: TypeScript高度
+# =====================================================================
+
+def chapter6_typescript_advanced():
+    title("第6章: TypeScript高度な型システム")
+
+    heading("6.1 ジェネリクス（Generics）")
+    p("""
+        まず全体像: この節では「6.1 ジェネリクス（Generics）」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        ジェネリクス = 「型の引数」。関数やクラスに型を後から渡せる仕組み。
+        Pythonの TypeVar に相当する。
+
+        【なぜ必要？】
+        型安全性を保ちつつ、汎用的なコードを書くため。
+
+          // any だと型安全性が失われる
+          function first(arr: any[]): any { return arr[0]; }
+
+          // ジェネリクスなら型が保持される
+          function first<T>(arr: T[]): T { return arr[0]; }
+          const n = first([1, 2, 3]);    // n: number（推論される）
+          const s = first(['a', 'b']);   // s: string
+
+        よく使うパターン:
+          // 複数の型引数
+          function map<T, U>(arr: T[], fn: (item: T) => U): U[]
+
+          // 制約（extends）: 特定の型に限定
+          function getLength<T extends { length: number }>(x: T): number {
+            return x.length;  // lengthプロパティがあることが保証される
+          }
+
+          // デフォルト型
+          type Response<T = unknown> = { data: T; status: number };
+    """)
+
+    heading("6.2 Conditional Types（条件付き型）")
+    p("""
+        先に結論: 「6.2 Conditional Types（条件付き型）」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        三項演算子の型バージョン: T extends U ? X : Y
+
+        例:
+          type IsString<T> = T extends string ? true : false;
+          type A = IsString<'hello'>;  // true
+          type B = IsString<42>;       // false
+
+        【Distributive（分配）の挙動】
+        ユニオン型に対してConditional Typeを適用すると、各メンバーに分配される:
+          type ToArray<T> = T extends any ? T[] : never;
+          type C = ToArray<string | number>;
+          // string[] | number[]  （(string|number)[] ではない！）
+
+        分配を防ぎたい場合は [] で囲む:
+          type ToArray2<T> = [T] extends [any] ? T[] : never;
+          type D = ToArray2<string | number>;
+          // (string | number)[]
+
+        組み込みユーティリティ型の実装:
+          type Exclude<T, U> = T extends U ? never : T;
+          type Extract<T, U> = T extends U ? T : never;
+          type NonNullable<T> = T extends null | undefined ? never : T;
+    """)
+
+    heading("6.3 Mapped Types（マップ型）")
+    p("""
+        この節の狙い: 「6.3 Mapped Types（マップ型）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        既存の型のプロパティを変換して新しい型を作る。
+        Pythonの辞書内包表記の型バージョン。
+
+          // 全プロパティをオプショナルに
+          type Partial<T> = { [K in keyof T]?: T[K] };
+
+          // 全プロパティを読み取り専用に
+          type Readonly<T> = { readonly [K in keyof T]: T[K] };
+
+          // 全プロパティを必須に
+          type Required<T> = { [K in keyof T]-?: T[K] };
+          //                              -? で「?」を除去
+
+        キーのフィルタリング（as による再マッピング）:
+          // string型のプロパティだけ抽出
+          type StringProps<T> = {
+            [K in keyof T as T[K] extends string ? K : never]: T[K]
+          };
+    """)
+
+    heading("6.4 Template Literal Types")
+    p("""
+        この節の狙い: 「6.4 Template Literal Types」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        文字列リテラル型をテンプレートで組み合わせる（TS 4.1+）。
+
+          type Color = 'red' | 'blue';
+          type Size = 'sm' | 'lg';
+          type ClassName = `${Size}-${Color}`;
+          // 'sm-red' | 'sm-blue' | 'lg-red' | 'lg-blue'
+
+        実用例: CSSプロパティのユニオンを自動生成
+          type CSSProp = 'margin' | 'padding';
+          type Direction = 'top' | 'bottom' | 'left' | 'right';
+          type SpacingProp = `${CSSProp}-${Direction}`;
+          // 'margin-top' | 'margin-bottom' | ... の8パターン
+
+        文字列操作ユーティリティ型:
+          Uppercase<'hello'>    // 'HELLO'
+          Lowercase<'HELLO'>    // 'hello'
+          Capitalize<'hello'>   // 'Hello'
+          Uncapitalize<'Hello'> // 'hello'
+    """)
+
+    heading("6.5 infer キーワード")
+    p("""
+        先に結論: 「6.5 infer キーワード」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        infer = Conditional Type内で「型を推論して名前をつける」キーワード。
+        パターンマッチのように型から一部を抽出できる。
+
+          // 関数の戻り値の型を取得
+          type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+
+          type A = ReturnType<() => string>;  // string
+          type B = ReturnType<(x: number) => boolean>;  // boolean
+
+          // 配列の要素の型を取得
+          type ElementType<T> = T extends (infer E)[] ? E : never;
+          type C = ElementType<string[]>;  // string
+
+          // Promiseのアンラップ
+          type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+          type D = Awaited<Promise<Promise<number>>>;  // number（再帰的）
+
+        inferの使い所:
+          - ライブラリの型定義から特定の型を抽出する
+          - 複雑な型変換を宣言的に書く
+          - 型レベルのパターンマッチング
+    """)
+
+    misconception(
+        "TypeScriptの型はランタイムに影響する",
+        "TS型は完全にコンパイル時のみ。ランタイムにはJSになり型情報は消える。型ガード（typeof, instanceof）でランタイムチェックを併用する必要がある"
+    )
+
+    interview("""
+        Q: ジェネリクスとanyの違いは？
+        A: anyは型チェックを完全に放棄します。ジェネリクスは型を変数化し、
+           呼び出し時に具体的な型が決まります。例えばfirst<T>(arr: T[]): T
+           なら、first([1,2])の戻り値はnumber型と推論され、型安全性が
+           保たれます。anyでは戻り値の型情報が失われます。
+    """)
+
+
+# =====================================================================
+#  第7章: Webパフォーマンス
+# =====================================================================
+
+def chapter7_web_performance():
+    title("第7章: Webパフォーマンス")
+
+    heading("7.1 Core Web Vitals")
+    p("""
+        この節の狙い: 「7.1 Core Web Vitals」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        Googleが定めたUX品質指標。SEOランキングにも影響する。
+
+        LCP (Largest Contentful Paint) — 表示速度
+          最大コンテンツ要素が表示されるまでの時間。
+          良好: 2.5秒以内 / 要改善: 4.0秒以内 / 不良: 4.0秒超
+          改善策: 画像最適化、CSSインライン化、サーバー応答高速化
+
+        INP (Interaction to Next Paint) — 応答性
+          ユーザー操作から次の描画までの遅延（FIDの後継指標）。
+          良好: 200ms以内 / 要改善: 500ms以内 / 不良: 500ms超
+          改善策: 長いタスクの分割、メインスレッドのブロック回避
+
+        CLS (Cumulative Layout Shift) — 視覚安定性
+          予期しないレイアウトのずれの合計スコア。
+          良好: 0.1以下 / 要改善: 0.25以下 / 不良: 0.25超
+          改善策: 画像にwidth/height指定、Web Font対策、動的コンテンツ対策
+
+        計測ツール:
+          開発時: Chrome DevTools (Lighthouse, Performance tab)
+          実ユーザー: Chrome UX Report (CrUX), web-vitals ライブラリ
+    """)
+
+    heading("7.2 Code Splitting（コード分割）")
+    p("""
+        この節の狙い: 「7.2 Code Splitting（コード分割）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        全てのJSを1つのバンドルにすると、初期ロードが遅くなる。
+        必要な分だけ分けて読み込む = Code Splitting。
+
+        方法1: Dynamic Import（動的インポート）
+          // 通常のimport → バンドルに含まれる
+          import HeavyChart from './HeavyChart';
+
+          // dynamic import → 必要時にロード
+          const HeavyChart = React.lazy(() => import('./HeavyChart'));
+
+          <Suspense fallback={<Loading />}>
+            <HeavyChart />
+          </Suspense>
+
+        方法2: Route-based Splitting（Next.jsでは自動）
+          各ページが自動的に別チャンクになる。
+          /products のJSは /about にアクセスしても読み込まれない。
+
+        方法3: ライブラリの分割
+          lodash全体ではなく個別関数だけimport:
+            NG: import _ from 'lodash';
+            OK: import debounce from 'lodash/debounce';
+    """)
+
+    heading("7.3 Tree Shaking")
+    p("""
+        まず全体像: この節では「7.3 Tree Shaking」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Tree Shaking = 使われていないコード（Dead Code）をバンドルから除去。
+        木を揺すって枯れ葉（不要コード）を落とすイメージ。
+
+        条件:
+          - ESModules（import/export）を使うこと
+            → require()（CommonJS）はTree Shaking不可
+          - 副作用のないモジュールであること
+            → package.jsonの"sideEffects": falseが重要
+
+        なぜrequire()はダメ？
+          require()は実行時に評価されるため、静的解析できない。
+          import/exportはコンパイル時に依存関係が確定するため、
+          「この関数は誰も使っていない」と判断できる。
+
+        実例: lodash
+          import { debounce } from 'lodash';  // 全体(72KB)がバンドルされる
+          import debounce from 'lodash-es/debounce';  // 約1KBだけ
+    """)
+
+    heading("7.4 Service Worker")
+    p("""
+        まず全体像: この節では「7.4 Service Worker」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Service Worker = ブラウザとネットワークの間に入る「プロキシ」。
+        オフライン対応やキャッシュ制御を可能にする。
+
+        ライフサイクル:
+          1. Register — JSからService Workerを登録
+          2. Install — リソースをプリキャッシュ
+          3. Activate — 古いキャッシュをクリーンアップ
+          4. Fetch — ネットワークリクエストをインターセプト
+
+        キャッシュ戦略:
+          Cache First    — キャッシュ優先。ない場合だけネットワーク。
+                          静的アセット（画像、フォント）向き。
+          Network First  — ネットワーク優先。失敗したらキャッシュ。
+                          APIレスポンス向き。
+          Stale While Revalidate — キャッシュを即返し、裏で更新。
+                          頻繁に更新されるが即時性が不要なデータ向き。
+
+        PWA（Progressive Web App）の基盤技術。
+        Workbox（Google製ライブラリ）で簡単に実装できる。
+
+        注意: Service WorkerはHTTPS環境でのみ動作（localhost除く）。
+    """)
+
+    interview("""
+        Q: Core Web Vitalsを改善するためにどうしますか？
+        A: まずLighthouseで現状を計測し、ボトルネックを特定します。
+           LCP改善: 画像のWebP変換とlazy loading、クリティカルCSSインライン化。
+           INP改善: 重い処理のWeb Worker委譲、長いタスクの分割。
+           CLS改善: 画像にwidth/height属性、font-display:swap設定。
+           コード分割とTree Shakingでバンドルサイズも削減します。
+    """)
+
+
+# =====================================================================
+#  第8章: CSS設計
+# =====================================================================
+
+def chapter8_css_architecture():
+    title("第8章: CSS設計")
+
+    heading("8.1 CSS-in-JS vs Tailwind vs CSS Modules")
+    p("""
+        まず全体像: この節では「8.1 CSS-in-JS vs Tailwind vs CSS Modules」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        CSSの書き方は3大アプローチがある:
+
+        【CSS-in-JS】(styled-components, Emotion)
+          JSファイル内にCSSを書く。
+          長所: 動的スタイル、スコープ自動隔離、デッドコード削除
+          短所: ランタイムオーバーヘッド、SSRの複雑さ、バンドルサイズ
+
+          const Button = styled.button`
+            color: ${props => props.primary ? 'blue' : 'gray'};
+            padding: 8px 16px;
+          `;
+
+        【Tailwind CSS】(ユーティリティファースト)
+          事前定義されたクラスを組み合わせる。
+          長所: 高速プロトタイピング、一貫したデザイン、本番CSSが小さい
+          短所: HTML が長くなる、学習コスト、カスタムデザインに手間
+
+          <button class="text-blue-500 px-4 py-2 rounded hover:bg-blue-100">
+            Click
+          </button>
+
+        【CSS Modules】
+          CSSファイルのクラス名を自動でユニーク化。
+          長所: 標準CSS構文、スコープ隔離、ランタイムゼロ
+          短所: 動的スタイルが苦手、グローバルスタイルは別管理
+
+          // Button.module.css
+          .primary { color: blue; }
+
+          // Button.tsx
+          import styles from './Button.module.css';
+          <button className={styles.primary}>Click</button>
+
+        2024-25年のトレンド:
+          - Tailwind CSS が圧倒的人気（Next.js公式推奨）
+          - CSS-in-JSのランタイムコストが問題視され、ゼロランタイム系
+            （Vanilla Extract, Panda CSS）に移行する動き
+          - CSS Modulesは堅実な選択肢として健在
+    """)
+
+    heading("8.2 Flexbox と Grid")
+    p("""
+        先に結論: 「8.2 Flexbox と Grid」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        【Flexbox】— 1次元レイアウト（行 or 列）
+        メインとなるコンテナの中で、子要素を1列に配置する。
+
+          .container {
+            display: flex;
+            justify-content: center;  /* 主軸方向の配置 */
+            align-items: center;      /* 交差軸方向の配置 */
+            gap: 16px;                /* 要素間の隙間 */
+          }
+
+        使い所: ナビゲーション、カードの横並び、中央揃え
+
+        【Grid】— 2次元レイアウト（行 と 列）
+        行と列の両方を同時に制御するグリッドシステム。
+
+          .container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);  /* 3列均等 */
+            grid-template-rows: auto 1fr auto;      /* ヘッダー/本文/フッター */
+            gap: 16px;
+          }
+
+        使い所: ページ全体のレイアウト、カードグリッド、ダッシュボード
+
+        使い分け:
+          1次元の並び（1行 or 1列） → Flexbox
+          2次元のグリッド配置      → Grid
+          両方使う場面も多い（Gridの中のFlexbox等）
+    """)
+
+    misconception(
+        "FlexboxとGridはどちらか一方を使う",
+        "併用するのが正しい。Gridでページ全体を組み、各セル内でFlexboxを使うのが一般的"
+    )
+
+    interview("""
+        Q: CSSのスタイリング手法をどう選びますか？
+        A: チームの規模と要件で判断します。素早いプロトタイピングやデザイン
+           システムの統一にはTailwind CSS。コンポーネント単位の独立性が
+           重要ならCSS Modules。動的スタイルが多ければCSS-in-JS（ただし
+           ゼロランタイム系のVanilla Extractを検討）。Next.jsプロジェクト
+           ではTailwind + CSS Modulesの組み合わせが現在の定番です。
+    """)
+
+
+# =====================================================================
+#  第9章: テスト
+# =====================================================================
+
+def chapter9_testing():
+    title("第9章: フロントエンドテスト")
+
+    heading("9.1 テストピラミッド")
+    p("""
+        まず全体像: この節では「9.1 テストピラミッド」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        テストには3つの層がある（下から上に向かって数が減る）:
+
+              /\\
+             /E2E \\     ← 少数・遅い・高コスト（Playwright）
+            /──────\\
+           /Integration\\  ← 中程度（React Testing Library）
+          /──────────────\\
+         /   Unit Tests   \\  ← 多数・速い・低コスト（Jest/Vitest）
+        └──────────────────┘
+
+        Unit: 個別の関数・フック。外部依存はモック。
+        Integration: コンポーネントの結合。ユーザー操作をシミュレート。
+        E2E: 実際のブラウザで全体をテスト。最も信頼性が高いが遅い。
+
+        推奨比率: Unit 70% / Integration 20% / E2E 10%
+    """)
+
+    heading("9.2 Jest / Vitest")
+    p("""
+        先に結論: 「9.2 Jest / Vitest」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Jest: Facebookが作ったテストフレームワーク。長年のデファクト。
+        Vitest: Viteベースのテストフレームワーク。Jestと互換API。
+
+        Vitest の利点:
+          - Viteと同じ設定・プラグインを使える
+          - ESModulesネイティブ対応
+          - Jestより高速（特にTypeScriptプロジェクト）
+          - Jest互換API（移行が容易）
+
+        基本的なテスト:
+          // utils.test.ts
+          import { describe, it, expect } from 'vitest';
+          import { sum } from './utils';
+
+          describe('sum', () => {
+            it('2つの数値を足す', () => {
+              expect(sum(1, 2)).toBe(3);
+            });
+            it('負の数を扱える', () => {
+              expect(sum(-1, 1)).toBe(0);
+            });
+          });
+
+        モック:
+          vi.fn()     — 関数のモック
+          vi.spyOn()  — 既存関数の監視
+          vi.mock()   — モジュール全体のモック
+    """)
+
+    heading("9.3 React Testing Library")
+    p("""
+        この節の狙い: 「9.3 React Testing Library」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        理念:「ユーザーが使うように」テストする。
+
+        【内部実装をテストしない】
+          NG: state の値を直接チェック
+          OK: 画面に表示されるテキストをチェック
+
+        【DOMへの問い合わせの優先順位】
+          1. getByRole     — アクセシビリティロール（最優先）
+          2. getByLabelText — フォーム要素
+          3. getByText     — テキスト内容
+          4. getByTestId   — data-testid（最終手段）
+
+        例:
+          import { render, screen } from '@testing-library/react';
+          import userEvent from '@testing-library/user-event';
+
+          test('カウンターが増える', async () => {
+            render(<Counter />);
+            const button = screen.getByRole('button', { name: '増加' });
+            await userEvent.click(button);
+            expect(screen.getByText('Count: 1')).toBeInTheDocument();
+          });
+
+        非同期テスト:
+          findByText — 要素が表示されるまで待つ（デフォルト1秒）
+          waitFor    — 条件が満たされるまでポーリング
+    """)
+
+    heading("9.4 Playwright（E2Eテスト）")
+    p("""
+        この節の狙い: 「9.4 Playwright（E2Eテスト）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        Playwright = Microsoft製のE2Eテストフレームワーク。
+        Chromium/Firefox/WebKitの3ブラウザを1つのAPIでテスト。
+
+        Cypress との比較:
+          Playwright: マルチブラウザ、マルチタブ、より高速
+          Cypress: エコシステムが充実、デバッグUIが優秀
+
+        基本的なテスト:
+          test('ログインフロー', async ({ page }) => {
+            await page.goto('/login');
+            await page.fill('[name="email"]', 'user@example.com');
+            await page.fill('[name="password"]', 'password');
+            await page.click('button[type="submit"]');
+            await expect(page).toHaveURL('/dashboard');
+            await expect(page.locator('h1')).toHaveText('ダッシュボード');
+          });
+
+        強力な機能:
+          - 自動待機（要素の出現やネットワーク完了を待つ）
+          - ネットワークインターセプト（APIモック）
+          - スクリーンショット・動画記録
+          - Visual Regression Testing
+    """)
+
+    heading("9.5 MSW (Mock Service Worker)")
+    p("""
+        まず全体像: この節では「9.5 MSW (Mock Service Worker)」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        MSW = Service Workerを使ってネットワークレベルでAPIをモックする。
+        テストでもStorybookでもブラウザ開発でも同じモック定義を使える。
+
+        従来のモック:
+          axios.get をモック → 実装の詳細に依存（fetchに変えたら壊れる）
+
+        MSW:
+          ネットワーク層でインターセプト → fetchでもaxiosでも動作
+
+        定義例:
+          import { http, HttpResponse } from 'msw';
+
+          export const handlers = [
+            http.get('/api/users', () => {
+              return HttpResponse.json([
+                { id: 1, name: 'Alice' },
+                { id: 2, name: 'Bob' },
+              ]);
+            }),
+          ];
+
+        テスト/Storybook/開発サーバーで同じhandlersを共有できる。
+        エラーケース（500, タイムアウト等）のテストも簡単。
+    """)
+
+    interview("""
+        Q: フロントエンドのテスト戦略を説明してください。
+        A: テストピラミッドに従い、Unit（Vitest）を最も多く書きます。
+           コンポーネントテストはReact Testing Libraryでユーザー視点の
+           テストを書き、getByRoleを優先します。APIモックにはMSWを使い、
+           実装の詳細に依存しないテストにします。E2Eは重要なユーザーフロー
+           のみPlaywrightで書き、CIで自動実行します。
+    """)
+
+
+# =====================================================================
+#  第10章: アクセシビリティ
+# =====================================================================
+
+def chapter10_accessibility():
+    title("第10章: Webアクセシビリティ")
+
+    heading("10.1 なぜアクセシビリティが重要か")
+    p("""
+        先に結論: 「10.1 なぜアクセシビリティが重要か」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        アクセシビリティ（a11y）= 障害の有無に関わらず全ての人がWebを
+        利用できるようにすること。
+
+        【ビジネス的理由】
+          - ユーザー層の拡大（世界人口の15%が何らかの障害を持つ）
+          - SEO改善（セマンティックHTMLは検索エンジンにも有利）
+          - 法的リスク回避（米国ADA法、日本の障害者差別解消法）
+          - 全ユーザーのUX向上（キーボード操作は健常者にも便利）
+
+        【技術的理由】
+          - スクリーンリーダー対応
+          - キーボードのみの操作
+          - 色覚多様性への配慮
+          - モバイル・低速回線への対応
+    """)
+
+    heading("10.2 WCAG（Webコンテンツアクセシビリティガイドライン）")
+    p("""
+        まず全体像: この節では「10.2 WCAG（Webコンテンツアクセシビリティガイドライン）」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        WCAG 2.1 の4原則（POUR）:
+
+        Perceivable（知覚可能）
+          全ての情報を少なくとも1つの感覚で知覚できる。
+          例: 画像にalt属性、動画に字幕
+
+        Operable（操作可能）
+          全ての機能をキーボードで操作できる。
+          例: Tab移動、Enter/Spaceで実行、Escで閉じる
+
+        Understandable（理解可能）
+          コンテンツと操作方法が理解できる。
+          例: エラーメッセージが具体的、一貫したナビゲーション
+
+        Robust（堅牢）
+          様々な支援技術で正しく解釈できる。
+          例: 正しいHTML構造、WAI-ARIAの適切な使用
+
+        適合レベル:
+          A   — 最低限（必須）
+          AA  — 標準（多くの法律がこのレベルを要求）
+          AAA — 最高（全て達成するのは難しい）
+    """)
+
+    heading("10.3 WAI-ARIA")
+    p("""
+        この節の狙い: 「10.3 WAI-ARIA」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        ARIA (Accessible Rich Internet Applications) = HTMLの
+        セマンティクスを補完する属性セット。
+
+        【第1ルール: ARIAを使わなくて済むなら使うな】
+        ネイティブHTML要素を使う方が常に良い:
+          NG: <div role="button" tabindex="0">Click</div>
+          OK: <button>Click</button>
+
+        よく使うARIA属性:
+          role         — 要素の役割を明示 (role="dialog", role="alert")
+          aria-label   — テキストがない要素にラベルを付ける
+          aria-labelledby — 別要素のIDを参照してラベルを付ける
+          aria-describedby — 説明文を関連付ける
+          aria-hidden  — 支援技術から隠す（装飾的要素に）
+          aria-live    — 動的に変わる内容を通知（"polite" or "assertive"）
+          aria-expanded — 開閉状態を伝える
+
+        実装例:
+          <button aria-expanded={isOpen} aria-controls="menu-1">
+            メニュー
+          </button>
+          <ul id="menu-1" role="menu" hidden={!isOpen}>
+            <li role="menuitem">項目1</li>
+          </ul>
+    """)
+
+    heading("10.4 セマンティックHTML")
+    p("""
+        この節の狙い: 「10.4 セマンティックHTML」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        セマンティックHTML = 意味を持つHTMLタグを適切に使うこと。
+        divとspanだけで作ると、機械（スクリーンリーダー、検索エンジン）が
+        構造を理解できない。
+
+        置き換えガイド:
+          <div> で全部包む  → <header>, <main>, <footer>, <nav>, <section>
+          <div> でクリック  → <button>
+          <div> でリンク    → <a href="...">
+          <div> でリスト    → <ul>/<ol> + <li>
+          <span> で見出し   → <h1>〜<h6>（階層を飛ばさない）
+
+        見出しの階層:
+          NG: <h1>タイトル</h1> → <h3>セクション</h3>（h2を飛ばした）
+          OK: <h1>タイトル</h1> → <h2>セクション</h2> → <h3>サブセクション</h3>
+
+        フォームのラベル:
+          NG: <input placeholder="名前" />（ラベルがない）
+          OK: <label for="name">名前</label><input id="name" />
+    """)
+
+    misconception(
+        "アクセシビリティは視覚障害者のためだけ",
+        "キーボード操作、音声入力、高齢者の操作支援、一時的な怪我、明るい屋外での操作など、全ユーザーに恩恵がある"
+    )
+
+    interview("""
+        Q: Webアクセシビリティの基本的な実装方法は？
+        A: まずセマンティックHTMLを使い、divの乱用を避けます。
+           画像にはalt属性、フォームにはlabel要素を必ず付けます。
+           キーボード操作の確認（Tab順序、フォーカス管理）を行い、
+           WAI-ARIAは本当に必要な場合のみ使います。
+           色のコントラスト比4.5:1以上（WCAG AA）を確保し、
+           axe-coreやLighthouseで自動チェックもCIに組み込みます。
+    """)
+
+
+# =====================================================================
+#  第11章: Web API
+# =====================================================================
+
+def chapter11_web_apis():
+    title("第11章: Web API")
+
+    heading("11.1 WebSocket")
+    p("""
+        この節の狙い: 「11.1 WebSocket」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        WebSocket = クライアントとサーバーの間に双方向の常時接続を確立する
+        プロトコル。HTTP のリクエスト/レスポンスとは異なり、
+        サーバーからクライアントにプッシュ通知ができる。
+
+        【HTTPポーリングとの比較】
+          HTTP Polling: クライアントが定期的にリクエスト → 無駄が多い
+          Long Polling: サーバーがデータができるまでレスポンスを保留 → 接続コスト
+          WebSocket: 一度接続したら双方向通信 → 最も効率的
+
+        使い所: チャット、リアルタイム通知、ライブ更新、ゲーム
+
+        接続フロー:
+          1. HTTPでアップグレードリクエスト（Upgrade: websocket）
+          2. サーバーが101 Switching Protocolsで応答
+          3. 以降はWebSocketプロトコルで双方向通信
+          4. どちらかがclose frameを送って切断
+
+        コード例:
+          const ws = new WebSocket('wss://api.example.com/ws');
+          ws.onopen = () => ws.send(JSON.stringify({ type: 'subscribe' }));
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            updateUI(data);
+          };
+          ws.onclose = () => reconnect();  // 再接続ロジック
+    """)
+
+    heading("11.2 WebRTC")
+    p("""
+        この節の狙い: 「11.2 WebRTC」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        WebRTC (Web Real-Time Communication) = ブラウザ間のP2P通信。
+        サーバーを経由せず、ブラウザ同士が直接データをやり取りする。
+
+        用途: ビデオ通話、音声通話、画面共有、P2Pファイル転送
+
+        接続確立（シグナリング）:
+          1. Offer/Answer交換 — SDP（セッション記述）を交換
+          2. ICE候補交換 — 接続経路の候補をやり取り
+          3. P2P接続確立 — 最適な経路で直接通信開始
+
+        シグナリングサーバーは接続確立のためだけに必要。
+        通信自体はP2Pなのでサーバー負荷が低い。
+
+        NAT越えの仕組み:
+          STUN: 自分のパブリックIPを取得するサーバー
+          TURN: P2P接続できない場合のリレーサーバー（最終手段）
+    """)
+
+    heading("11.3 Web Workers")
+    p("""
+        まず全体像: この節では「11.3 Web Workers」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Web Worker = メインスレッドとは別のスレッドでJSを実行する仕組み。
+        重い計算をWeb Workerに委譲すれば、UIがフリーズしない。
+
+        【なぜ必要？】
+        JSはシングルスレッド。画像処理や暗号計算をメインスレッドで行うと、
+        イベントループがブロックされてUIが応答しなくなる。
+
+        種類:
+          Dedicated Worker — 1つのスクリプトから利用（最も一般的）
+          Shared Worker — 複数のタブ/ウィンドウから共有
+          Service Worker — ネットワークプロキシ（前章参照）
+
+        コード例:
+          // main.js
+          const worker = new Worker('heavy-calc.js');
+          worker.postMessage({ data: largeArray });
+          worker.onmessage = (e) => { updateUI(e.data); };
+
+          // heavy-calc.js
+          onmessage = (e) => {
+            const result = heavyCalculation(e.data.data);
+            postMessage(result);
+          };
+
+        制約:
+          - DOMにアクセスできない
+          - window, documentオブジェクトがない
+          - メインスレッドとはpostMessage/onmessageで通信（コピー渡し）
+          - Transferableオブジェクトで大きなデータをゼロコピー転送可能
+    """)
+
+    heading("11.4 IndexedDB")
+    p("""
+        まず全体像: この節では「11.4 IndexedDB」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        IndexedDB = ブラウザ内の本格的なデータベース。
+        localStorageの上位互換で、大量のデータを構造化して保存できる。
+
+        localStorage vs IndexedDB:
+          localStorage: 同期API、文字列のみ、~5MB
+          IndexedDB: 非同期API、構造化データ、数百MB以上
+
+        使い所:
+          - オフライン対応のデータキャッシュ
+          - 大量データのクライアント側保存
+          - PWAのデータ永続化
+
+        APIは複雑なので、通常はラッパーライブラリを使う:
+          idb — Promiseベースの軽量ラッパー
+          Dexie.js — より高機能なラッパー
+
+        コード例（idb使用）:
+          const db = await openDB('myApp', 1, {
+            upgrade(db) {
+              db.createObjectStore('users', { keyPath: 'id' });
+            },
+          });
+          await db.put('users', { id: 1, name: 'Alice' });
+          const user = await db.get('users', 1);
+    """)
+
+    interview("""
+        Q: WebSocketとHTTPポーリングの使い分けは？
+        A: リアルタイム性が重要（チャット、ゲーム等）ならWebSocket。
+           更新頻度が低い（数秒〜数分間隔）ならHTTPポーリングで十分です。
+           SSE（Server-Sent Events）はサーバーからの一方向プッシュに適し、
+           WebSocketより軽量です。WebRTCはブラウザ間のP2P通信が必要な
+           ビデオ通話等に使います。
+    """)
+
+
+# =====================================================================
+#  第12章: ビルドツール
+# =====================================================================
+
+def chapter12_build_tools():
+    title("第12章: ビルドツール")
+
+    heading("12.1 なぜビルドツールが必要か")
+    p("""
+        この節の狙い: 「12.1 なぜビルドツールが必要か」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        ブラウザはESModulesを理解するが、開発時のモジュール構成をそのまま
+        本番で使うと問題が起きる:
+          - 数百のHTTPリクエストが発生（各ファイルが1リクエスト）
+          - TypeScript/JSXをブラウザは理解しない
+          - 環境変数の注入ができない
+          - 最適化（minify, tree-shake）されていない
+
+        ビルドツールの役割:
+          1. トランスパイル — TS/JSX → ブラウザが理解するJS
+          2. バンドル — 多数のファイルを少数のファイルにまとめる
+          3. 最適化 — minify, tree-shaking, code-splitting
+          4. 開発サーバー — HMR（ホットリロード）
+    """)
+
+    heading("12.2 Webpack")
+    p("""
+        まず全体像: この節では「12.2 Webpack」を、定義 -> 仕組み -> 実務上の判断の順で整理する。
+        Webpack = 長年のデファクトバンドラー（2014〜）。
+
+        コンセプト:
+          Entry → 起点ファイル（通常 src/index.ts）
+          Output → 出力先（通常 dist/bundle.js）
+          Loader → ファイル変換（ts-loader, css-loader, file-loader）
+          Plugin → ビルドプロセス拡張（HtmlWebpackPlugin等）
+
+        特徴:
+          - 非常に柔軟だが設定が複雑
+          - 巨大なエコシステム（何でもLoaderがある）
+          - 開発時のビルドが遅い（全体をバンドルするため）
+
+        現在の立ち位置:
+          レガシーだが依然として広く使われている。
+          新規プロジェクトではViteが推奨されるが、
+          大規模な既存プロジェクトではまだWebpackが多い。
+    """)
+
+    heading("12.3 Vite")
+    p("""
+        この節の狙い: 「12.3 Vite」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        Vite（ヴィート、フランス語で「速い」）= 次世代ビルドツール。
+
+        【なぜ速い？】
+        開発時:
+          ブラウザのESModulesを直接活用する。バンドルしない。
+          各ファイルをそのままブラウザに配信し、必要に応じて変換。
+          → プロジェクトの大きさに関係なく起動が速い。
+
+        本番ビルド:
+          Rollup（高品質なバンドラー）を内部で使用。
+          Tree-shaking, code-splitting, minifyを自動実行。
+
+        Webpack vs Vite の開発サーバー:
+          Webpack: 全ファイルをバンドル → サーバー起動 → 遅い
+          Vite: サーバー即起動 → リクエストされたファイルだけ変換 → 速い
+
+        設定例（vite.config.ts）:
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+
+          export default defineConfig({
+            plugins: [react()],
+            build: { target: 'es2020' },
+          });
+
+        圧倒的に設定がシンプル。
+    """)
+
+    heading("12.4 Turbopack")
+    p("""
+        先に結論: 「12.4 Turbopack」は実装と設計判断に直結する。背景とトレードオフを押さえる。
+        Turbopack = Vercel（Next.js開発元）がRustで書いた新バンドラー。
+        Next.js 13+の開発サーバーで使用可能（next dev --turbo）。
+
+        特徴:
+          - Rustで書かれているため非常に高速
+          - インクリメンタルビルド（変更ファイルだけ再処理）
+          - 関数レベルのキャッシュ（同じ入力→キャッシュされた出力）
+          - Webpack との設定互換性を目指す
+
+        現状:
+          まだ開発段階。本番ビルドは未サポート（2025年時点）。
+          開発サーバーとしてはViteに匹敵する速度。
+          Next.jsユーザー以外には現時点では関係が薄い。
+    """)
+
+    heading("12.5 HMR（Hot Module Replacement）")
+    p("""
+        この節の狙い: 「12.5 HMR（Hot Module Replacement）」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        HMR = コード変更時にページ全体をリロードせず、
+        変更されたモジュールだけを差し替える仕組み。
+
+        【なぜ重要？】
+        全体リロードすると:
+          - 状態（フォーム入力、スクロール位置等）が失われる
+          - 再読み込みに数秒かかる
+          - 開発効率が大幅に下がる
+
+        HMRの流れ:
+          1. ファイルを保存
+          2. ビルドツールが変更を検知
+          3. 変更モジュールだけ再コンパイル
+          4. WebSocketでブラウザに差分を通知
+          5. ブラウザが古いモジュールを新しいものに差し替え
+          6. React状態は保持される（React Fast Refresh）
+
+        React Fast Refresh:
+          HMR + React特化の状態保持。コンポーネントのコードを変えても
+          useStateの値が保持される（コンポーネントのシグネチャが変わらない限り）。
+    """)
+
+    heading("12.6 Module Federation")
+    p("""
+        この節の狙い: 「12.6 Module Federation」を単語暗記ではなく、なぜ必要かまでつながる形で理解する。
+        Module Federation = 異なるアプリ間でモジュールを動的に共有する仕組み。
+        マイクロフロントエンドの実現に使われる。
+
+        【問題】
+        大規模アプリを複数チームで開発する場合、モノリシックなフロントエンドは
+        デプロイやスケーリングのボトルネックになる。
+
+        【Module Federationの解決策】
+        各チームが独立したアプリとしてビルド・デプロイし、
+        実行時に他のアプリからコンポーネントを動的にロードする。
+
+        例:
+          アプリA（ヘッダー担当）が <Header /> を公開
+          アプリB（メイン画面）が アプリAから <Header /> を動的にimport
+          アプリAをデプロイすると、アプリBのヘッダーも自動更新
+
+        注意点:
+          - 共有ライブラリのバージョン管理が複雑
+          - 通信のオーバーヘッド
+          - デバッグが難しい
+          - 本当に必要な規模（数十チーム）でなければモノレポの方が良い
+    """)
+
+    misconception(
+        "Webpackはもう使わなくていい",
+        "新規プロジェクトではViteが推奨だが、既存の大規模プロジェクトはWebpackが多い。Module Federationなど一部機能はWebpackの方が成熟している"
+    )
+
+    interview("""
+        Q: ViteとWebpackの違いは？
+        A: 最大の違いは開発サーバーのアーキテクチャです。Webpackは全ファイルを
+           バンドルしてから配信するため起動が遅い。ViteはブラウザのESModulesを
+           活用し、リクエストされたファイルだけを変換するため起動が瞬時です。
+           本番ビルドはViteがRollup、WebpackはWebpack自身を使います。
+           新規プロジェクトにはVite、既存大規模プロジェクトの移行は慎重に判断します。
+    """)
+
+
+# =====================================================================
+#  メイン実行
+# =====================================================================
+
+def main():
+    print(SEP)
+    print("  Frontend Engineering 深掘り解説")
+    print("  全12章: ブラウザからビルドツールまで")
+    print(SEP)
+
+    # Part 1
+    chapter1_browser_rendering()
+    chapter2_js_engine()
+    chapter3_react_deep()
+    chapter4_nextjs()
+    chapter5_state_management()
+    chapter6_typescript_advanced()
+
+    # Part 2
+    chapter7_web_performance()
+    chapter8_css_architecture()
+    chapter9_testing()
+    chapter10_accessibility()
+    chapter11_web_apis()
+    chapter12_build_tools()
+
+    title("学習完了！")
+    p("""
+        全12章を通じて、フロントエンドエンジニアリングの基礎から応用まで
+        網羅しました。重要なのは:
+          1. ブラウザの仕組みを理解することが全ての土台
+          2. Reactの内部を知ることで適切な最適化ができる
+          3. パフォーマンスは計測してから改善する
+          4. テストとアクセシビリティは後付けではなく設計段階から
+          5. ツール選定はトレードオフを理解した上で
+    """)
+
+
+if __name__ == "__main__":
+    main()

@@ -536,15 +536,20 @@ class PropertyBasedTester:
         return result
 
     def _find_minimal(self, failing_input: Any,
-                      prop: Callable[[Any], bool]) -> Any:
-        """shrinking で最小反例を探索"""
+                      prop: Callable[[Any], bool],
+                      max_shrinks: int = 100) -> Any:
+        """shrinking で最小反例を探索（max_shrinks で無限ループ防止）"""
         if not isinstance(failing_input, list):
             return failing_input
         current = failing_input
+        shrink_count = 0
         improved = True
-        while improved:
+        while improved and shrink_count < max_shrinks:
             improved = False
             for candidate in self.shrink_list(current):
+                if candidate == current:
+                    continue
+                shrink_count += 1
                 try:
                     if not prop(candidate):
                         current = candidate
@@ -1269,7 +1274,6 @@ def main():
     demo_mutation_testing()
     demo_contract_testing()
     demo_bdd()
-    demo_coverage_trap()
 
     # ユニットテスト実行
     result = run_unit_tests()

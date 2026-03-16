@@ -1,0 +1,240 @@
+======================================================================
+ 並行処理 & 並列処理 ディープガイド
+ Concurrency & Parallelism Deep Dive
+======================================================================
+=== メモリモデル シミュレーション ===
+
+  Visibility デモ: flag=True, data=42
+
+  Reordering テスト (10000回):
+    r1=0, r2=1: 10000回
+
+  ■ Memory Barrier / Fence:
+    - Store Barrier: barrier 前の store が barrier 後の store より先に完了
+    - Load Barrier:  barrier 前の load が barrier 後の load より先に完了
+    - Full Barrier:  両方
+    - Python: threading.Lock の acquire/release が暗黙のバリア
+    - Java: volatile read/write がバリアを挿入
+    
+=== 同期プリミティブ完全ガイド ===
+
+  Peterson Lock: counter=10000 (期待値: 10000)
+  Semaphore: 最大同時実行数=3 (上限: 3)
+  ReadWriteLock 操作ログ: ['R0=0', 'R1=0', 'R2=0', 'R3=0', 'R4=0', 'R5=0', 'W0=99']
+  Condition Variable: produced=8, consumed=8
+  Barrier: ['arrive-2', 'arrive-0', 'arrive-1', 'passed-1', 'passed-2', 'passed-0']
+  CountDownLatch: ['done-1', 'done-0', 'done-2', 'all-done']
+
+=== Lock-Free / Wait-Free ===
+
+  CAS AtomicInteger: 10000 (期待値: 10000)
+  Treiber Stack: pushed=2000, popped=2000
+
+  ■ ABA問題:
+    1. スレッドAが top=X を読む
+    2. スレッドBが X を pop → Y を pop → X を push (top=X に戻る)
+    3. スレッドAの CAS は成功するが、スタックの状態は変わっている
+
+  ■ 対策:
+    - Tagged Pointer: ポインタにバージョン番号を付加
+      (value, next, version) で CAS → version も比較
+    - Hazard Pointer: 使用中のノードを宣言して回収を防ぐ
+    - Epoch-Based Reclamation: エポック単位でメモリ回収
+    
+  Tagged Stack (ABA対策): popped=[4, 3, 2, 1, 0]
+
+  ベンチマーク (5000回 x 4スレッド):
+    Lock-Based: 0.0212秒
+    Lock-Free:  0.0323秒
+    ※ Python GIL 下では差が出にくい。C/Java では Lock-Free が有利な場合が多い
+
+=== 並行パターン ===
+
+  [Producer-Consumer]
+    produced=20, consumed=20
+
+  [Reader-Writer: 書者優先]
+    操作順序: ['R0', 'R1', 'R2', 'W0', 'R3', 'R4']
+
+  [Dining Philosophers: デッドロック回避3戦略]
+    戦略1 (Resource Ordering): meals=[10, 10, 10, 10, 10] (全員10回)
+    戦略2 (Try-Lock): trylock 失敗時に両方解放してリトライ
+    戦略3 (Arbitrator): 中央のウェイターが許可 → 最大 N-1 人まで同時着席
+
+  [Actor Model: メッセージパッシング]
+    Actor count=100 (期待値: 100)
+
+  [CSP: Channel ベースの通信]
+    Channel: received=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+  [Fork-Join: 並列マージソート]
+    Fork-Join sort: sorted=True, len=100
+
+=== デッドロック ===
+
+  ■ デッドロックの4条件 (Coffman, 1971):
+    1. Mutual Exclusion: リソースは排他的に使用
+    2. Hold and Wait: リソースを保持しながら別のリソースを待つ
+    3. No Preemption: リソースは強制的に奪えない
+    4. Circular Wait: 循環的な待ちが存在
+    → 1つでも崩せばデッドロックは発生しない
+    
+  Wait-for Graph サイクル検出: ['T1', 'T2', 'T3']
+  サイクルなし: []
+
+  [Lock Ordering: ロックに全順序を付ける]
+    Lock Ordering: 200 回成功 (デッドロックなし)
+
+  [Try-Lock with Timeout]
+    Try-Lock: 200 回成功
+
+  ■ Banker's Algorithm (銀行家のアルゴリズム):
+    - リソース割り当て前に「安全状態」かチェック
+    - 安全状態: 全プロセスが完了可能な実行順序が存在
+    - 実用性: オーバーヘッドが大きく、実システムではほぼ使われない
+    - 学術的意義: デッドロック回避の理論的基盤
+    
+  [Livelock の例]
+    Livelock: スレッドが互いに譲り合い続けて進まない状態
+    例: 廊下で2人がすれ違おうとして同じ方向に避け続ける
+    対策: ランダムなバックオフ (Ethernet の CSMA/CD と同じ原理)
+
+=== async/await vs Thread vs Process ===
+
+  [I/O-bound ワークロード比較]
+    逐次:     2.608秒
+    Thread:   0.157秒
+    asyncio:  0.055秒
+    → I/O-bound では asyncio が軽量で高速
+
+  [CPU-bound ワークロード比較]
+    逐次:            0.047秒
+    Thread (GIL):    0.029秒
+    Process:         0.469秒
+    → CPU-bound では multiprocessing が真の並列化
+
+  [Mixed workload: ThreadPool + ProcessPool]
+    パターン: ProcessPoolExecutor で CPU 処理
+               ThreadPoolExecutor で I/O 処理
+               asyncio で全体のオーケストレーション
+
+  ■ Event Loop の仕組み:
+    while True:
+        events = epoll.wait()      # I/O イベントを待つ
+        for event in events:
+            callback = registry[event.fd]
+            callback(event)         # コールバックを実行
+        run_scheduled_callbacks()   # タイマー系コールバック
+
+    - select: 古い (O(n) でFDをスキャン)
+    - poll:   select の改良 (FD数制限なし)
+    - epoll:  Linux 最適 (O(1) でイベント通知)
+    - kqueue: macOS/BSD 版 epoll
+    
+  [Coroutine の仕組み: generator → async]
+    Generator coroutine: step1 → step2 (received: data) → step3
+    async/await: async result
+    内部: async def は coroutine オブジェクトを返す
+           await で制御を event loop に返す (yield と同じ原理)
+
+=== 並行バグのパターン ===
+
+  [Race Condition: TOCTOU]
+    TOCTOU: 残高=-60 (マイナスになる可能性あり)
+    結果: [('success', 20), ('success', -60)]
+
+  ■ Data Race vs Race Condition:
+    - Data Race: 2つのスレッドが同じメモリに同時アクセスし、
+                 少なくとも1つが書き込み (未定義動作)
+    - Race Condition: タイミングにより結果が変わるロジックバグ
+                      (Data Race がなくても起こりうる)
+
+    例: Data Race なし + Race Condition あり
+      lock.acquire(); tmp = balance; lock.release()
+      lock.acquire(); balance = tmp - amount; lock.release()
+      → 各操作はアトミックだが、間に別スレッドが割り込む
+    
+  [Priority Inversion]
+    Mars Pathfinder (1997) の事例:
+      1. 低優先度タスクがバスロックを取得
+      2. 高優先度タスクがバスロックを待つ (ブロック)
+      3. 中優先度タスクが低優先度タスクをプリエンプト
+      4. 高優先度タスクがスターベーション → ウォッチドッグリセット
+
+    対策:
+      - Priority Inheritance: ロック保持者の優先度を引き上げ
+      - Priority Ceiling: ロックに最大優先度を設定
+    
+    Priority Inversion ログ: ['Low: lock acquired', 'High: waiting for lock', 'Low: releasing lock', 'High: lock acquired']
+
+  ■ Starvation (飢餓):
+    - 優先度の低いスレッドが永遠にリソースを得られない
+    - 読者優先の RWLock で書者が飢餓状態になる例
+    - 対策: 公平なスケジューリング (FIFO ロック)
+    
+  [Thundering Herd]
+    Thundering Herd: wakeups=10, success=10
+    対策: notify_all() → notify() に変更して1スレッドだけ起こす
+
+=== 並行処理 優先度マップ ===
+
+  Tier 1 (最優先 ― 実務で毎日使う):
+    - threading.Lock / RLock / Condition の使い方
+    - Race Condition の理解と回避
+    - asyncio (async/await) の基本と Event Loop
+    - Producer-Consumer パターン (queue.Queue)
+    - ThreadPoolExecutor / ProcessPoolExecutor の使い分け
+    - GIL の理解 (CPU-bound → multiprocessing)
+
+  Tier 2 (重要 ― 設計判断に必要):
+    - デッドロックの4条件と回避戦略 (Lock Ordering)
+    - Reader-Writer Lock (読者/書者問題)
+    - Semaphore / Barrier / CountDownLatch
+    - Actor Model / CSP パターン
+    - I/O-bound vs CPU-bound の判別と最適化
+    - TOCTOU バグの検出と防止
+
+  Tier 3 (差別化 ― シニアエンジニアの武器):
+    - メモリモデル (happens-before, Sequential Consistency)
+    - Lock-Free データ構造 (CAS, Treiber Stack)
+    - ABA問題と対策 (Tagged Pointer, Hazard Pointer)
+    - Wait-for Graph によるデッドロック検出
+    - Fork-Join パターン (分割統治の並列化)
+    - Priority Inversion と対策
+
+  Tier 4 (専門知識 ― 特定領域で必要):
+    - Memory Barrier / Fence (CPU アーキテクチャ依存)
+    - Wait-Free アルゴリズム
+    - Banker's Algorithm
+    - Michael-Scott Queue
+    - Epoch-Based Reclamation
+    - Thundering Herd の根本対策 (epoll + EPOLLEXCLUSIVE)
+
+  学習ロードマップ:
+    Week 1-2: Tier 1 (threading, asyncio, queue)
+    Week 3-4: Tier 2 (デッドロック, パターン, 同期プリミティブ)
+    Week 5-6: Tier 3 (メモリモデル, Lock-Free, Fork-Join)
+    Week 7+:  Tier 4 (必要に応じて深掘り)
+
+  ■ 面接頻出トピック:
+    Q: Thread と Process の違いは？
+    A: Thread はメモリ空間共有 (軽量、同期が必要)
+       Process は独立メモリ空間 (重い、IPC が必要)
+
+    Q: デッドロックをどう防ぐ？
+    A: Lock Ordering (全ロックに順序付け) が最も実用的。
+       Try-lock + timeout でリカバリも可能。
+
+    Q: Python で CPU-bound を並列化するには？
+    A: multiprocessing or concurrent.futures.ProcessPoolExecutor
+       GIL のため threading では並列化されない。
+
+    Q: async/await と threading の使い分けは？
+    A: I/O-bound → async/await (コルーチン、軽量)
+       CPU-bound → multiprocessing
+       ブロッキング I/O → threading
+    
+
+======================================================================
+ 完了! すべてのセクションを実行しました。
+======================================================================

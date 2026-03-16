@@ -1,0 +1,315 @@
+========================================================================
+ OS & ハードウェア ディープガイド
+ CSAPP/OSTEP レベル: CPU パイプラインから NUMA まで
+========================================================================
+
+=== CPU パイプライン シミュレーション ===
+
+プログラム:
+  [0] ADD R1 R0 #10
+  [1] ADD R2 R0 #20
+  [2] ADD R3 R1 R2
+  [3] SUB R4 R3 #5
+  [4] MUL R5 R4 R1
+  [5] LOAD R6 R5
+  [6] ADD R7 R6 R5
+  [7] ADD R8 R7 #1
+
+  Cycle 5:   Forward MEM→ID: R1=10
+  Cycle 5:   Forward EX→ID: R2=20
+  Cycle 6:   Forward EX→ID: R3=30
+  Cycle 7:   Forward EX→ID: R4=25
+  Cycle 8:   Forward EX→ID: R5=250
+  Cycle 9: STALL - LOAD-USE hazard: R6
+  Cycle 10:   Forward MEM→ID: R6=0
+  Cycle 11:   Forward EX→ID: R7=250
+
+--- パイプライン統計 ---
+  cycles: 14
+  completed: 8
+  stalls: 1
+  forwards: 6
+  CPI: 1.75
+  branch_accuracy: 0.0
+
+--- 2-bit 分岐予測器デモ ---
+パターン: TTTTTTTTTN × 5ループ
+  予測精度: 88.0%
+  ヒット: 44, ミス: 6
+
+■ CPI (Cycles Per Instruction) の目安:
+  理想パイプライン: CPI = 1.0
+  ストールあり:     CPI = 1.0 + ストール率
+  スーパースカラ:   CPI < 1.0 (IPC > 1)
+  現代CPU (Zen4):   IPC ≈ 5-6 (理論上)
+
+■ 分岐予測ミスのコスト:
+  パイプライン深さが深いほど大きい
+  Intel Alder Lake: ~15-20 サイクル penalty
+  TAGE予測器: 精度 97%+ (複雑な履歴パターンを学習)
+
+
+========================================================================
+
+=== キャッシュシミュレータ ===
+
+--- セットアソシアティブキャッシュ (LRU vs Clock) ---
+
+  LRU 置換:
+    accesses: 250
+    hits: 44
+    misses: 206
+    miss_rate: 82.40%
+    evictions: 202
+
+  Clock 置換:
+    accesses: 250
+    hits: 42
+    misses: 208
+    miss_rate: 83.20%
+    evictions: 204
+
+--- AMAT 計算 ---
+  L1 Hit Time: 4 cycles, Miss Rate: 5.0%
+  L2 Hit Time: 12 cycles, Miss Rate: 20.0%
+  Memory Access: 100 cycles
+  AMAT = 4 + 0.05 × (12 + 0.2 × 100)
+       = 5.6 cycles
+
+--- MESI プロトコル デモ ---
+  操作シーケンス:
+    Core0 read 0x1000
+    Core1 read 0x1000
+    Core0 write 0x1000
+    Core2 read 0x1000
+    Core3 write 0x1000
+
+  状態遷移ログ:
+    Core0 0x1000: I→E (read)
+    Core0 0x1000: E→S (snoop)
+    Core1 0x1000: I→S (read)
+    Core1 0x1000: S→I (invalidate)
+    Core0 0x1000: S→M (write)
+    Core0 0x1000: M→S (snoop flush)
+    Core2 0x1000: I→S (read)
+    Core0 0x1000: S→I (invalidate)
+    Core2 0x1000: S→I (invalidate)
+    Core3 0x1000: I→M (write)
+
+--- False Sharing ---
+  同じキャッシュラインに複数コアが異なる変数で書き込むと
+  MESI Invalidation が頻発し性能が大幅に劣化する。
+
+  例: struct { int core0_counter; int core1_counter; }
+  → 64B ライン内に両方の変数 → 書くたびに相手の I→S→I の往復
+
+  対策:
+    - パディング: __attribute__((aligned(64))) で変数をラインに分離
+    - Java: @Contended アノテーション
+    - Linux: __cacheline_aligned_in_smp マクロ
+
+
+========================================================================
+
+=== 仮想メモリ シミュレーション ===
+
+--- 4レベルページテーブル (x86-64) ---
+  VA 0x0000000000400000 → TLB MISS → page walk → PA 0x0000000000001000
+  VA 0x0000000000401000 → TLB MISS → page walk → PA 0x0000000000002000
+  VA 0x0000000000600000 → TLB MISS → page walk → PA 0x0000000000003000
+  VA 0x00007fffffffe000 → TLB MISS → page walk → PA 0x0000000000004000
+  VA 0x00007ffffffff000 → TLB MISS → page walk → PA 0x0000000000005000
+  VA 0x0000000000400000 → TLB HIT → PA 0x0000000000001000
+
+  TLB ヒット率: 16.7%
+  ページフォルト: 12
+  ページウォーク: 5
+
+  TLB Shootdown: 5 エントリ無効化
+  → コンテキストスイッチ/mmap変更時に発生。IPIで全コアに通知。
+
+--- ページ置換アルゴリズム比較 ---
+  LRU: faults=237, rate=22.6%
+  Clock: faults=245, rate=23.3%
+  2Q: faults=331, rate=31.5%
+  → 2Q はシーケンシャルスキャンに強い (スキャン耐性)
+
+--- Copy-on-Write fork ---
+  Parent: 5ページ割り当て済み
+  fork() → 子プロセス作成 (0ページコピー、参照カウント+1)
+  子がページ2に書き込み → CoWコピー発生: 1回
+  子がページ3に書き込み → CoWコピー累計: 2回
+  → fork+exec パターンでは大部分のページは exec でまるごと置換されるため CoW は非常に効率的
+
+========================================================================
+
+=== プロセス & スケジューリング ===
+
+--- プロセス状態遷移 ---
+  NEW --[admit]--> READY --[dispatch]--> RUNNING --[I/O request]--> BLOCKED --[I/O complete]--> READY --[dispatch]--> RUNNING --[exit]--> TERMINATED
+
+--- CFS スケジューラ ---
+  プロセス: nginx(nice=0), compile(nice=+10), realtime(nice=-10)
+  tick=  1: nginx    (nice= +0, vruntime=     1.0)
+  tick=  2: compile  (nice=+10, vruntime=     9.3)
+  tick=  3: realtime (nice=-10, vruntime=     0.1)
+  tick=  4: realtime (nice=-10, vruntime=     0.2)
+  tick=  5: realtime (nice=-10, vruntime=     0.3)
+  tick=  6: nginx    (nice= +0, vruntime=     2.0)
+  tick=  7: nginx    (nice= +0, vruntime=     3.0)
+  tick=  8: nginx    (nice= +0, vruntime=     4.0)
+  tick=  9: nginx    (nice= +0, vruntime=     5.0)
+  tick= 10: compile  (nice=+10, vruntime=    18.6)
+  ... (残り 6 tick)
+
+  → nice が低い (優先度が高い) ほど vruntime がゆっくり進む
+    → より多くの CPU 時間を得る
+
+--- Work-Stealing スケジューラ ---
+  タスク総数: 12
+  スティール回数: 7
+  ワーカー別処理数: {0: 3, 1: 3, 2: 3, 3: 3}
+
+■ IPC (Inter-Process Communication) 比較:
+  パイプ:         最も単純。親子プロセス間。一方向。
+  名前付きパイプ: 無関係なプロセス間でも使える。
+  共有メモリ:     最速。同期が必要 (semaphore/mutex)。
+  メッセージキュー: 構造化メッセージ。カーネルがバッファ管理。
+  ソケット:       ネットワーク越しも可。最も汎用的。
+  シグナル:       非同期通知。データ量は最小 (シグナル番号のみ)。
+
+  スループット: 共有メモリ >> パイプ > ソケット > メッセージキュー
+  レイテンシ:   共有メモリ < パイプ < ソケット < メッセージキュー
+
+
+========================================================================
+
+=== I/O モデル & Reactor パターン ===
+
+--- 5つの I/O モデル比較 ---
+  タスク: [('DB_query', 5), ('API_call', 8), ('File_read', 3), ('DNS', 2)]
+
+  Blocking I/O             : total_time=18
+  Non-blocking Poll        : total_time=8, polls=18
+  I/O Multiplexing         : total_time=8, epoll_waits=4
+  Async I/O                : total_time=8
+
+--- Reactor パターン (イベントループ) ---
+  tick=  2: timer:heartbeat=ping
+  tick=  3: io:client_A=req#1, io:client_C=req#2
+  tick=  5: io:client_B=req#3
+  tick=  7: timer:cleanup=cleanup
+
+  Reactor の特徴:
+    ✓ シングルスレッドで数万接続を処理 (C10K problem 解決)
+    ✓ コンテキストスイッチなし
+    ✗ CPU-bound 処理が入ると全体がブロック
+    → Node.js: Worker Thread で対処
+    → Redis: 基本的にCPU-boundにならない設計
+
+--- select / poll / epoll 比較 ---
+  FD数=   100: select=     200, poll=     900, epoll=    2
+  FD数=  1000: select=    2000, poll=    9000, epoll=   11
+  FD数= 10000: select=   20000, poll=   90000, epoll=  101
+  FD数=100000: select=  200000, poll=  900000, epoll= 1001
+
+  → FD数が増えるほど epoll の O(active) が圧倒的に有利
+  → 10万接続で1%アクティブ: epoll は select の 200倍効率的
+
+■ Proactor パターン (Windows IOCP / Linux io_uring):
+  Reactor: 「準備完了」通知 → アプリが read() → 処理
+  Proactor: カーネルが read() 完了 → 「完了」通知 → 処理
+
+  io_uring (Linux 5.1+):
+    - Submission Queue (SQ) と Completion Queue (CQ) をリング構造で共有
+    - システムコールなしで I/O リクエストを投入可能
+    - カーネルとユーザー空間のメモリコピーゼロ
+
+
+========================================================================
+
+=== 割り込み & NUMA ===
+
+--- 割り込み処理 (Top-half / Bottom-half) ---
+  -- Top-half (即時) --
+  [IRQ] #1 Top-half: ack + save 'TCP SYN from 10.0.0.1'
+  [IRQ] #14 Top-half: ack + save 'read sector 42'
+  [IRQ] #0 Top-half: ack + save '100ms'
+  [IRQ] #1 Top-half: ack + save 'TCP ACK from 10.0.0.1'
+
+  -- Bottom-half (遅延処理) --
+  [SoftIRQ] #1 Bottom-half: NIC: process packet 'TCP SYN from 10.0.0.1'
+  [SoftIRQ] #14 Bottom-half: Disk: complete I/O 'read sector 42'
+  [SoftIRQ] #0 Bottom-half: Timer: tick '100ms'
+  [SoftIRQ] #1 Bottom-half: NIC: process packet 'TCP ACK from 10.0.0.1'
+
+  IRQ: 4, SoftIRQ: 4
+
+--- DMA (Direct Memory Access) ---
+  デバイス: NVMe SSD
+  転送: 0xfe000000 → 0x00100000 (4096 bytes)
+  CPU コスト: 5 cycles (setup only)
+  DMA コスト: 512 cycles (CPU free)
+  DMA なし:   4096 cycles (CPU busy)
+  → CPU は DMA 中に他の仕事ができる (効率 100倍以上)
+
+--- NUMA トポロジ ---
+  NUMA 距離行列 (相対コスト):
+         Node0  Node1  Node2  Node3
+  Node0  1.0   1.7   2.5   2.5
+  Node1  1.7   1.0   1.7   2.5
+  Node2  2.5   1.7   1.0   1.7
+  Node3  2.5   2.5   1.7   1.0
+
+  メモリアクセスパターン:
+  CPU0 → page100: cost=1.0x (LOCAL)
+  CPU0 → page200: cost=2.5x (REMOTE(node2))
+  CPU2 → page200: cost=1.0x (LOCAL)
+  CPU3 → page100: cost=2.5x (REMOTE(node0))
+
+■ NUMA 最適化の原則:
+  1. メモリはそれを使うCPUのローカルノードに割り当てる
+  2. numactl --membind / --cpunodebind でプロセスを固定
+  3. Linux: /proc/sys/vm/zone_reclaim_mode で回収ポリシー制御
+  4. 大規模DB (PostgreSQL/MySQL): NUMA-aware な設定が性能に直結
+
+■ 割り込みの種類:
+  ハードウェア割り込み: NIC, ディスク, タイマー, キーボード
+  ソフトウェア割り込み: システムコール (int 0x80 / syscall)
+  例外: ページフォルト, ゼロ除算, 一般保護違反 (GPF)
+  NMI: Non-Maskable Interrupt (ハードウェア故障, ウォッチドッグ)
+
+
+========================================================================
+
+=== OS & ハードウェア 優先度マップ ===
+
+  Tier 1 (最優先 - 全エンジニア必須):
+    - プロセスvsスレッド, コンテキストスイッチの仕組み
+    - 仮想メモリ, ページフォルト, malloc の裏側
+    - ファイルディスクリプタ, I/O多重化 (epoll)
+    - キャッシュ階層 (L1/L2/L3) と局所性の原則
+
+  Tier 2 (重要 - バックエンド/インフラ):
+    - CPU パイプライン, 分岐予測, IPC
+    - スケジューラ (CFS), nice, cgroup
+    - MESI プロトコル, キャッシュコヒーレンシ
+    - Reactor パターン, select/poll/epoll の違い
+    - DMA, 割り込みの Top-half/Bottom-half
+
+  Tier 3 (差別化 - SRE/パフォーマンス):
+    - NUMA トポロジとメモリ配置最適化
+    - ページ置換 (LRU/Clock/2Q)
+    - TLB shootdown, Huge Pages
+    - io_uring, Proactor パターン
+    - False Sharing 検出と回避
+
+  Tier 4 (専門 - カーネル/組込み):
+    - ページテーブルの多段構造の実装詳細
+    - Work-Stealing スケジューラの実装
+    - 割り込みコントローラ (APIC) の詳細
+    - CPU マイクロアーキテクチャ (OoO実行, ROB)
+
+========================================================================
+ 完了: 全セクション実行済み
+========================================================================

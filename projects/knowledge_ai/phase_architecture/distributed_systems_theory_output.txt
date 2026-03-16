@@ -1,0 +1,654 @@
+**********************************************************************
+  Distributed Systems Theory
+  FLP Impossibility / Paxos / Consistency / BFT / Replication / Time
+  DDIA + Distributed Algorithms Level
+**********************************************************************
+======================================================================
+Chapter 1: FLP Impossibility Theorem
+  非同期システムでは1ノード障害でも合意が保証できない
+======================================================================
+
+------------------------------------------------------------
+1.1 FLP不可能性定理とは何か
+------------------------------------------------------------
+
+    FLP定理 (Fischer, Lynch, Paterson 1985):
+    ──────────────────────────────────────
+    「完全非同期システムにおいて、たとえ1つのプロセスがクラッシュする
+     可能性があるだけで、決定的な合意プロトコルは存在しない」
+
+    前提条件:
+      1. 非同期モデル: メッセージ遅延に上限なし
+      2. 決定的プロセス: ランダム性を使わない
+      3. 信頼性のあるネットワーク: メッセージは必ず届く (遅延は不定)
+      4. クラッシュ障害: 最大1ノードがクラッシュしうる
+
+    結論:
+      上記条件下で Agreement + Validity + Termination を
+      同時に満たすプロトコルは存在しない。
+
+    重要: FLPは「不可能」を証明するが「実用不可能」を意味しない。
+           Paxos/Raft は確率的終了性で回避する。
+    
+------------------------------------------------------------
+1.2 合意の3条件 (Consensus Properties)
+------------------------------------------------------------
+  Agreement  : 全ての正常プロセスは同じ値を決定する
+  Validity   : 決定される値はいずれかのプロセスが提案した値
+  Termination: 全ての正常プロセスは最終的に決定する
+
+  FLPが示すのは: Termination を保証できない (永遠に決定しないケースが存在)
+  Agreement + Validity は保証可能だが、終了性を犠牲にする
+
+------------------------------------------------------------
+1.3 FLP Impossibility — シミュレーション
+------------------------------------------------------------
+  [Adversary] メッセージ配送順序を操作して合意を妨害する
+  Round 1: P1 が decide 直前に crash! → bivalent 状態維持
+  Round 2: P0 が decide 直前に crash! → bivalent 状態維持
+  Round 3: P2 が decide 直前に crash! → bivalent 状態維持
+  Round 4: P3 が decide 直前に crash! → bivalent 状態維持
+  Round 5: 正常プロセスが不足 — 合意不可能
+
+  合意達成: False
+  → Adversary がメッセージ遅延+クラッシュタイミングを制御すると合意不可能
+
+------------------------------------------------------------
+1.4 FLPの実用的回避策
+------------------------------------------------------------
+
+    FLPを回避する方法:
+    ┌─────────────────┬───────────────────────────────────────────┐
+    │ 方法            │ 説明                                      │
+    ├─────────────────┼───────────────────────────────────────────┤
+    │ タイムアウト     │ 部分同期モデル (eventually synchronous)    │
+    │                 │ → Paxos, Raft が採用                      │
+    ├─────────────────┼───────────────────────────────────────────┤
+    │ ランダム化       │ 確率的終了性 (w.p.1 で終了)               │
+    │                 │ → Ben-Or Protocol, Randomized Consensus   │
+    ├─────────────────┼───────────────────────────────────────────┤
+    │ 障害検出器       │ ◇P (eventually perfect failure detector) │
+    │                 │ → Chandra-Toueg Consensus                 │
+    ├─────────────────┼───────────────────────────────────────────┤
+    │ 弱い一貫性      │ 合意を諦めて結果整合性                     │
+    │                 │ → Dynamo, CRDTs                           │
+    └─────────────────┴───────────────────────────────────────────┘
+
+    Paxos/Raft の戦略:
+      「非同期だが、十分長い安定期間があれば progress する」
+      → Safety は常に保証、Liveness は安定期間中のみ保証
+    
+
+======================================================================
+Chapter 2: Paxos — Lamport's Consensus Algorithm
+  Single-decree Paxos の完全実装 + Multi-Paxos
+======================================================================
+
+------------------------------------------------------------
+2.1 Single-Decree Paxos (Synod Protocol)
+------------------------------------------------------------
+
+    役割:
+      Proposer  — 値を提案する
+      Acceptor  — 提案を受け入れる/拒否する
+      Learner   — 決定された値を学習する
+
+    Phase 1: Prepare / Promise
+      Proposer → Acceptor: Prepare(n)
+      Acceptor → Proposer: Promise(n, accepted_n, accepted_v)
+        条件: n > max_promised ならば promise する
+
+    Phase 2: Accept / Accepted
+      Proposer → Acceptor: Accept(n, v)
+      Acceptor → Proposer: Accepted(n, v)
+        条件: n >= max_promised ならば accept する
+
+    不変条件 (Safety):
+      - 最大1つの値のみが決定される
+      - 決定された値は必ず提案された値のいずれか
+    
+  --- Single-Decree Paxos シミュレーション ---
+
+=== Scenario 1: 単一 Proposer ===
+  [P1] Phase 1: Prepare(n=110)
+    A0 → Promise(n=110, accepted=(None, None))
+    A1 → Promise(n=110, accepted=(None, None))
+    A2 → Promise(n=110, accepted=(None, None))
+    A3 → Promise(n=110, accepted=(None, None))
+    A4 → Promise(n=110, accepted=(None, None))
+  [P1] Phase 2: Accept(n=110, v=value_X)
+    A0 → Accepted(n=110, v=value_X)
+    A1 → Accepted(n=110, v=value_X)
+    A2 → Accepted(n=110, v=value_X)
+    A3 → Accepted(n=110, v=value_X)
+    A4 → Accepted(n=110, v=value_X)
+  [P1] DECIDED: value_X (n=110)
+
+=== Scenario 2: 競合 Proposer (P2 は P1 の accepted 値を尊重) ===
+  [P2] Phase 1: Prepare(n=144)
+    A0 → Promise(n=144, accepted=(110, value_X))
+    A1 → Promise(n=144, accepted=(110, value_X))
+    A2 → Promise(n=144, accepted=(110, value_X))
+    A3 → Promise(n=144, accepted=(110, value_X))
+    A4 → Promise(n=144, accepted=(110, value_X))
+  [P2] 既存 accepted 値を採用: value_X (from proposal 110)
+  [P2] Phase 2: Accept(n=144, v=value_X)
+    A0 → Accepted(n=144, v=value_X)
+    A1 → Accepted(n=144, v=value_X)
+    A2 → Accepted(n=144, v=value_X)
+    A3 → Accepted(n=144, v=value_X)
+    A4 → Accepted(n=144, v=value_X)
+  [P2] DECIDED: value_X (n=144)
+
+  Safety 検証: 両 Proposer の結果 = value_X, value_X
+  → 同じ値に合意! Paxos の Safety 保証が機能
+
+------------------------------------------------------------
+2.2 Multi-Paxos & Leader 最適化
+------------------------------------------------------------
+
+    Multi-Paxos の核心:
+      Single-decree Paxos をログの各スロットに適用する。
+
+    Leader 最適化:
+      1. 安定したリーダーが Phase 1 を1回だけ実行
+      2. 以降は Phase 2 のみ (1 RTT で commit)
+      3. リーダー障害時のみ Phase 1 が再実行される
+
+    ┌────────────────────────────────────────────────┐
+    │ Log Slot:  [1]    [2]    [3]    [4]    [5]     │
+    │            v=A    v=B    v=C    v=D    ...     │
+    │            ↑ Single-decree Paxos per slot      │
+    │                                                │
+    │ Multi-Paxos Leader: Phase 1 は slot 1 で1回   │
+    │  以降 slot 2,3,4... は Phase 2 のみ (高速)    │
+    └────────────────────────────────────────────────┘
+
+    現実のシステム:
+      Google Chubby  → Multi-Paxos
+      Apache ZooKeeper → Zab (Paxos variant)
+      etcd / Consul  → Raft (Paxos の理解しやすい版)
+    
+------------------------------------------------------------
+2.3 Paxos vs Raft 比較
+------------------------------------------------------------
+
+    ┌──────────────┬──────────────────────┬──────────────────────┐
+    │              │ Paxos                │ Raft                 │
+    ├──────────────┼──────────────────────┼──────────────────────┤
+    │ 論文発表     │ 1989 (Lamport)       │ 2014 (Ongaro)        │
+    │ 設計思想     │ 数学的に最小限       │ 理解しやすさ重視     │
+    │ リーダー     │ 必須ではない         │ 強リーダー必須       │
+    │ ログ穴       │ 許容 (gap)           │ 不許容 (連続)        │
+    │ メンバ変更   │ 未定義 (拡張が必要)  │ Joint Consensus      │
+    │ 実装難度     │ 非常に高い           │ 比較的低い           │
+    │ 正当性証明   │ Lamport の TLA+      │ TLA+ spec 付き       │
+    │ 性能         │ 理論的に同等         │ 理論的に同等         │
+    │ 採用例       │ Chubby, Spanner      │ etcd, CockroachDB    │
+    └──────────────┴──────────────────────┴──────────────────────┘
+
+    Raft が Paxos を「制限」した点:
+      1. リーダーのログが最も進んでいることを保証
+      2. ログの gap を禁止 → リプレイが単純
+      3. リーダー選出に制約 (最新ログを持つノードのみ)
+    
+
+======================================================================
+Chapter 3: Consistency Models — 一貫性モデルの実装と検証
+======================================================================
+
+------------------------------------------------------------
+3.1 一貫性モデルの強さ階層
+------------------------------------------------------------
+
+    強い ──────────────────────────────── 弱い
+    Linearizable > Sequential > Causal > Eventual
+
+    Linearizable (線形化可能性):
+      - 全操作にリアルタイムの順序付けが存在
+      - 操作は「瞬間的に」効果を持つように見える
+      - コスト: 高レイテンシ (CAP の C)
+
+    Sequential Consistency (逐次一貫性):
+      - 全操作にグローバル順序が存在
+      - 各プロセスのローカル順序は保持
+      - リアルタイム順序は不要
+
+    Causal Consistency (因果一貫性):
+      - 因果関係のある操作の順序は全ノードで一致
+      - 並行操作は異なる順序で見えてよい
+
+    Eventual Consistency (結果整合性):
+      - 更新が停止すれば最終的に全ノードが一致
+      - 途中は異なる値を返してよい
+    
+------------------------------------------------------------
+3.2 Jepsen-style 一貫性チェッカー
+------------------------------------------------------------
+
+  --- Linearizable な履歴 ---
+  Linearizable: True
+
+  --- Non-linearizable な履歴 (stale read) ---
+  Linearizable: False
+  VIOLATION: P2:read(x=a)@[3.0,3.5] read a, but latest write was b
+
+------------------------------------------------------------
+3.3 Session Guarantees
+------------------------------------------------------------
+
+    クライアントセッション内の保証 (Bayou, 1994):
+
+    1. Read Your Writes (RYW):
+       自分が書いた値は必ず読める
+       → Dynamo: sticky session / read from write quorum
+
+    2. Monotonic Reads (MR):
+       一度読んだ値より古い値は読まない
+       → バージョンベクタで実装
+
+    3. Monotonic Writes (MW):
+       write は発行順に全レプリカに適用される
+       → 因果順序付けで保証
+
+    4. Writes Follow Reads (WFR):
+       read の結果に依存する write は因果順序で適用
+       → read で得た causal context を write に付与
+
+    実装パターン:
+      per-session version vector を追跡
+      read 時: session_vv <= replica_vv なレプリカから読む
+      write 時: session_vv を write に付与
+    
+  Write to replica 0: version=1
+  Read from replica 1 (no RYW): value=None
+  Read with RYW (session_wv=1): value={'name': 'Alice'}
+  Read from replica 1 (after replication): value={'name': 'Alice'}
+
+======================================================================
+Chapter 4: Byzantine Fault Tolerance
+  悪意あるノードが存在する環境での合意
+======================================================================
+
+------------------------------------------------------------
+4.1 ビザンチン将軍問題
+------------------------------------------------------------
+
+    問題設定 (Lamport, Shostak, Pease 1982):
+      n 人の将軍が攻撃/撤退を合意する。
+      最大 f 人の裏切り者(任意の振る舞い)がいる。
+
+    定理: n >= 3f + 1 が必要
+      f=1 なら n>=4, f=2 なら n>=7
+
+    なぜ 3f+1 か:
+      - f 個のノードがクラッシュ → 応答なし
+      - f 個のノードが嘘をつく → 誤った応答
+      - 正直ノード f+1 個で多数決に勝つ必要
+      → 合計 f + f + (f+1) = 3f + 1
+    
+------------------------------------------------------------
+4.2 Byzantine Generals — シミュレーション
+------------------------------------------------------------
+
+  n=4, f=1, traitors={0}
+  Commander (G0) value: ATTACK
+  3f+1 = 4, n >= 3f+1: True
+  G1 (honest): decided RETREAT
+  G2 (honest): decided RETREAT
+  G3 (honest): decided RETREAT
+  Agreement among honest generals: True
+
+  n=3, f=1, traitors={2}
+  Commander (G0) value: ATTACK
+  3f+1 = 4, n >= 3f+1: False
+  G1 (honest): decided ATTACK
+  Agreement among honest generals: True
+
+------------------------------------------------------------
+4.3 PBFT — Practical Byzantine Fault Tolerance
+------------------------------------------------------------
+
+    PBFT (Castro & Liskov, 1999):
+      ネットワークが部分同期であれば BFT 合意可能。
+
+    3-phase protocol:
+    ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+    │ PRE-PREPARE  │→  │   PREPARE    │→  │    COMMIT    │
+    │ Leader→All   │   │ All→All      │   │ All→All      │
+    │ <request,v,n>│   │ 2f+1 prepare │   │ 2f+1 commit  │
+    └──────────────┘   └──────────────┘   └──────────────┘
+
+    Phase 1 (Pre-prepare): Leader が request に sequence number を割り当て
+    Phase 2 (Prepare): 各 replica が pre-prepare を検証、prepare を broadcast
+      → 2f+1 の prepare 受信で "prepared" 状態 (= agreement on order)
+    Phase 3 (Commit): prepared な replica が commit を broadcast
+      → 2f+1 の commit 受信で実行・返信
+    
+
+  PBFT Simulation: n=4, f=1
+  Byzantine node: N3
+  Phase 1: Leader N0 sends Pre-prepare(seq=1)
+  Phase 2: Prepare broadcast
+    N3 (byzantine): skips prepare
+    N0: prepares=2, prepared=False
+    N1: prepares=2, prepared=False
+    N2: prepares=2, prepared=False
+  Phase 3: Commit broadcast
+    N0: commits=0, committed=False
+    N1: commits=0, committed=False
+    N2: commits=0, committed=False
+
+------------------------------------------------------------
+4.4 Tendermint (BFT for Blockchain)
+------------------------------------------------------------
+
+    Tendermint (Cosmos SDK):
+      PBFT の改良版、ブロックチェーン向け。
+
+    特徴:
+      1. Propose → Prevote → Precommit (3-phase)
+      2. Round ごとに Proposer をローテーション
+      3. Locking mechanism: 一度 precommit したら戻れない
+      4. 2/3+ の stake-weight で合意 (PoS + BFT)
+
+    PBFT との違い:
+      - PBFT: permissioned (固定メンバー)
+      - Tendermint: permissionless-ish (validator set は変動)
+      - Tendermint: optimistic responsiveness なし
+        → 固定タイムアウトに依存
+
+    Cosmos / CometBFT で使用。
+    Ethereum 2.0 の Casper FFG も BFT ベース。
+    
+
+======================================================================
+Chapter 5: Replication Deep Dive
+  Single-leader / Multi-leader / Leaderless の詳細
+======================================================================
+
+------------------------------------------------------------
+5.1 Single-Leader Replication
+------------------------------------------------------------
+  Sync write: leader + sync replicas に書き込み完了後ACK
+    Replica 0 (leader): {'user:1': ('Alice', 1), 'user:2': ('Bob', 2)}
+    Replica 1 (sync):   {'user:1': ('Alice', 1)}
+    Replica 2 (async):  {}  ← まだ未反映
+    Replica 2 (after async repl): {'user:1': ('Alice', 1), 'user:2': ('Bob', 2)}
+
+    Split-Brain Fencing (脳分裂防止):
+    ┌─────────────────────────────────────────────────────────┐
+    │ 問題: ネットワーク分断で旧リーダーがまだ write を受付  │
+    │                                                         │
+    │ 解決策:                                                 │
+    │  1. Epoch/Fence Token: 新リーダーが epoch を increment  │
+    │     古い epoch の write は拒否される                     │
+    │  2. STONITH: 旧リーダーを強制シャットダウン             │
+    │  3. Lease: リーダーは定期的にリース更新が必要           │
+    │     リース失効 → 自動的にリーダー権限喪失              │
+    └─────────────────────────────────────────────────────────┘
+    
+------------------------------------------------------------
+5.2 Multi-Leader Replication
+------------------------------------------------------------
+  LWW 解決: doc:1 = version_B
+  Merge 解決: doc:1 = ['version_B', 'version_A', 'version_C']
+
+    Multi-Leader の競合解決戦略:
+    ┌───────────────────┬────────────────────────────────────┐
+    │ LWW               │ 最新タイムスタンプが勝つ(データロス)│
+    │ Merge             │ 全バージョンを保持 (CRDT 的)       │
+    │ Custom logic      │ アプリケーション固有のマージ関数    │
+    │ Conflict-free     │ CRDT で設計上競合を排除             │
+    │ Operational Transform │ Google Docs 方式               │
+    └───────────────────┴────────────────────────────────────┘
+    
+------------------------------------------------------------
+5.3 Leaderless Replication (Dynamo-style)
+------------------------------------------------------------
+  Write(key1, v=1): success=True, W=3
+  Write(key2, v=1, nodes 3,4 down): success=True
+    Hints pending for node 3: 0
+    Hinted handoff to node 3: 0 hints delivered
+  Read(key1): valueA
+  Anti-entropy sync: 4 keys synced
+
+    Quorum Math: W + R > N → 少なくとも1つの最新レプリカから読める
+
+    BUT: W+R>N は Linearizable を保証しない!
+    ┌──────────────────────────────────────────────────────────┐
+    │ 理由:                                                    │
+    │  1. Sloppy quorum: 本来のノード以外に write → 重複なし  │
+    │  2. Concurrent writes: LWW で片方が消える               │
+    │  3. Write と read が部分的に重なる → stale read 可能    │
+    │  4. 障害復旧中の read repair タイミング                  │
+    │                                                          │
+    │ Linearizable にするには:                                 │
+    │  - Read 時に追加の write-back が必要 (ABD algorithm)     │
+    │  - または Paxos/Raft で合意を取る                        │
+    └──────────────────────────────────────────────────────────┘
+    
+
+======================================================================
+Chapter 6: Time & Ordering in Distributed Systems
+  Lamport Clock / Vector Clock / HLC / TrueTime
+======================================================================
+
+------------------------------------------------------------
+6.1 Lamport Timestamps (Logical Clock)
+------------------------------------------------------------
+
+    Lamport Clock (1978):
+      ルール:
+        1. イベント発生時: counter++
+        2. メッセージ送信時: (counter, msg) を送る
+        3. メッセージ受信時: counter = max(local, received) + 1
+
+      性質:
+        a → b ならば L(a) < L(b)        (因果順序を反映)
+        L(a) < L(b) でも a → b とは限らない (逆は不成立)
+    
+  P1: local_event @ L=1
+  P1: send(hello) @ L=2
+  P1: recv(reply) @ L=5
+  P2: local_event @ L=1
+  P2: local_event @ L=2
+  P2: recv(hello) @ L=3
+  P2: send(reply) @ L=4
+
+  Total order: P1=5, P2=4
+
+------------------------------------------------------------
+6.2 Vector Clocks — 因果関係の完全な追跡
+------------------------------------------------------------
+
+    Vector Clock: 各プロセスが全プロセスの counter を維持
+
+    VC(a) < VC(b):  a → b (因果関係あり)
+    VC(a) || VC(b): a と b は並行 (concurrent)
+
+    Lamport Clock との違い:
+      Lamport: 因果関係の一方向のみ (a→b ⇒ L(a)<L(b))
+      Vector:  双方向 (a→b ⟺ VC(a)<VC(b))
+    
+  A send: {'A': 1, 'B': 0, 'C': 0}
+  B recv from A: {'A': 1, 'B': 1, 'C': 0}
+  C independent: {'A': 0, 'B': 0, 'C': 1}
+  B vs C: CONCURRENT
+  After B→C: B vs C = BEFORE
+
+------------------------------------------------------------
+6.3 Hybrid Logical Clock (HLC)
+------------------------------------------------------------
+
+    HLC (Kulkarni et al. 2014):
+      物理時計 + 論理カウンタの組合せ
+
+    HLC = (physical_ts, logical_counter)
+      - physical_ts: NTP 同期された物理時計
+      - logical_counter: 同一 physical_ts 内の順序付け
+
+    利点:
+      - Vector Clock のような O(n) ストレージ不要
+      - Lamport Clock より豊富な情報 (物理時刻に近い)
+      - CockroachDB, YugabyteDB で採用
+    
+  N1 send: HLC=(1773560859154, 0)
+  N2 recv: HLC=(1773560859154, 1)
+  N2 send: HLC=(1773560859154, 2)
+
+------------------------------------------------------------
+6.4 TrueTime — Google Spanner のタイムスタンプ
+------------------------------------------------------------
+
+    TrueTime API:
+      tt.now() → [earliest, latest]  (区間を返す)
+
+    不確実性区間 ε (通常 1-7ms):
+      - GPS + 原子時計で ε を最小化
+      - Spanner: commit 時に ε だけ待つ (commit-wait)
+        → 外部一貫性 (external consistency) を保証
+
+    ┌───────────────────────────────────────────────────────┐
+    │ Commit-Wait Protocol:                                 │
+    │  1. Acquire locks                                     │
+    │  2. Choose commit timestamp s = TT.now().latest       │
+    │  3. Wait until TT.now().earliest > s (commit-wait)    │
+    │  4. Release locks and apply                           │
+    │                                                       │
+    │  これにより: T1.commit < T2.start ⇒ s1 < s2         │
+    │  = 外部一貫性 (linearizability と同等)                │
+    └───────────────────────────────────────────────────────┘
+    
+  TSO batch: [0, 1, 2, 3, 4] (relative)
+  → 厳密に単調増加するタイムスタンプを中央集権的に発行
+  → TiDB/TiKV で採用。single-point-of-failure リスクあり
+
+======================================================================
+Chapter 7: Formal Verification & Chaos Testing
+  TLA+, Safety vs Liveness, Jepsen
+======================================================================
+
+------------------------------------------------------------
+7.1 TLA+ (Temporal Logic of Actions)
+------------------------------------------------------------
+
+    TLA+ (Lamport):
+      分散システムの仕様記述と検証のための形式言語。
+
+    基本概念:
+      State Machine: システムは状態の集合と遷移関数
+      Invariant:     全到達可能状態で true な述語
+      Safety:        「悪いことは起きない」(invariant)
+      Liveness:      「良いことがいつか起きる」(progress)
+
+    TLA+ spec の構造:
+      INIT     : 初期状態の定義
+      Next     : 状態遷移の定義
+      Spec     : Init ∧ □[Next]_vars ∧ Liveness
+      Invariant: □(Safety_Property)
+    
+------------------------------------------------------------
+7.2 Safety vs Liveness in Practice
+------------------------------------------------------------
+
+    Safety (安全性):
+      "Something bad never happens"
+      例: 2つのノードが異なる値に decide しない
+      検証: 到達可能な全状態を探索 (model checking)
+
+    Liveness (活性):
+      "Something good eventually happens"
+      例: 全正常ノードがいつか decide する
+      検証: 公平性条件 (fairness) が必要
+        Weak fairness: 常に有効なアクションはいつか実行される
+        Strong fairness: 無限に頻繁に有効なアクションはいつか実行される
+    
+  Mutex safety check: PASS
+  States explored: 8
+
+------------------------------------------------------------
+7.3 Jepsen / Chaos Testing
+------------------------------------------------------------
+
+    Jepsen (Kyle Kingsbury):
+      分散データベースの一貫性を検証するフレームワーク。
+
+    テスト手法:
+      1. クラスタを構築
+      2. クライアントから並行操作を発行
+      3. 障害を注入 (ネットワーク分断, ノードクラッシュ, clock skew)
+      4. 操作履歴を収集
+      5. 一貫性モデルに対して検証
+
+    発見された有名なバグ:
+      - MongoDB: stale reads during network partition
+      - Elasticsearch: split-brain data loss
+      - CockroachDB: serializable violation (修正済)
+      - etcd: watch notification loss
+      - Redis Cluster: data loss on failover
+
+    Chaos Engineering (Netflix):
+      - Chaos Monkey: ランダムにインスタンスを kill
+      - Chaos Kong: リージョン全体を停止
+      - Latency Monkey: レイテンシ注入
+      - FIT (Failure Injection Testing): 依存サービス障害
+
+    原則:
+      1. 定常状態の仮説を立てる
+      2. 実験群と対照群で比較
+      3. 本番環境で実行 (blast radius を制限)
+      4. 自動化して継続的に実行
+    
+
+======================================================================
+Chapter 8: 分散システム理論 — 学習優先度
+======================================================================
+
+    ┌──────┬────────────────────────┬──────────────────────────────────┐
+    │ Tier │ トピック               │ 理由                             │
+    ├──────┼────────────────────────┼──────────────────────────────────┤
+    │  1   │ CAP/PACELC            │ 面接の第一声で聞かれる           │
+    │  1   │ Replication (Ch5)     │ 全 DB の基礎。障害時の動作理解   │
+    │  1   │ Consensus (Raft)      │ etcd/ZooKeeper の原理。必須      │
+    │  1   │ Consistency Models    │ 「linearizable ですか?」即答必要 │
+    ├──────┼────────────────────────┼──────────────────────────────────┤
+    │  2   │ Paxos (理論)          │ Raft の元ネタ。Staff+ で差別化   │
+    │  2   │ Vector Clock / HLC    │ 因果一貫性の実装。DynamoDB 系    │
+    │  2   │ Quorum Math           │ W+R>N の限界を説明できるか       │
+    │  2   │ Jepsen 概念           │ 「テストどうする?」への回答      │
+    ├──────┼────────────────────────┼──────────────────────────────────┤
+    │  3   │ FLP Impossibility     │ 「なぜ timeout?」の根本理由      │
+    │  3   │ PBFT / Byzantine      │ ブロックチェーン系で必須         │
+    │  3   │ TrueTime / Spanner    │ Google 系面接で頻出              │
+    │  3   │ Formal Verification   │ TLA+ を読める = 設計力の証明     │
+    ├──────┼────────────────────────┼──────────────────────────────────┤
+    │  4   │ Ben-Or Protocol       │ Randomized consensus 理論        │
+    │  4   │ Failure Detectors     │ Chandra-Toueg 理論               │
+    │  4   │ Tendermint 詳細       │ Blockchain 特化                  │
+    │  4   │ ABD Algorithm         │ Quorum + linearizable 証明       │
+    └──────┴────────────────────────┴──────────────────────────────────┘
+
+    学習パス:
+      Week 1-2: Tier 1 — DDIA Ch5-9 を精読
+      Week 3-4: Tier 2 — 実装しながら理解
+      Week 5-6: Tier 3 — 論文を読む (FLP, Paxos Made Simple)
+      Week 7+:  Tier 4 — 興味に応じて深掘り
+
+    推薦図書:
+      1. DDIA (Kleppmann) — バイブル。Ch5-9 が核心
+      2. "Paxos Made Simple" (Lamport) — 9ページの名論文
+      3. "In Search of an Understandable Consensus Algorithm" — Raft 論文
+      4. "Time, Clocks, and the Ordering of Events" (Lamport 1978) — 原典
+      5. Jepsen analyses — https://jepsen.io/analyses
+
+    面接での使い方:
+      「Dynamo-style leaderless store を設計してください」
+      → Quorum, Vector Clock, Read Repair, Anti-Entropy を説明
+      → 「ただし W+R>N でも linearizable ではない」まで言及
+      → Sloppy Quorum と Hinted Handoff の tradeoff を議論
+    
+
+======================================================================
+  Complete! 分散システム理論の全7章 + 学習優先度を実行しました。
+======================================================================

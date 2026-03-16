@@ -1,0 +1,198 @@
+2026/03/15 16:55:31 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/03/15 16:55:31 INFO mlflow.store.db.utils: Updating database tables
+2026/03/15 16:55:35 INFO mlflow.tracking.fluent: Experiment with name 'note_tag_classifier' does not exist. Creating a new experiment.
+2026/03/15 16:55:37 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:55:37 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:06 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:06 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:15 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:16 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:25 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:25 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:35 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:35 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:46 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:46 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/03/15 16:56:58 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/03/15 16:56:58 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+╔═══════════════════════════════════════════════════════╗
+║   Phase DS3: MLOps - 実験管理・本番化・モニタリング   ║
+╚═══════════════════════════════════════════════════════╝
+
+📦 データ: 訓練 96件 / テスト 24件
+
+════════════════════════════════════════════════════════════
+🧪 実験管理: ハイパーパラメータ探索
+════════════════════════════════════════════════════════════
+  69c6912ca787409193ca | Logistic Regression  | acc=0.292 f1=0.045
+  49aa2dda58e1415e8d38 | Logistic Regression  | acc=1.000 f1=1.000
+  b923d4358fa04e23b498 | Logistic Regression  | acc=1.000 f1=1.000
+  be5c83d06b904437a9d5 | Random Forest        | acc=0.625 f1=0.711
+  c36a54e9afd74d3ba5ea | Random Forest        | acc=1.000 f1=1.000
+  70ccafb7d713468384dc | Gradient Boosting    | acc=1.000 f1=1.000
+  a0e02265282b4ebfba6f | Gradient Boosting    | acc=1.000 f1=1.000
+
+════════════════════════════════════════════════════════════
+📡 データドリフト検知
+════════════════════════════════════════════════════════════
+
+  テキスト長の分布:
+    学習データ: 平均 34.2文字, 中央値 35.0文字
+    本番データ: 平均 46.4文字, 中央値 46.0文字
+
+  PSI スコア: 10.0186
+  判定: 🚨 大きな変化（モデル再学習を検討）
+
+  PSI 解釈基準:
+    < 0.10 : 分布変化なし → 再学習不要
+    0.10-0.25: 軽微な変化 → 監視継続
+    > 0.25 : 大きな変化 → モデル再学習が必要
+
+  実務では以下も監視する:
+    - 予測ラベルの分布変化（コンセプトドリフト）
+    - モデルの予測確信度（confidence）の低下
+    - 実際の正解率のモニタリング（ラベル収集が可能な場合）
+
+
+════════════════════════════════════════════════════════════
+🚀 モデルのAPI化 (FastAPI)
+────────────────────────────────────────────────────────────
+
+# phase_ds3_mlops/model_server.py
+"""
+学習済みモデルを FastAPI で提供する
+実務ではこれを Docker コンテナ化して ECS/Cloud Run にデプロイする
+
+実行: uvicorn model_server:app --reload
+"""
+from fastapi import FastAPI
+from pydantic import BaseModel
+import pickle
+import os
+
+app = FastAPI(title="Tag Classifier API")
+
+# モデルをメモリに読み込む（起動時1回だけ）
+MODEL_PATH = os.getenv("MODEL_PATH", "best_model.pkl")
+with open(MODEL_PATH, "rb") as f:
+    model = pickle.load(f)
+
+class PredictRequest(BaseModel):
+    text: str
+
+class PredictResponse(BaseModel):
+    tag: str
+    confidence: float
+    model_version: str = "v1.0"
+
+@app.post("/predict", response_model=PredictResponse)
+async def predict(req: PredictRequest):
+    # 予測
+    proba = model.predict_proba([req.text])[0]
+    tag_idx = proba.argmax()
+    confidence = float(proba[tag_idx])
+
+    return PredictResponse(
+        tag=model.classes_[tag_idx],
+        confidence=confidence,
+    )
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": model is not None}
+
+# 考えてほしい疑問:
+#   Q1. バッチ予測 vs オンライン予測の違いは？（コスト・レイテンシ）
+#   Q2. モデルを Blue/Green デプロイするにはどうするか？
+#   Q3. 予測ログをどこに保存すべきか？（ドリフト検知のため）
+
+
+════════════════════════════════════════════════════════════
+🔬 A/Bテスト設計: モデルの安全な本番投入
+════════════════════════════════════════════════════════════
+
+戦略: Canary Release (段階的ロールアウト)
+
+  Day 1:  新モデルに 5% のトラフィックを流す
+  Day 3:  問題なければ 20% に拡大
+  Day 7:  問題なければ 50% に拡大
+  Day 14: 100% 切り替え or ロールバック
+
+見るべきメトリクス:
+  ML メトリクス: 予測精度, 信頼度スコア分布
+  ビジネスメトリクス: タグ付けの修正率, 検索ヒット率
+  インフラメトリクス: レイテンシ, エラー率, CPU使用率
+
+実装イメージ（api_gateway側）:
+  import random
+
+  def route_request(user_id: str) -> str:
+      # ユーザーIDで安定したハッシュ（同じユーザーは常に同じモデル）
+      if hash(user_id) % 100 < CANARY_PERCENTAGE:
+          return "model_v2"  # 新モデル
+      return "model_v1"      # 現行モデル
+
+テックリードとしての判断軸:
+  ✅ 新モデルを投入すべき条件:
+     - 精度が統計的有意に改善（p < 0.05）
+     - ビジネスメトリクスが改善または横ばい
+     - レイテンシが SLO 内（p95 < 200ms 等）
+
+  ❌ ロールバックすべき条件:
+     - エラーレートが閾値超過（> 1%）
+     - ユーザー不満の急増（サポートチケット）
+     - 特定セグメントで精度が大きく劣化
+
+
+════════════════════════════════════════════════════════════
+📈 MLOps 成熟度レベル（Google の定義）
+════════════════════════════════════════════════════════════
+
+  Level 0: 手動プロセス
+    Jupyterで実験 → 手動でスクリプト化 → 手動デプロイ
+    多くのスタートアップの初期状態
+
+  Level 1: ML パイプライン自動化
+    データ → 学習 → 評価 → デプロイ が自動化
+    継続的学習（新データで自動再学習）が可能
+
+  Level 2: CI/CD パイプライン自動化
+    コード変更 → 自動テスト → 自動デプロイ → 自動監視
+    モデルのバージョン管理とロールバックが即座に可能
+
+テックリードとしての現実的なアドバイス:
+  多くの会社は Level 0〜1 の間にいる。
+  まず Level 1 を目指す: 学習・評価・デプロイの自動化だけでも
+  チームの生産性は劇的に向上する。
+
+  優先順位:
+    1. 実験の再現性（MLflow, DVC）
+    2. モデルの自動テスト（精度のリグレッションテスト）
+    3. 本番モニタリング（ドリフト検知）
+    4. 継続的学習パイプライン
+
+════════════════════════════════════════════════════════════
+🎯 データサイエンティスト → テックリード/PM への道
+────────────────────────────────────────────────────────────
+
+  あなたが今習得したスキルの位置づけ:
+
+  DS1 (ML基礎)     → データを理解し、適切なモデルを選択できる
+  DS2 (深層学習)   → NLP・画像等の非構造化データを扱える
+  DS3 (MLOps)      → MLプロジェクトを本番で動かし続けられる
+
+  テックリードとしての付加価値:
+    ・DS チームと Eng チームの橋渡し
+    ・ML システムのアーキテクチャ設計（Phase 1-10 の知識が活きる）
+    ・実験コストとビジネス価値のトレードオフ判断
+
+  PMとしての付加価値:
+    ・ML プロジェクトの現実的なスコープ設定
+    ・「精度 99% 達成まで待つ」vs「精度 85% で今すぐリリース」の判断
+    ・A/B テスト設計とビジネスメトリクスの定義
+
+  次のステップ:
+    → techcorp_sim のシナリオ3（データパイプライン障害）を解く
+    → Kaggle でコンペに参加してフィードバックを得る
+    → MLflow UI (http://localhost:5000) で実験を可視化する
+

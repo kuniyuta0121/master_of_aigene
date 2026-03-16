@@ -1033,6 +1033,15 @@ def section_deadlock():
 # 6. async/await vs Thread vs Process
 # ============================================================================
 
+def _cpu_task(n):
+    """CPU集約タスク: 素数判定 (モジュールレベルで定義 - pickle対応)"""
+    total = 0
+    for i in range(2, n):
+        if all(i % j != 0 for j in range(2, int(i**0.5) + 1)):
+            total += 1
+    return total
+
+
 def section_async_vs_thread_vs_process():
     print("\n=== async/await vs Thread vs Process ===\n")
 
@@ -1078,32 +1087,24 @@ def section_async_vs_thread_vs_process():
     # --- 6b. CPU-bound 比較 ---
     print("\n  [CPU-bound ワークロード比較]")
 
-    def cpu_task(n):
-        """CPU集約タスク: 素数判定"""
-        total = 0
-        for i in range(2, n):
-            if all(i % j != 0 for j in range(2, int(i**0.5) + 1)):
-                total += 1
-        return total
-
     n = 3000
 
     # 逐次
     start = time.perf_counter()
     for _ in range(4):
-        cpu_task(n)
+        _cpu_task(n)
     seq_cpu = time.perf_counter() - start
 
     # threading (GIL で並列化されない)
     start = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        list(ex.map(cpu_task, [n]*4))
+        list(ex.map(_cpu_task, [n]*4))
     thread_cpu = time.perf_counter() - start
 
     # multiprocessing
     start = time.perf_counter()
     with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:
-        list(ex.map(cpu_task, [n]*4))
+        list(ex.map(_cpu_task, [n]*4))
     process_cpu = time.perf_counter() - start
 
     print(f"    逐次:            {seq_cpu:.3f}秒")

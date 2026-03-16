@@ -1,0 +1,73 @@
+╔═══════════════════════════════════════════════════════╗
+║   Phase DS2: Deep Learning - テキスト分類 (PyTorch)   ║
+╚═══════════════════════════════════════════════════════╝
+
+🖥️  使用デバイス: mps
+📦 データ: 180件 / クラス: ['DB', 'DL', 'Data', 'Frontend', 'Go', 'Infra', 'ML', 'PM', 'Python', 'Security']
+📝 語彙サイズ: 92語
+
+════════════════════════════════════════════════════════════
+▶ Simple NN (平均プーリング) (パラメータ数: 329,610)
+────────────────────────────────────────────────────────────
+  Epoch  5/20 | Loss: 1.6471 | Val Acc: 0.833
+  Epoch 10/20 | Loss: 0.9238 | Val Acc: 1.000
+  Epoch 15/20 | Loss: 0.6112 | Val Acc: 1.000
+  Epoch 20/20 | Loss: 0.3954 | Val Acc: 1.000
+  ✅ 最終検証精度: 1.000
+
+════════════════════════════════════════════════════════════
+▶ LSTM (Bidirectional) (パラメータ数: 916,490)
+────────────────────────────────────────────────────────────
+  Epoch  5/20 | Loss: 0.6459 | Val Acc: 1.000
+  Epoch 10/20 | Loss: 0.0487 | Val Acc: 1.000
+  Epoch 15/20 | Loss: 0.0119 | Val Acc: 1.000
+  Epoch 20/20 | Loss: 0.0123 | Val Acc: 1.000
+  ✅ 最終検証精度: 1.000
+
+════════════════════════════════════════════════════════════
+▶ Self-Attention (Transformer風) (パラメータ数: 346,378)
+────────────────────────────────────────────────────────────
+  Epoch  5/20 | Loss: 1.1409 | Val Acc: 0.972
+  Epoch 10/20 | Loss: 0.1116 | Val Acc: 1.000
+  Epoch 15/20 | Loss: 0.0374 | Val Acc: 1.000
+  Epoch 20/20 | Loss: 0.0255 | Val Acc: 1.000
+  ✅ 最終検証精度: 1.000
+
+════════════════════════════════════════════════════════════
+📊 アーキテクチャ比較サマリー
+────────────────────────────────────────────────────────────
+  Simple NN (平均プーリング)                 ██████████████████████████████ 1.000
+  LSTM (Bidirectional)                ██████████████████████████████ 1.000
+  Self-Attention (Transformer風)       ██████████████████████████████ 1.000
+
+════════════════════════════════════════════════════════════
+📚 転移学習（Fine-tuning）について
+────────────────────────────────────────────────────────────
+
+実務での標準的なアプローチ（2025年現在）:
+
+1. 事前学習済みモデルを使う
+   from transformers import AutoTokenizer, AutoModelForSequenceClassification
+   model = AutoModelForSequenceClassification.from_pretrained("cl-tohoku/bert-base-japanese")
+
+2. 最終層だけ Fine-tuning（少ないデータでも動く）
+   # BERT の重みは固定、分類層だけ学習
+   for param in model.bert.parameters():
+       param.requires_grad = False
+
+3. なぜ強いのか？
+   - BERT はウィキペディア等の大量テキストで「言語を理解」している
+   - あなたのデータはタスク固有の「パターン」を学ぶだけでよい
+   - 10件のデータでも動く（ゼロから学習なら数千件必要）
+
+[実装してみよう]
+   pip install transformers sentence-transformers
+   from sentence_transformers import SentenceTransformer
+   model = SentenceTransformer("intfloat/multilingual-e5-small")
+   embeddings = model.encode(["Pythonの型ヒント", "機械学習の基礎"])
+   → これが Phase 2 の RAG で使っている埋め込みの実体！
+
+✅ 完了！次のステップ:
+  → Phase DS3: MLflow で実験管理 & モデル本番化
+  → [実装してみよう] sentence-transformers で埋め込みを取得して
+     コサイン類似度によるノート検索を実装する

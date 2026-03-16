@@ -1,0 +1,354 @@
+====================================================================
+  System Design Patterns - FAANG Tech Lead / PM 面接対策
+====================================================================
+
+====================================================================
+  1. マイクロサービスパターン (Microservices Patterns)
+====================================================================
+  ── EC サイトの Bounded Context 分割 ──
+  [BoundedContext: Order]
+  Entities: Order, OrderLine, OrderStatus
+  Commands: PlaceOrder, CancelOrder, UpdateOrder
+  Publishes: OrderPlaced, OrderCancelled
+  Consumes: PaymentCompleted, InventoryReserved
+  Downstream: Payment, Inventory, Shipping
+
+  [BoundedContext: Payment]
+  Entities: Payment, PaymentMethod, Refund
+  Commands: ProcessPayment, IssueRefund
+  Publishes: PaymentCompleted, PaymentFailed, RefundIssued
+  Consumes: OrderPlaced
+  Upstream: Order
+
+  [BoundedContext: Inventory]
+  Entities: Product, Stock, Warehouse
+  Commands: ReserveStock, ReleaseStock
+  Publishes: InventoryReserved, InventoryInsufficient
+  Consumes: OrderPlaced, OrderCancelled
+  Upstream: Order
+
+  ── API Gateway Pattern ──
+  GET /api/products (no auth): {'status': 200, 'body': 'Routed to product-service', 'service': 'product-service'}
+  GET /api/users (no token):   {'status': 401, 'body': 'Unauthorized'}
+  GET /api/users (valid):      {'status': 200, 'body': 'Routed to user-service', 'service': 'user-service'}
+  GET /api/orders #1: status=200
+  GET /api/orders #2: status=200
+  GET /api/orders #3: status=200
+  GET /api/orders #4: status=429
+  GET /api/orders #5: status=429
+
+  ── Service Discovery ──
+  Healthy instances: 3
+  After marking 10.0.0.2 unhealthy: 2
+  Selected instance: 10.0.0.3:8080
+
+  ── Saga Pattern: Orchestration ──
+    Saga order-saga-001 started
+      Executing: CreateOrder
+      ✓ CreateOrder completed
+      Executing: ProcessPayment
+      ✗ ProcessPayment FAILED → compensating
+      Compensating: CreateOrder
+      ↩ CreateOrder compensated
+  Result: Rolled back
+
+  ── Saga Pattern: Choreography ──
+      Event published: OrderCreated
+      PaymentService received OrderCreated for ORD-42
+      Event published: PaymentCompleted
+      InventoryService received PaymentCompleted for ORD-42
+      Event published: InventoryReserved
+      ShippingService received InventoryReserved for ORD-42
+
+  ── Circuit Breaker State Machine ──
+    Call 1: FAILED - Service unavailable (state=CLOSED)
+    Call 2: FAILED - Service unavailable (state=CLOSED)
+    Call 3: FAILED - Service unavailable (state=OPEN)
+    Call 4: FAILED - Service unavailable (state=OPEN)
+    Call 5: OK (state=CLOSED)
+    Call 6: OK (state=CLOSED)
+      [payment-service] CLOSED → OPEN
+      [payment-service] OPEN → HALF_OPEN
+      [payment-service] HALF_OPEN → OPEN
+      [payment-service] OPEN → HALF_OPEN
+      [payment-service] HALF_OPEN → CLOSED
+
+  ── Sidecar / Ambassador / Adapter ──
+  Ambassador: [envoy-proxy] proxied → GET /api/payment
+  Sidecar:    [envoy-proxy] logged+authed → POST /api/orders
+  Adapter:    {"timestamp": "2026-03-09T00:00:00Z", "service": "order-service", "data": {"cpu": 45, "mem": 78}}
+
+====================================================================
+  2. イベント駆動アーキテクチャ (Event-Driven Architecture)
+====================================================================
+  ── Event Sourcing ──
+  Current balance: 1300
+  Events in store: 3
+  Rebuilt balance: 1300
+  Balances match: True
+    v1: MoneyDeposited {'amount': 1000}
+    v2: MoneyDeposited {'amount': 500}
+    v3: MoneyWithdrawn {'amount': 200}
+
+  ── CQRS (Command Query Responsibility Segregation) ──
+  Electronics: [
+    {
+        "id": "P1",
+        "name": "Laptop",
+        "price": 899,
+        "category": "Electronics"
+    },
+    {
+        "id": "P2",
+        "name": "Keyboard",
+        "price": 79,
+        "category": "Electronics"
+    }
+]
+  P1 after price update: {'id': 'P1', 'name': 'Laptop', 'price': 899, 'category': 'Electronics'}
+
+  ── Event Bus + Outbox + DLQ ──
+  Outbox published: 1 events
+  Received: ['Order processed: ORD-99']
+  DLQ processing result: False
+  Messages in DLQ: 1
+  After idempotent publish (2 calls, same ID): 1 received
+
+====================================================================
+  3. DDD (Domain-Driven Design)
+====================================================================
+  ── DDD: Aggregate, Entity, Value Object ──
+  Value Objects equal: True
+  Money add: 1500 JPY
+  Order total: 105900 JPY
+  Order status: PLACED
+  Domain events: [{'type': 'OrderPlaced', 'order_id': 'ORD-001', 'total': '105900 JPY'}]
+  Repository find: True
+  ACL translated: External Product (4500 JPY)
+
+====================================================================
+  4. 分散システムパターン (Distributed Systems)
+====================================================================
+  ── CAP Theorem ──
+  CP (整合性 + 分断耐性)
+    Examples:  ZooKeeper, HBase, MongoDB (default)
+    Tradeoff:  分断時に一部リクエストを拒否（可用性を犠牲）
+    Use case:  金融取引、在庫管理
+  AP (可用性 + 分断耐性)
+    Examples:  Cassandra, DynamoDB, CouchDB
+    Tradeoff:  分断時に古いデータを返す可能性（整合性を犠牲）
+    Use case:  SNS タイムライン、DNS、ショッピングカート
+
+  ── Consistent Hashing ──
+  Distribution (3 nodes):
+    server-A: 322 keys (32.2%)
+    server-B: 341 keys (34.1%)
+    server-C: 337 keys (33.7%)
+  After adding server-D:
+    server-A: 237 keys (23.7%)
+    server-B: 242 keys (24.2%)
+    server-C: 262 keys (26.2%)
+    server-D: 259 keys (25.9%)
+  Keys moved: 259 (25.9%) — ideal: ~250
+
+  ── Leader Election (Bully Algorithm) ──
+  Initial leader: node-3 (term=1)
+  Heartbeat after killing node-3: False
+  New leader: node-2 (term=2)
+  After reviving node-3: node-3 (term=3)
+
+  ── Distributed Lock (Redlock) ──
+  Client-A lock: True — Lock acquired (5/5 instances)
+  Client-B lock (same resource): False — Failed (0/5, need 3)
+  Client-B lock (after A unlocks): True — Lock acquired (5/5 instances)
+  Client-C lock (2 instances down): True — Lock acquired (3/5 instances)
+  Client-D lock (3 instances down): False — Failed (2/5, need 3)
+
+  ── Two-Phase Commit ──
+      [Coordinator] Starting 2PC for TXN-001
+      [Phase 1] Sending PREPARE to all participants
+        OrderDB: VOTE_COMMIT
+        PaymentDB: VOTE_COMMIT
+        InventoryDB: VOTE_COMMIT
+      [Phase 2] All voted COMMIT → sending COMMIT
+  Result: COMMITTED
+
+      [Coordinator] Starting 2PC for TXN-002
+      [Phase 1] Sending PREPARE to all participants
+        OrderDB: VOTE_COMMIT
+        PaymentDB: VOTE_ABORT
+        InventoryDB: VOTE_COMMIT
+      [Phase 2] Some voted ABORT → sending ABORT
+  Result: ABORTED
+
+  ── Vector Clock ──
+  A local event:  VC({'A': 1})
+  B receives A:   VC({'B': 1, 'A': 1})
+  C local event:  VC({'C': 1})
+  A → B? True
+  B → A? False
+  A || C? True (concurrent)
+
+  ── Gossip Protocol ──
+  Round 1: 3/8 nodes informed, 4 updates
+  Round 2: 5/8 nodes informed, 4 updates
+  Round 3: 5/8 nodes informed, 0 updates
+  Round 4: 7/8 nodes informed, 4 updates
+  Round 5: 7/8 nodes informed, 0 updates
+  Round 7: 8/8 nodes informed, 2 updates
+  Full convergence in 7 rounds!
+
+====================================================================
+  5. 汎用システム設計問題 (System Design Interview)
+====================================================================
+  ── URL Shortener ──
+  https://example.com/very/long/path/to/resource?par... → Z376ZEO (resolve: 302)
+  https://docs.google.com/spreadsheets/d/1234567890/... → sMOeTU6 (resolve: 302)
+  https://github.com/user/repo/pull/42... → MGM2lQE (resolve: 302)
+  Custom alias: mylink → https://special.example.com
+  Base62(100000) = q0U
+  Base62(62^7-1) = ZZZZZZZ (max 7 chars)
+
+  ── Rate Limiter (3 Algorithms) ──
+  Token Bucket (cap=5, 8 requests): 5 allowed, 3 rejected
+  Sliding Window Log (3/sec, 5 requests): 3 allowed, 2 rejected
+  Fixed Window Counter (4/sec, 6 requests): 4 allowed, 2 rejected
+
+  アルゴリズム比較:
+  ┌──────────────────────┬────────┬──────────┬────────────┐
+  │ Algorithm            │ Memory │ Accuracy │ Burst      │
+  ├──────────────────────┼────────┼──────────┼────────────┤
+  │ Token Bucket         │ O(1)   │ Medium   │ Allowed    │
+  │ Sliding Window Log   │ O(N)   │ High     │ Controlled │
+  │ Fixed Window Counter │ O(1)   │ Low      │ Boundary   │
+  └──────────────────────┴────────┴──────────┴────────────┘
+  
+  ── Chat System Design ──
+  Channel history (3 messages):
+    seq=1 [alice]: Hey team!
+    seq=2 [bob]: Hi Alice!
+    seq=3 [alice]: Let's discuss the design
+  Charlie's undelivered: 3 messages
+  Alice online: True
+  Charlie online: False
+
+  ── News Feed (Push vs Pull vs Hybrid) ──
+  Celebrity has 5 followers (threshold=3)
+  Is celebrity: True
+  user-0's feed (3 items):
+    [celebrity] Big announcement! (pull)
+    [user-2] Regular user post (push)
+    [user-1] Hello from user-1! (push)
+
+  ── Notification System ──
+  Enqueue N1 (HIGH): queued
+  Enqueue N2 (LOW): queued
+  Enqueue N3 (CRITICAL): queued
+  Enqueue N4 (MEDIUM): queued
+  Processed: 4 delivered, 0 failed
+  Delivery order (by priority):
+    N3: Security Alert [CRITICAL] → sms
+    N1: Order Shipped [HIGH] → push
+    N4: Flash Sale [MEDIUM] → push
+    N2: Weekly Digest [LOW] → email
+  Rate limiting (max 3/hr, 5 attempts): 3 queued
+
+====================================================================
+  6. スケーラビリティパターン (Scalability Patterns)
+====================================================================
+  ── Horizontal vs Vertical Scaling ──
+
+  ┌─────────────────────┬──────────────────────┬──────────────────────┐
+  │                     │ Vertical (Scale Up)  │ Horizontal (Scale Out)│
+  ├─────────────────────┼──────────────────────┼──────────────────────┤
+  │ How                 │ Bigger machine       │ More machines        │
+  │ Cost                │ Exponential          │ Linear               │
+  │ Limit               │ Hardware ceiling     │ Theoretically none   │
+  │ Complexity          │ Low                  │ High (distributed)   │
+  │ Downtime            │ Usually required     │ Zero-downtime        │
+  │ Data Consistency    │ Easy (single node)   │ Hard (distributed)   │
+  │ Failure Impact      │ Total                │ Partial              │
+  │ Examples            │ Bigger RDS instance  │ Add more EC2s / pods │
+  └─────────────────────┴──────────────────────┴──────────────────────┘
+
+  いつ Vertical を選ぶか:
+    ・初期段階でシンプルさを優先したいとき
+    ・データベースで強い整合性が必要なとき
+    ・スケール要件が予測可能で上限が見えているとき
+
+  いつ Horizontal を選ぶか:
+    ・高可用性が必要なとき（SPOF を排除）
+    ・トラフィックが予測困難で弾力的にスケールしたいとき
+    ・地理的に分散する必要があるとき
+  
+  ── Database Sharding Strategies ──
+  RANGE sharding (4 shards, 100 records):
+    Shard 0: 100 records ##################################################
+    Shard 1:   0 records 
+    Shard 2:   0 records 
+    Shard 3:   0 records 
+  HASH sharding (4 shards, 100 records):
+    Shard 0:  23 records ###########
+    Shard 1:  24 records ############
+    Shard 2:  33 records ################
+    Shard 3:  20 records ##########
+  DIRECTORY sharding (4 shards, 100 records):
+    Shard 0:  25 records ############
+    Shard 1:  25 records ############
+    Shard 2:  25 records ############
+    Shard 3:  25 records ############
+
+  ── Read Replica Pattern ──
+  Writes to primary: 2
+  Reads per replica: [3, 3, 3]
+  Read load balanced: Yes
+
+  ── Cache Strategies ──
+  Cache-Aside      | Hit rate: 62.5%  | DB reads: 6 | DB writes: 1
+  Write-Through    | Hit rate: 68.8%  | DB reads: 5 | DB writes: 1
+  Write-Behind     | Hit rate: 68.8%  | DB reads: 5 | DB writes: 1
+  Read-Through     | Hit rate: 62.5%  | DB reads: 6 | DB writes: 1
+
+  ── CDN Pattern ──
+  /static/logo.png @ tokyo        → origin
+  /static/logo.png @ tokyo        → edge:tokyo
+  /static/logo.png @ singapore    → origin
+  /static/logo.png @ singapore    → edge:singapore
+  /api/data.json @ us-west      → origin
+  Origin hits: 3, Edge hits: 2
+
+  ── Back-pressure Handling ──
+  drop_oldest : queued=2, dropped=5, processed=3
+  drop_newest : queued=2, dropped=5, processed=3
+  block       : queued=2, dropped=0, processed=3
+
+====================================================================
+  Complete! 全パターンの実行が完了しました。
+====================================================================
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - URL Shortener設計 (ハッシュ, Base62, DB選定)
+    - Rate Limiter設計 (Token Bucket, Sliding Window)
+    - マイクロサービス基礎 (サービス分割, 通信パターン)
+    - API Gateway (認証・ルーティング・負荷分散)
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Event Sourcing / CQRS (イベント駆動設計)
+    - DDD (Aggregate, Bounded Context, Ubiquitous Language)
+    - Circuit Breaker (障害伝搬防止)
+    - Sharding (水平分割, パーティションキー選定)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Saga Orchestration (分散トランザクション)
+    - Consistent Hashing (ノード追加/削除の影響最小化)
+    - Back-pressure (過負荷制御)
+    - Gossip Protocol (分散ノード間の情報伝搬)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Vector Clock実装 (因果関係の追跡)
+    - CRDT (Conflict-free Replicated Data Types)
+    - Phi Accrual Failure Detector (障害検知)
+    - Cell-Based Architecture (障害分離アーキテクチャ)
+

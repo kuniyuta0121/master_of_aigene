@@ -1,0 +1,102 @@
+╔═══════════════════════════════════════════════════════╗
+║   Phase Algo: アルゴリズム & データ構造 基礎           ║
+╚═══════════════════════════════════════════════════════╝
+
+📊 計算量の比較（n = 10^6、10^9 ops/sec と仮定）
+────────────────────────────────────────────────────────────
+計算量            n=   1,000n=  10,000n= 100,000n=1,000,000
+────────────────────────────────────────────────────────
+O(log n)              < 1ms       < 1ms       < 1ms       < 1ms
+O(n)                  < 1ms       < 1ms       < 1ms       1.0ms
+O(n log n)            < 1ms       < 1ms       1.7ms      19.9ms
+O(n²)                 1.0ms     100.0ms     10.00s   1000.00s
+O(2^n)               ∞ (不可)      ∞ (不可)      ∞ (不可)      ∞ (不可)
+
+重要な直感:
+  n=10^6 のデータに対して O(n²) は不可能（27分以上）
+  O(n log n) は 0.02秒 → ソート・ヒープ操作の目標計算量
+  面接では「このアルゴリズムの計算量は？」が必ず聞かれる
+
+
+════════════════════════════════════════════════════════════
+🧪 実装テスト
+────────────────────────────────────────────────────────────
+  ✅ Two Pointers: PASS
+  ✅ Sliding Window: PASS
+  ✅ Binary Search: PASS
+  中央値テスト: データ [5,15,1,3,8,7,9,2] → 6.0
+  ✅ Heap: PASS
+  ✅ Union-Find / Islands: PASS
+  ✅ Dynamic Programming: PASS
+  ✅ LRU Cache: PASS
+
+  全テスト通過！
+
+════════════════════════════════════════════════════════════
+🎯 FAANG コーディング面接 攻略戦略
+────────────────────────────────────────────────────────────
+
+面接の進め方（45分）:
+  5分: 問題を理解し、エッジケースを確認
+  5分: アプローチを口頭で説明（brute force → optimal）
+  20分: コーディング（クリーンに書く・途中で話す）
+  10分: テスト（自分でケースを作って通す）
+  5分: 計算量を分析
+
+絶対やってはいけないこと:
+  ❌ 黙ってコーディングする（面接官は思考プロセスを見ている）
+  ❌ いきなり最適解を書こうとする（brute force から始める）
+  ❌ エッジケースを後回しにする（[] や 1要素から考える）
+  ❌ 動くか不安なままコードを渡す（自分でテストする）
+
+Google でよく出るパターン（出現率順）:
+  1. Two Pointers / Sliding Window  (30%)
+  2. Graph BFS/DFS                  (25%)
+  3. Dynamic Programming            (20%)
+  4. Binary Search（答えへのBS含む）(15%)
+  5. Heap / Priority Queue          (10%)
+
+練習ロードマップ:
+  Week 1-2: Array, String, Hashmap (LeetCode Easy全問)
+  Week 3-4: Two Pointers, Sliding Window (Medium)
+  Week 5-6: Tree, Graph BFS/DFS (Medium)
+  Week 7-8: DP (Medium → Hard)
+  Week 9-10: Heap, Union-Find, Binary Search (Hard)
+  Week 11-12: Mock Interview（時間計測して本番想定）
+
+テックリードとして知っておくべきこと:
+  面接を「設計し採点する側」になったとき、何を見るか：
+  ・コードの可読性（命名・関数分割）
+  ・計算量の意識（なぜその解法か説明できるか）
+  ・コミュニケーション（チームメンバーとして働けるか）
+
+
+✅ 完了！次のステップ:
+  → LeetCode: https://leetcode.com/study-plan/
+    目標: 3ヶ月で Medium 100問 + Hard 30問
+  → NeetCode 150: 頻出パターンを体系的に網羅
+  → [実装してみよう] Trie, Segment Tree, Topological Sort を追加実装
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    - Two Pointers (対向・同方向・fast/slow)
+    - Binary Search (基本・答えへのBS・lower/upper bound)
+    - HashMap活用 (Two Sum系・頻度カウント・grouping)
+    - BFS/DFS基礎 (グラフ探索・木の走査・連結成分)
+
+  【Tier 2: 重要 — 実務で頻出】
+    - Sliding Window (固定長・可変長・最大/最小部分配列)
+    - Heap / Priority Queue (Top-K・マージK個のソート済みリスト)
+    - 基本DP (Fibonacci型・Knapsack・最長部分列)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    - Union-Find (連結成分・サイクル検出・Kruskal)
+    - Topological Sort (DAG・タスクスケジューリング)
+    - Interval問題 (マージ・挿入・最小会議室数)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    - Monotonic Stack (Next Greater Element・ヒストグラム最大矩形)
+    - 座標圧縮 (大きな座標空間の効率的処理)
+    - Mo's Algorithm (オフラインクエリ処理)
+

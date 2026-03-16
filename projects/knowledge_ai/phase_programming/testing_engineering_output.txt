@@ -1,0 +1,178 @@
+test_bulk_discount_tiers (__main__.TestPricingEngine)
+数量割引の境界値テスト ... ok
+test_calculate_invalid_inputs (__main__.TestPricingEngine)
+異常系: ValueError が出ることを検証 ... ok
+test_calculate_parametrized (__main__.TestPricingEngine)
+複数ケースを parametrize 風にテスト ... test_find_nonexistent (__main__.TestUserRepositoryIntegration) ... ok
+test_save_and_find (__main__.TestUserRepositoryIntegration) ... ok
+test_full_order_flow (__main__.TestOrderE2E) ... ok
+test_fake_manages_balance (__main__.TestTestDoubles) ... ok
+test_mock_fails_on_wrong_call (__main__.TestTestDoubles) ... ok
+test_mock_verifies_expectations (__main__.TestTestDoubles) ... ok
+test_spy_records_calls (__main__.TestTestDoubles) ... ok
+test_stub_always_succeeds (__main__.TestTestDoubles) ... ok
+test_new_stack_is_empty (__main__.TestStack)
+RED→GREEN: Step 1 ... ok
+test_peek_does_not_remove (__main__.TestStack)
+RED→GREEN: Step 5 ... ok
+test_pop_empty_raises (__main__.TestStack)
+RED→GREEN: Step 4 — 異常系 ... ok
+test_pop_returns_last_pushed (__main__.TestStack)
+RED→GREEN: Step 3 — LIFO の検証 ... ok
+test_push_makes_non_empty (__main__.TestStack)
+RED→GREEN: Step 2 ... ok
+test_discount_calculation (__main__.TestAAA) ... ok
+test_builder_pattern (__main__.TestBuilderPattern) ... ok
+test_object_mother (__main__.TestBuilderPattern) ... ok
+test_full_branch_coverage (__main__.TestBranchCoverage)
+全分岐をテスト ... ok
+test_line_coverage_only (__main__.TestBranchCoverage)
+Line Coverage は高いが Branch Coverage は不十分 ... ok
+
+======================================================================
+FAIL: test_calculate_parametrized (__main__.TestPricingEngine) (base=99.99, qty=3, disc=50)
+複数ケースを parametrize 風にテスト
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/yuta/master_of_aigene/projects/knowledge_ai/phase_programming/testing_engineering.py", line 126, in test_calculate_parametrized
+    self.assertAlmostEqual(result, expected, places=2)
+AssertionError: 149.98 != 149.99 within 2 places (0.010000000000019327 difference)
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.011s
+
+FAILED (failures=1)
+============================================================
+テストエンジニアリング — Tier 別ロードマップ
+============================================================
+
+  Tier 1 — 最優先 (今すぐ):
+    - テストピラミッド (Unit 70% / Integration 20% / E2E 10%)
+    - テストダブル 5種 (Dummy, Stub, Spy, Mock, Fake)
+    - TDD Red-Green-Refactor サイクル
+    - Arrange-Act-Assert パターン
+    - unittest / pytest の基本
+
+  Tier 2 — 重要 (3ヶ月以内):
+    - Property-Based Testing (不変条件で網羅的検証)
+    - Coverage の罠 (Line vs Branch vs Mutation Score)
+    - Object Mother / Test Data Builder
+    - Flaky Test の原因と対策
+    - BDD (Given-When-Then)
+
+  Tier 3 — 差別化 (6ヶ月以内):
+    - Mutation Testing (テスト品質の計測)
+    - Contract Testing (Consumer-Driven Contract)
+    - テストの独立性設計 (shared state 排除)
+    - パフォーマンステスト基礎
+
+  Tier 4 — 専門性 (1年以内):
+    - Chaos Engineering 的テスト
+    - Visual Regression Testing
+    - テスト戦略の組織設計
+    - テストインフラ (CI/CD パイプライン最適化)
+
+============================================================
+2. テストダブル比較表
+============================================================
+
+  | 種類   | 振る舞い     | 検証       | 用途                    |
+  |--------|-------------|-----------|------------------------|
+  | Dummy  | 何もしない   | しない     | パラメータ埋め            |
+  | Stub   | 固定値を返す | しない     | 間接入力の制御            |
+  | Spy    | 記録する     | 後から検証 | 呼び出しの確認            |
+  | Mock   | 期待値設定   | 自動検証   | インタラクション検証       |
+  | Fake   | 簡易実装     | しない     | InMemoryDB 等の代替実装  |
+    
+============================================================
+3. TDD Red-Green-Refactor (Stack 実装の流れ)
+============================================================
+
+  Step 1 [RED]:      test_new_stack_is_empty   → Stack クラスがない → FAIL
+  Step 2 [GREEN]:    class Stack + is_empty()  → テスト通過
+  Step 3 [RED]:      test_push                 → push() がない → FAIL
+  Step 4 [GREEN]:    push() 実装               → テスト通過
+  Step 5 [RED]:      test_pop                  → pop() がない → FAIL
+  Step 6 [GREEN]:    pop() 実装 (LIFO)         → テスト通過
+  Step 7 [RED]:      test_pop_empty_raises     → 空 pop 未対応 → FAIL
+  Step 8 [GREEN]:    空チェック追加             → テスト通過
+  Step 9 [REFACTOR]: __iter__, __repr__ 追加   → テスト維持しつつ設計改善
+
+  ポイント:
+    - 1テストずつ追加 → 最小限の実装 → リファクタ
+    - テストが常に「正しい仕様書」になる
+    - 過剰実装を防ぐ (YAGNI)
+    
+
+============================================================
+4. Property-Based Testing デモ
+============================================================
+  sort は冪等 (2回 sort しても結果同じ): PASSED
+  sort は長さを保存する: PASSED
+  sort は要素を保存する (multiset 一致): PASSED
+  reverse(reverse(xs)) == xs: PASSED
+  全要素が非負 (これは失敗する): FAILED
+    反例: [-67, -50, 2, -5, 75, 61, 65]
+    shrink 後: [-1]
+
+============================================================
+5. Mutation Testing デモ
+============================================================
+  変異: age > 18             → KILLED   (テストが検出)
+  変異: age >= 17            → KILLED   (テストが検出)
+  変異: age <= 18            → KILLED   (テストが検出)
+  変異: age >= 19            → KILLED   (テストが検出)
+  変異: return True          → KILLED   (テストが検出)
+
+  Mutation Score: 5/5 = 100%
+  → 良好
+
+============================================================
+6. Contract Testing デモ
+============================================================
+
+  契約: OrderService → UserService
+  [PASS] GET /api/users/1
+  [PASS] POST /api/users
+
+  --- 後方互換性チェック ---
+  v1 → v2 (互換): 0 違反 (OK)
+  v1 → v3 (破壊): 3 違反
+    BREAKING: フィールド 'email' が削除された
+    BREAKING: 'id' の型が int → str に変更
+    BREAKING: 必須フィールド 'phone' が追加された
+
+============================================================
+7. BDD (Given-When-Then) デモ
+============================================================
+  シナリオ: 大量注文で割引が適用される
+  Given: 100個の商品を注文する顧客
+  When:  割引価格を計算する
+  Then:  20%割引が適用される
+  結果:  [PASS]
+
+============================================================
+ユニットテスト実行結果
+============================================================
+
+============================================================
+サマリー
+============================================================
+  テスト実行: 21
+  成功: 20
+  失敗: 1
+
+  Flaky Test 原因:
+  Flaky Test の原因と対策:
+  
+  1. 時間依存
+     原因: datetime.now() をハードコード
+     対策: Clock インジェクション / freeze_time
+  
+  2. 順序依存
+     原因: テスト間で共有状態を変更
+
+  次のステップ:
+    1. pytest + coverage を導入して実プロジェクトに適用
+    2. Mutation Testing (mutmut) でテスト品質を計測
+    3. Contract Testing (Pact) でマイクロサービス間を検証

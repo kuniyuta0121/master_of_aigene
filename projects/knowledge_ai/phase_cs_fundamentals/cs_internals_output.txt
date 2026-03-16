@@ -1,0 +1,770 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  CS Internals Deep Dive                                        ║
+║  OS・ネットワーク・DB内部・並行処理・GC                          ║
+║  「なぜそうなっているのか」を説明できるレベルへ                   ║
+╚══════════════════════════════════════════════════════════════════╝
+======================================================================
+Chapter 1: Operating Systems Internals
+  プロセス・メモリ・I/O — すべての基盤
+======================================================================
+
+────────────────────────────────────────────────────────────
+1.1 CPU スケジューラ実装
+────────────────────────────────────────────────────────────
+
+  Round Robin (quantum=2):
+  Process   Arrival  Burst
+  P1              0      6
+  P2              1      4
+  P3              2      2
+  P4              3      3
+
+  Gantt Chart:
+  |  P1  |  P2  |  P3  |  P1  |  P4  |  P2  |  P1  |P4 |
+  0     2     4     6     8     10    12    14 15
+
+  Average Waiting Time: 6.5
+
+    ★ スケジューリングアルゴリズム比較:
+    ┌──────────────────┬──────────┬──────────┬──────────────┐
+    │ Algorithm         │ Preemptive│ Starvation│ 用途          │
+    ├──────────────────┼──────────┼──────────┼──────────────┤
+    │ FCFS              │ No       │ No       │ バッチ処理     │
+    │ SJF               │ No       │ Yes      │ 平均待ち最小   │
+    │ SRTF (SJF+割込)   │ Yes      │ Yes      │ 理論最適       │
+    │ Round Robin       │ Yes      │ No       │ タイムシェア   │
+    │ Priority          │ Yes      │ Yes      │ リアルタイム   │
+    │ MLFQ              │ Yes      │ No       │ Linux/macOS   │
+    └──────────────────┴──────────┴──────────┴──────────────┘
+
+    Linux CFS (Completely Fair Scheduler):
+    - Red-Black Tree でプロセスを管理
+    - vruntime (仮想実行時間) が最小のプロセスを次に実行
+    - nice 値で重み付け: nice -20 (最高優先) → nice +19 (最低)
+    
+────────────────────────────────────────────────────────────
+1.2 仮想メモリ: ページテーブル & TLB シミュレーション
+────────────────────────────────────────────────────────────
+
+  Physical frames: 4, TLB entries: 4
+  Reference string: [7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2, 1, 2, 0, 1, 7, 0, 1]
+
+   Page Result        Frame Frames in Memory
+  --------------------------------------------------
+      7 PAGE_FAULT        0 [7]
+      0 PAGE_FAULT        1 [7, 0]
+      1 PAGE_FAULT        2 [7, 0, 1]
+      2 PAGE_FAULT        3 [7, 0, 1, 2]
+      0 TLB_HIT           1 [7, 0, 1, 2]
+      3 PAGE_FAULT        4 [0, 1, 2, 3]
+      0 TLB_HIT           1 [0, 1, 2, 3]
+      4 PAGE_FAULT        5 [1, 2, 3, 4]
+      2 TLB_HIT           3 [1, 2, 3, 4]
+      3 TLB_HIT           4 [1, 2, 3, 4]
+      0 PAGE_FAULT        6 [2, 3, 4, 0]
+      3 TLB_HIT           4 [2, 3, 4, 0]
+      2 TLB_HIT           3 [2, 3, 4, 0]
+      1 PAGE_FAULT        7 [3, 4, 0, 1]
+      2 PAGE_FAULT        8 [4, 0, 1, 2]
+      0 TLB_HIT           6 [4, 0, 1, 2]
+      1 TLB_HIT           7 [4, 0, 1, 2]
+      7 PAGE_FAULT        9 [0, 1, 2, 7]
+      0 TLB_HIT           6 [0, 1, 2, 7]
+      1 TLB_HIT           7 [0, 1, 2, 7]
+
+  Page Faults:  10/20 (50%)
+  TLB Hit Rate: 10/20 (50%)
+
+    ★ 面接で聞かれるポイント:
+    - TLB (Translation Lookaside Buffer): ページテーブルのキャッシュ
+    - ページフォルト時: ディスクI/O → ~10ms (CPUサイクルの100万倍)
+    - Thrashing: フレーム不足でページフォルト連発 → 性能崩壊
+    - Working Set: プロセスが頻繁にアクセスするページ集合
+    - Belady's Anomaly: フレーム増やしてもFault増えることがある (FIFO)
+      → LRU では起きない (Stack Algorithm)
+    
+────────────────────────────────────────────────────────────
+1.3 メモリアロケータ: Buddy System
+────────────────────────────────────────────────────────────
+
+  Buddy System (64 bytes total):
+    alloc(8) → addr=0 (block=2^3=8)
+    alloc(4) → addr=8 (block=2^2=4)
+    alloc(16) → addr=16 (block=2^4=16)
+    free(addr=0)
+    alloc(8) → addr=0 (block=2^3=8)
+
+    Buddy System の特徴:
+    - 分割: 要求サイズに合うまで2分割 (2^n のサイズのみ)
+    - 統合: 解放時にバディ(隣接する同サイズブロック)と自動統合
+    - 内部断片化: 最大50% (7bytes要求 → 8bytes割当)
+    - 外部断片化: なし (統合で解消)
+    - Linux kernel の物理メモリ管理で使用
+
+    ★ malloc の実際の実装 (glibc):
+    - 小さい割当 (< 128KB): sbrk() でヒープ拡張、bins で管理
+    - 大きい割当 (>= 128KB): mmap() で直接マッピング
+    - tcmalloc (Google): スレッドごとのキャッシュで高速化
+    - jemalloc (Meta): サイズクラス + arena でスケーラブル
+    
+────────────────────────────────────────────────────────────
+1.4 I/O モデル (Unix の 5つの I/O モデル)
+────────────────────────────────────────────────────────────
+
+    1. Blocking I/O (同期ブロッキング)
+       Application    Kernel
+       ──────────    ──────────
+       read() ──────→ wait for data...
+                      data ready
+                    ← copy to user
+       ← return
+       → 最もシンプル、スレッド数 = 同時接続数
+
+    2. Non-blocking I/O (同期ノンブロッキング)
+       read() ──────→ no data → EAGAIN
+       read() ──────→ no data → EAGAIN  (busy loop = CPU浪費)
+       read() ──────→ data ready → copy → return
+       → 単独ではほぼ使わない
+
+    3. I/O Multiplexing (select/poll/epoll)
+       select() ────→ wait for ANY fd ready
+                    ← fd 3 is ready
+       read(fd3) ──→ copy → return
+       → 1スレッドで数千接続を処理 (Nginx, Node.js, Redis)
+
+       select vs poll vs epoll:
+       ┌────────┬──────────┬──────────────┬──────────────┐
+       │         │ select    │ poll          │ epoll         │
+       ├────────┼──────────┼──────────────┼──────────────┤
+       │ fd上限  │ 1024      │ 無制限        │ 無制限        │
+       │ 計算量  │ O(n)      │ O(n)          │ O(1) amortized│
+       │ fd渡し  │ 毎回コピー │ 毎回コピー    │ カーネル管理   │
+       │ macOS   │ ✓         │ ✓             │ ✗ (kqueue)   │
+       │ Linux   │ ✓         │ ✓             │ ✓            │
+       └────────┴──────────┴──────────────┴──────────────┘
+
+    4. Signal-driven I/O
+       → SIGIO シグナルで通知、実用上はほぼ使わない
+
+    5. Asynchronous I/O (AIO / io_uring)
+       aio_read() ──→ return immediately
+       ... do other work ...
+       signal/callback ← data is ready in user buffer
+       → カーネルがコピーまで完了、真の非同期
+       → Linux io_uring (2019〜): 高性能非同期I/O
+
+    ★ 面接での答え方:
+    「Nginx は epoll (Level-Triggered) で I/O 多重化、
+     Node.js は libuv (epoll/kqueue の抽象化) でイベントループ、
+     Go は goroutine + netpoller (epoll) でM:N スケジューリング」
+    
+────────────────────────────────────────────────────────────
+1.5 デッドロック検出: Resource Allocation Graph
+────────────────────────────────────────────────────────────
+
+  Scenario: Dining Philosophers (simplified)
+    P1 holds R1, waits R2
+    P2 holds R2, waits R3
+    P3 holds R3, waits R1
+
+  Deadlock detected: P1 → P2 → P3 → P1
+
+    デッドロックの4条件 (Coffman conditions):
+    1. Mutual Exclusion (排他制御)
+    2. Hold and Wait (保持と待機)
+    3. No Preemption (横取り不可)
+    4. Circular Wait (循環待ち)
+    → 1つでも崩せばデッドロックは発生しない
+
+    Prevention strategies:
+    - Resource ordering: R1 < R2 < R3 の順でしか取得しない
+    - Lock timeout: タイムアウトで解放 (データベースの一般的手法)
+    - Banker's algorithm: 安全状態かチェックしてからalloc (理論的)
+    
+
+======================================================================
+Chapter 2: Networking Deep Dive
+  TCP/IP・HTTP/2・TLS — 全ての通信の基盤
+======================================================================
+
+────────────────────────────────────────────────────────────
+2.1 TCP ステートマシン
+────────────────────────────────────────────────────────────
+
+  3-Way Handshake + 4-Way Close:
+    Client: CLOSED → SYN_SENT (send SYN seq=5377)
+    Client: SYN_SENT → ESTABLISHED (recv SYN-ACK, send ACK ack=5382)
+    Client: ESTABLISHED → FIN_WAIT_1 (send FIN)
+    Client: FIN_WAIT_1 → FIN_WAIT_2 (recv ACK)
+    Client: FIN_WAIT_2 → TIME_WAIT (recv FIN, send ACK (wait 2MSL))
+    Server: CLOSED → LISTEN (passive open)
+    Server: LISTEN → SYN_RECEIVED (recv SYN, send SYN-ACK seq=5381 ack=5378)
+    Server: SYN_RECEIVED → ESTABLISHED (recv ACK)
+    Server: ESTABLISHED → CLOSE_WAIT (recv FIN, send ACK)
+    Server: CLOSE_WAIT → LAST_ACK (send FIN)
+    Server: LAST_ACK → CLOSED (recv ACK)
+
+    ★ TIME_WAIT (2MSL = 2 × Maximum Segment Lifetime):
+    - なぜ必要？ 最後のACKが失われた場合に再送できるため
+    - 問題: 高トラフィックサーバーで TIME_WAIT ソケットが溜まる
+    - 対策: SO_REUSEADDR, tcp_tw_reuse (Linux)
+
+    ★ TCP vs UDP:
+    ┌──────────┬──────────────────┬──────────────────┐
+    │           │ TCP               │ UDP               │
+    ├──────────┼──────────────────┼──────────────────┤
+    │ 接続      │ コネクション型     │ コネクションレス   │
+    │ 信頼性    │ 再送・順序保証     │ なし (ベストエフォート)│
+    │ ヘッダ    │ 20+ bytes         │ 8 bytes           │
+    │ 用途      │ HTTP, DB, SSH     │ DNS, 動画, ゲーム  │
+    │ 輻輳制御  │ あり              │ なし               │
+    └──────────┴──────────────────┴──────────────────┘
+    
+────────────────────────────────────────────────────────────
+2.2 TCP 輻輳制御シミュレーション
+────────────────────────────────────────────────────────────
+
+  AIMD (Additive Increase, Multiplicative Decrease):
+   Round     cwnd Phase
+  ---------------------------------------------
+       0        2 ██ Slow Start
+       1        4 ████ Slow Start
+       2        8 ████████ Slow Start
+       3       16 ████████████████ Slow Start
+       4       17 █████████████████ Congestion Avoidance
+       5       18 ██████████████████ Congestion Avoidance
+       6       19 ███████████████████ Congestion Avoidance
+       7       20 ████████████████████ Congestion Avoidance
+       8       21 █████████████████████ Congestion Avoidance
+       9       22 ██████████████████████ Congestion Avoidance
+      10       23 ███████████████████████ Congestion Avoidance
+      11       24 ████████████████████████ Congestion Avoidance → LOSS
+      12        2 ██ Slow Start
+      13        4 ████ Slow Start
+      14        8 ████████ Slow Start
+      15       16 ████████████████ Slow Start
+
+    輻輳制御アルゴリズムの進化:
+    - Tahoe (1988): Loss → cwnd=1, Slow Start から再開
+    - Reno  (1990): Fast Recovery, Loss → cwnd=ssthresh/2
+    - CUBIC (2008): Linux デフォルト, 3次関数で cwnd 増加
+    - BBR   (2016): Google, 帯域幅とRTTを推定して最適化
+      → 従来: ロスベース (パケット落ちてから減速)
+      → BBR: モデルベース (帯域推定に基づき制御)
+    
+────────────────────────────────────────────────────────────
+2.3 HTTP バージョン比較
+────────────────────────────────────────────────────────────
+
+    HTTP/1.1 の Head-of-Line Blocking:
+    ┌──────────┐     ┌──────────┐
+    │ Browser   │     │ Server   │
+    │           │     │          │
+    │ GET /a ──→│     │          │  1つのTCPで
+    │ (wait...) │     │←── /a    │  1リクエスト/レスポンスずつ
+    │ GET /b ──→│     │          │  → 遅いレスポンスが後続をブロック
+    │ (wait...) │     │←── /b    │
+    └──────────┘     └──────────┘
+    → 対策: 6並列TCP接続 (ブラウザ), ドメインシャーディング
+
+    HTTP/2 のストリーム多重化:
+    ┌──────────┐     ┌──────────┐
+    │ Browser   │     │ Server   │
+    │           │     │          │  1つのTCPで
+    │ Stream 1 ←→ GET /a        │  複数ストリームを多重化
+    │ Stream 3 ←→ GET /b        │  → アプリ層の HoL は解消
+    │ Stream 5 ←→ GET /c        │  → TCP層の HoL は残る
+    └──────────┘     └──────────┘
+
+    HTTP/2 の追加機能:
+    - HPACK: ヘッダ圧縮 (Huffman + 動的テーブル)
+    - Server Push: リクエスト前にリソースをプッシュ
+    - Stream Priority: 優先度付きリソース配信
+
+    HTTP/3 (QUIC):
+    ┌──────────┐     ┌──────────┐
+    │ Browser   │     │ Server   │
+    │           │     │          │  UDP上のQUICプロトコル
+    │ Stream 1 ←→ independent   │  ストリーム間で独立
+    │ Stream 3 ←→ independent   │  → TCP層の HoL も解消
+    │ Stream 5 ←→ independent   │  → 0-RTT接続確立
+    └──────────┘     └──────────┘
+
+    ┌────────────┬──────────┬──────────┬──────────┐
+    │             │ HTTP/1.1  │ HTTP/2    │ HTTP/3    │
+    ├────────────┼──────────┼──────────┼──────────┤
+    │ Transport   │ TCP       │ TCP       │ QUIC(UDP) │
+    │ Multiplexing│ No        │ Yes       │ Yes       │
+    │ Header圧縮  │ No        │ HPACK     │ QPACK     │
+    │ HoL Blocking│ App+TCP   │ TCP only  │ None      │
+    │ 接続確立    │ 1-3 RTT   │ 1-3 RTT   │ 0-1 RTT   │
+    │ TLS        │ Optional  │ Optional  │ Built-in  │
+    └────────────┴──────────┴──────────┴──────────┘
+    
+────────────────────────────────────────────────────────────
+2.4 DNS 解決シミュレーション
+────────────────────────────────────────────────────────────
+
+  Resolving: www.google.com
+    1. Query Root Server (.)
+    2. Query TLD Server (.com)
+    3. Query Authoritative Server
+       Auth → 142.250.80.4 (TTL=300s)
+
+  Resolving: www.google.com
+    Cache HIT: www.google.com → 142.250.80.4 (TTL remaining)
+
+  Resolving: api.google.com
+    1. Query Root Server (.)
+    2. Query TLD Server (.com)
+    3. Query Authoritative Server
+       Auth → 142.250.80.5 (TTL=60s)
+
+    ★ DNS の重要概念:
+    - 再帰クエリ: クライアント→リゾルバ (リゾルバが全部やる)
+    - 反復クエリ: リゾルバ→各サーバー (参照を返す)
+    - Anycast: 同じIPを複数拠点に、最寄りのサーバーに到達
+    - DNS over HTTPS (DoH): プライバシー保護、ポート443
+    - TTL設計: 短い(60s)=柔軟だがクエリ増、長い(86400s)=効率的だが変更遅い
+    
+────────────────────────────────────────────────────────────
+2.5 ロードバランシングアルゴリズム
+────────────────────────────────────────────────────────────
+
+  Servers: web-1 (weight=3), web-2 (weight=2), web-3 (weight=1)
+
+  Weighted Round Robin (12 requests):
+    web-1: 6 ██████
+    web-2: 4 ████
+    web-3: 2 ██
+
+    ┌────────────────────┬────────────────────────────────┐
+    │ Algorithm           │ 特徴                            │
+    ├────────────────────┼────────────────────────────────┤
+    │ Round Robin         │ シンプル、均等分散               │
+    │ Weighted RR         │ サーバー性能差を考慮             │
+    │ Least Connections   │ 動的負荷に適応                  │
+    │ IP Hash             │ セッション維持 (Sticky)          │
+    │ Consistent Hashing  │ サーバー増減時の再分散が最小     │
+    │ Random              │ シンプル、大量サーバーで有効     │
+    │ Power of 2 Choices  │ ランダム2台から少ない方を選択   │
+    └────────────────────┴────────────────────────────────┘
+
+    L4 vs L7 Load Balancer:
+    - L4 (Transport): IP+Port で振り分け、高速 (AWS NLB)
+    - L7 (Application): URL/Header で振り分け、柔軟 (AWS ALB, Nginx)
+    
+
+======================================================================
+Chapter 3: Database Internals
+  B-Tree・LSM-Tree・MVCC — DBの中身を理解する
+======================================================================
+
+────────────────────────────────────────────────────────────
+3.1 B-Tree 実装
+────────────────────────────────────────────────────────────
+
+  Inserting: [10, 20, 5, 6, 12, 30, 7, 17]
+
+  B-Tree structure:
+[10, 20]
+    [6]
+        [5]
+        [7]
+    []
+        [12, 17]
+    []
+        [30]
+
+  Search 12: True
+  Search 15: False
+
+    B-Tree vs B+ Tree:
+    ┌──────────────┬──────────────────┬──────────────────┐
+    │               │ B-Tree            │ B+ Tree           │
+    ├──────────────┼──────────────────┼──────────────────┤
+    │ データ格納    │ 全ノード          │ リーフのみ         │
+    │ リーフ連結    │ なし              │ リンクドリスト     │
+    │ 範囲検索      │ 遅い (木を走査)   │ 速い (リーフ走査)  │
+    │ ディスクI/O  │ 多い              │ 少ない (ファンアウト大)│
+    │ 使用例       │ MongoDB           │ MySQL InnoDB, PostgreSQL│
+    └──────────────┴──────────────────┴──────────────────┘
+
+    ★ B+ Tree が DB で好まれる理由:
+    1. 高いファンアウト → 木の深さが浅い → ディスクI/O少ない
+    2. リーフの連結 → 範囲クエリ (WHERE x BETWEEN 10 AND 20) が高速
+    3. 内部ノードにデータなし → メモリに載りやすい
+    
+────────────────────────────────────────────────────────────
+3.2 LSM-Tree (Log-Structured Merge-Tree)
+────────────────────────────────────────────────────────────
+
+  LSM-Tree Operations:
+    PUT user:1=Alice
+    PUT user:2=Bob
+    FLUSH MemTable → SSTable-L0 (3 keys)
+    PUT user:1=Alice_v2
+    GET user:1 → Alice_v2 (MemTable (HIT))
+    DELETE user:2 (tombstone)
+    GET user:2 → None (MemTable (tombstone → deleted))
+    FLUSH MemTable → SSTable-L1 (3 keys)
+    PUT user:5=Eve
+
+    LSM-Tree の特徴:
+    - Write 最適化: 全ての書き込みはシーケンシャル (WAL + MemTable)
+    - Read: MemTable → L0 → L1 → ... (Bloom Filter で高速化)
+    - Compaction: SSTable をマージ → tombstone 削除、read 高速化
+      - Size-Tiered (STCS): 同サイズのSSTableをマージ (Cassandra default)
+      - Leveled (LCS): レベルごとにサイズ制限 (RocksDB default)
+    - Write Amplification: 同じデータが複数回書かれる (compactionのため)
+
+    B-Tree vs LSM-Tree:
+    ┌──────────────┬──────────────────┬──────────────────┐
+    │               │ B-Tree            │ LSM-Tree          │
+    ├──────────────┼──────────────────┼──────────────────┤
+    │ Write         │ ランダムI/O       │ シーケンシャルI/O  │
+    │ Read          │ O(log n)          │ 複数レベル走査     │
+    │ Space         │ 断片化あり        │ コンパクト          │
+    │ 使用例       │ MySQL, PostgreSQL │ Cassandra, RocksDB │
+    └──────────────┴──────────────────┴──────────────────┘
+    
+────────────────────────────────────────────────────────────
+3.3 MVCC (Multi-Version Concurrency Control)
+────────────────────────────────────────────────────────────
+
+  Snapshot Isolation デモ:
+    T1: begin → write x=10 → commit
+    T2: begin (before T1 commit) → read x → ???
+
+    T2 reads x = 10
+    → T2 は T1 の書き込みを見えない (Snapshot Isolation)
+    → T2 のスナップショットは T1 commit 前だから
+
+    T3 (after T1 commit) reads x = 10
+    → T3 は T1 の書き込みが見える
+
+    Transaction Isolation Levels:
+    ┌────────────────────┬────────┬──────────┬─────────┬──────────┐
+    │ Level               │Dirty   │Non-repeat│Phantom  │Write Skew│
+    │                     │Read    │able Read │Read     │          │
+    ├────────────────────┼────────┼──────────┼─────────┼──────────┤
+    │ Read Uncommitted    │ ✗      │ ✗        │ ✗       │ ✗        │
+    │ Read Committed      │ ✓      │ ✗        │ ✗       │ ✗        │
+    │ Repeatable Read     │ ✓      │ ✓        │ ✗       │ ✗        │
+    │ Snapshot Isolation  │ ✓      │ ✓        │ ✓       │ ✗        │
+    │ Serializable        │ ✓      │ ✓        │ ✓       │ ✓        │
+    └────────────────────┴────────┴──────────┴─────────┴──────────┘
+    ✓ = prevented, ✗ = possible
+
+    Write Skew の例:
+    - 医師2人がオンコール、最低1人必要
+    - T1: 「2人いるから自分は外れよう」→ UPDATE set oncall=false WHERE id=1
+    - T2: 「2人いるから自分は外れよう」→ UPDATE set oncall=false WHERE id=2
+    - 結果: 0人になる (Snapshot Isolation では防げない)
+    - 対策: SELECT FOR UPDATE, Serializable Snapshot Isolation (SSI)
+    
+────────────────────────────────────────────────────────────
+3.4 Write-Ahead Log (WAL)
+────────────────────────────────────────────────────────────
+
+    WAL の原則: データを変更する前に、変更内容をログに書く。
+
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │ Client    │───→│ WAL      │───→│ Data Page │
+    │ (INSERT)  │    │ (disk)   │    │ (memory)  │
+    └──────────┘    └──────────┘    └──────────┘
+                     ↓ fsync()        ↓ checkpoint
+                    永続化保証        遅延書き込み
+
+    Crash Recovery:
+    1. WAL をスキャン
+    2. committed だがデータページに反映されてない → REDO
+    3. uncommitted でデータページに書かれてしまった → UNDO
+    → ARIES アルゴリズム (Analysis, Redo, Undo)
+
+    PostgreSQL の WAL:
+    - WAL segment: 16MB ファイル
+    - LSN (Log Sequence Number): WAL 内の位置
+    - Replication: WAL を replica に送信 (Streaming Replication)
+    - Point-in-Time Recovery: WAL をリプレイして任意時点に復元
+
+    ★ 面接で聞かれるポイント:
+    Q: 「なぜ直接データファイルに書かないのか？」
+    A: 「データページの更新はランダムI/O。WALはシーケンシャルI/Oで
+       高速。また、部分書き込み(torn write)からも保護される。
+       1回のトランザクションで複数ページを更新する場合、
+       WALなしではアトミック性を保証できない。」
+    
+
+======================================================================
+Chapter 4: Concurrency & Parallelism
+  ロック・ロックフリー・CAS — 正しく並行処理を書く
+======================================================================
+
+────────────────────────────────────────────────────────────
+4.1 ロック実装の比較
+────────────────────────────────────────────────────────────
+
+    ┌──────────────┬──────────────────────────────────────────┐
+    │ Lock Type     │ 特徴                                      │
+    ├──────────────┼──────────────────────────────────────────┤
+    │ Spinlock      │ ビジーウェイト、短いCS向け、コンテキスト切替なし│
+    │ Mutex         │ スリープ、長いCS向け、カーネル介入あり       │
+    │ RWLock        │ 読み取り並行、書き込み排他                  │
+    │ Semaphore     │ N個同時アクセス (リソースプール)             │
+    │ Condition Var │ 条件を満たすまで待機 (Producer-Consumer)     │
+    └──────────────┴──────────────────────────────────────────┘
+
+    CS = Critical Section (臨界領域)
+
+    いつどれを使うか:
+    - Spinlock: マイクロ秒以下のCS、マルチコア、カーネル内
+    - Mutex: ミリ秒以上のCS、ユーザースペース
+    - RWLock: 読み取り >> 書き込み (キャッシュ, 設定)
+    - Semaphore: コネクションプール (max=10 など)
+    
+────────────────────────────────────────────────────────────
+4.2 Lock-Free データ構造 (Compare-And-Swap)
+────────────────────────────────────────────────────────────
+
+  Lock-Free Stack: pushed 1,2,3,4,5
+  Popped: [5, 4, 3, 2, 1]
+  CAS retries: 0
+
+    CAS (Compare-And-Swap):
+    ┌─────────────────────────────────────────┐
+    │ CAS(addr, expected, new):                │
+    │   atomic {                               │
+    │     if *addr == expected:                 │
+    │       *addr = new                        │
+    │       return true                        │
+    │     else:                                │
+    │       return false  // 他スレッドが変更済 │
+    │   }                                      │
+    └─────────────────────────────────────────┘
+
+    ABA 問題:
+    - Thread 1: read A, prepare CAS(A→C)
+    - Thread 2: change A→B→A  (元に戻った!)
+    - Thread 1: CAS succeeds (Aに見えるから) → 危険
+    - 対策: Tagged pointer (バージョン番号を付与)
+
+    Lock-Free vs Lock-Based:
+    - Lock-Free: デッドロックなし、Priority Inversion なし
+    - Lock-Free: 実装が複雑、ABA問題、メモリ管理が困難
+    - 実用: java.util.concurrent, C++ <atomic>, Go sync/atomic
+    
+────────────────────────────────────────────────────────────
+4.3 スレッドプール & Work Stealing
+────────────────────────────────────────────────────────────
+
+    Thread Pool アーキテクチャ:
+
+    ┌─────────────────────────────────────────────┐
+    │                Task Queue                    │
+    │  [Task1] [Task2] [Task3] [Task4] [Task5]    │
+    └─────────────────┬───────────────────────────┘
+                      │ dequeue
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+    ┌───────┐    ┌───────┐    ┌───────┐
+    │Worker 1│    │Worker 2│    │Worker 3│
+    │(Thread)│    │(Thread)│    │(Thread)│
+    └───────┘    └───────┘    └───────┘
+
+    Work Stealing (Java ForkJoinPool):
+    - 各ワーカーが自分のデキュー(両端キュー)を持つ
+    - 自分のキューが空 → 他のワーカーのキューから steal
+    - LIFO で自分のタスク実行、FIFO で他から steal
+    → キャッシュ局所性 + 負荷分散を両立
+
+    サイズ設計:
+    - CPU-bound: threads = CPU cores (or cores + 1)
+    - I/O-bound: threads = CPU cores × (1 + wait_time/compute_time)
+    - 例: 4 cores, I/O 80%/CPU 20% → 4 × (1 + 4) = 20 threads
+
+    Python の制約:
+    - GIL: CPU-bound は threading で並列化できない
+    - 対策: multiprocessing, C拡張, asyncio (I/O-bound)
+    
+────────────────────────────────────────────────────────────
+4.4 並行処理パターン
+────────────────────────────────────────────────────────────
+
+    1. Producer-Consumer (Bounded Buffer)
+       ┌──────────┐   ┌─────────┐   ┌──────────┐
+       │ Producer  │──→│ Queue   │──→│ Consumer  │
+       │ (produce) │   │ (N=10)  │   │ (consume) │
+       └──────────┘   └─────────┘   └──────────┘
+       - Queue満 → Producerブロック
+       - Queue空 → Consumerブロック
+       - Python: queue.Queue (thread-safe)
+
+    2. Reader-Writer Lock
+       - 複数Reader同時OK、Writer排他
+       - Writer starvation に注意
+       → Write-preferring or Fair lock
+
+    3. Double-Checked Locking (Singleton)
+       if instance is None:         # 1st check (no lock)
+           with lock:
+               if instance is None:  # 2nd check (with lock)
+                   instance = create()
+       → Java: volatile, Python: threading.Lock
+
+    4. Read-Copy-Update (RCU)
+       - Read: ロックなし、古いバージョンを読む可能性
+       - Update: コピー→変更→ポインタ差し替え (atomic)
+       - 古いバージョンの解放: Grace Period 後
+       → Linux kernel で多用 (routing table, etc.)
+
+    5. Actor Model (Erlang, Akka)
+       - 各Actor: 独自のstate + mailbox
+       - 共有状態なし → ロック不要
+       - メッセージパッシングで通信
+       → Erlang/OTP: 10万+の軽量プロセス
+    
+
+======================================================================
+Chapter 5: Compiler & Runtime Internals
+  Pythonの中身・GC・JIT — 言語の裏側を理解する
+======================================================================
+
+────────────────────────────────────────────────────────────
+5.1 簡易コンパイラ: Lexer → Parser → AST → 評価
+────────────────────────────────────────────────────────────
+
+  Expression: (2 + 3) * 4 - 6 / 2
+
+  Tokens: [('LPAREN', '('), ('NUMBER', 2.0), ('PLUS', '+'), ('NUMBER', 3.0), ('RPAREN', ')'), ('STAR', '*'), ('NUMBER', 4.0), ('MINUS', '-'), ('NUMBER', 6.0), ('SLASH', '/'), ('NUMBER', 2.0)]
+
+  AST:
+      (-
+      (*
+        (+
+          2.0
+          3.0)
+        4.0)
+      (/
+        6.0
+        2.0))
+
+  Result: 17.0
+
+────────────────────────────────────────────────────────────
+5.2 Garbage Collection アルゴリズム
+────────────────────────────────────────────────────────────
+
+  Object Graph:
+    Root → A → B → D
+             → C
+    E ↔ F (cycle, no root)
+    G (isolated)
+
+  Collected (garbage): ['E', 'F', 'G']
+  Remaining: ['A', 'B', 'C', 'D']
+
+    GC アルゴリズム比較:
+    ┌─────────────────┬───────────┬──────────┬───────────────┐
+    │ Algorithm         │ Pause Time│ Throughput│ 使用例         │
+    ├─────────────────┼───────────┼──────────┼───────────────┤
+    │ Mark-Sweep        │ 長い      │ 高い     │ 基本形          │
+    │ Mark-Compact      │ 長い      │ 高い     │ 断片化防止       │
+    │ Copying GC        │ 中        │ 中       │ 世代別の若い世代 │
+    │ Generational      │ 短い(Minor)│ 高い     │ JVM, Python     │
+    │ G1 (Garbage First)│ 制御可能  │ 高い     │ Java 11+ default│
+    │ ZGC / Shenandoah  │ < 10ms    │ やや低い │ Java 15+, 大ヒープ│
+    └─────────────────┴───────────┴──────────┴───────────────┘
+
+    CPython の GC:
+    1. Reference Counting (主要): 参照が0になったら即解放
+       → メリット: 確定的、低レイテンシ
+       → デメリット: 循環参照を回収できない
+    2. Generational GC (補助): 循環参照を回収
+       → 世代0 (新) → 世代1 (中) → 世代2 (老)
+       → 世代0が最も頻繁にGC実行
+       → gc.collect() で手動実行可能
+
+    ★ 面接質問: 「循環参照があるとPythonではメモリリークする？」
+    回答: 「しない。参照カウントでは回収できないが、
+          世代別GCが定期的に循環参照を検出・回収する。
+          ただし __del__ を持つオブジェクトの循環参照は
+          Python 3.4 未満では回収できなかった (PEP 442 で修正)」
+    
+────────────────────────────────────────────────────────────
+5.3 Python dict の内部実装
+────────────────────────────────────────────────────────────
+
+    CPython dict: Open Addressing + Perturbation Probing
+
+    ┌──────────────────────────────────────────────┐
+    │ Hash Table (compact dict, Python 3.6+)       │
+    │                                               │
+    │ indices:  [_, 0, _, _, 1, _, _, 2]            │
+    │ entries:  [(hash_a, 'key_a', val_a),          │
+    │            (hash_b, 'key_b', val_b),          │
+    │            (hash_c, 'key_c', val_c)]          │
+    └──────────────────────────────────────────────┘
+
+    Probing (衝突解決):
+    j = hash(key) & mask
+    perturb = hash(key)
+    while slot_occupied:
+        j = (5 * j + perturb + 1) & mask
+        perturb >>= 5
+    → 線形探索より分散が良い
+
+    Resize:
+    - 2/3 以上埋まったら拡張 (×2 or ×4)
+    - テーブルサイズは常に 2^n
+    - 全エントリを再ハッシュ (O(n))
+
+    サイズの実際:
+    - 空 dict: 64 bytes (Python 3.12)
+    - key追加ごとに entries に追加
+    - 大きなdictは indices + entries で効率的
+
+    ★ 面接: 「Python の dict の計算量は？」
+    - 平均: O(1) (lookup, insert, delete)
+    - 最悪: O(n) (全キーが衝突)
+    - 実際: ハッシュ関数が良いため、ほぼ O(1)
+    - 順序保証: Python 3.7+ で挿入順序を保証 (仕様)
+    
+
+======================================================================
+推奨書籍 (CS Internals)
+======================================================================
+
+    - "Operating Systems: Three Easy Pieces" (OSTEP) — 無料オンライン
+    - "Computer Networking: A Top-Down Approach" by Kurose & Ross
+    - "Database Internals" by Alex Petrov
+    - "Designing Data-Intensive Applications" by Martin Kleppmann
+    - "The Art of Multiprocessor Programming" by Herlihy & Shavit
+    - "Crafting Interpreters" by Robert Nystrom — 無料オンライン
+    
+
+  ★ 優先度順まとめ (この順で覚える):
+
+  【Tier 1: 最優先 — 面接・実務で即必要】
+    ・TCP/IP基礎 (3-way handshake, 輻輳ウィンドウの概念)
+    ・プロセス/スレッド (違い, コンテキストスイッチ, スケジューリング基礎)
+    ・B-Tree/インデックス (B+ Tree, なぜDBで使われるか)
+    ・メモリ管理基礎 (仮想メモリ, ページング, スタック vs ヒープ)
+
+  【Tier 2: 重要 — 実務で頻出】
+    ・HTTP/1.1 vs 2 vs 3 (多重化, QUIC, ヘッド・オブ・ライン・ブロッキング)
+    ・MVCC/トランザクション分離レベル (Snapshot Isolation, Write Skew)
+    ・デッドロック検出 (Wait-for Graph, タイムアウト, 予防戦略)
+
+  【Tier 3: 上級 — シニア以上で差がつく】
+    ・LSM-Tree (Write最適化, Compaction戦略, B-Treeとの比較)
+    ・輻輳制御 (CUBIC/BBR) (なぜBBRが優れるか, 帯域推定)
+    ・Lock-Free データ構造 (CAS, ABA問題, Tagged Pointer)
+    ・Work Stealing (ForkJoinPool, デキューベースの負荷分散)
+
+  【Tier 4: 専門 — Staff+/特定ドメインで必要】
+    ・Buddy System (メモリアロケータ, 断片化管理)
+    ・Lexer/Parser/AST (コンパイラフロントエンド, DSL設計)
+    ・GC実装 (Mark-Sweep, Generational, ZGC/Shenandoah)
+    ・epoll/io_uring (非同期I/O, イベント駆動サーバーの内部)
+

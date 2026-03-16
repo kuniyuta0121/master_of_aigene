@@ -1,0 +1,604 @@
+
+**********************************************************************
+*  COMPILER & RUNTIME INTERNALS                                    *
+*  From source code to execution: the complete pipeline             *
+**********************************************************************
+
+======================================================================
+1. LEXER -- Regex-Based Tokenizer
+======================================================================
+
+The lexer (scanner) converts raw source text into a stream of tokens.
+Each token has a type, a value, and a source position for error reporting.
+
+Key design choices:
+  - Combined regex: all patterns merged into one regex with named groups
+    -> Python's re engine picks the first match (longest match per group)
+  - Position tracking: line/column updated as we scan
+  - Keyword resolution: identifiers checked against keyword table post-match
+  - Handles: integers, floats, strings (with escapes), operators, delimiters
+
+Real compilers (GCC, Clang, V8) use hand-written lexers for speed,
+but regex-based lexers (flex, Python re) are fine for learning.
+
+  Source: 'let x = 42 + y * (3 - 1); # compute\nif x > 10 then "big" else "small"'
+
+    Token(LET, 'let', (1:1))
+    Token(IDENTIFIER, 'x', (1:5))
+    Token(EQ, '=', (1:7))
+    Token(NUMBER, 42, (1:9))
+    Token(PLUS, '+', (1:12))
+    Token(IDENTIFIER, 'y', (1:14))
+    Token(STAR, '*', (1:16))
+    Token(LPAREN, '(', (1:18))
+    Token(NUMBER, 3, (1:19))
+    Token(MINUS, '-', (1:21))
+    Token(NUMBER, 1, (1:23))
+    Token(RPAREN, ')', (1:24))
+    Token(SEMICOLON, ';', (1:25))
+    Token(IF, 'if', (2:1))
+    Token(IDENTIFIER, 'x', (2:4))
+    Token(GT, '>', (2:6))
+    Token(NUMBER, 10, (2:8))
+    Token(THEN, 'then', (2:11))
+    Token(STRING, 'big', (2:16))
+    Token(ELSE, 'else', (2:22))
+    Token(STRING, 'small', (2:27))
+    Token(EOF, None, (2:34))
+
+======================================================================
+2. PARSER -- Pratt Parser (Operator Precedence)
+======================================================================
+
+Pratt parsing (TDOP) elegantly handles operator precedence without
+separate grammar rules per precedence level.
+
+Core idea:
+  - Each token has a binding power (precedence number)
+  - nud (null denotation): how token acts as prefix/atom (e.g. -x, literal)
+  - led (left denotation): how token acts as infix (e.g. x + y)
+  - parse_expr(min_prec) keeps consuming tokens while their prec > min_prec
+
+Advantages over recursive descent:
+  - Adding operators = adding one entry, not new grammar rule
+  - Precedence is just a number comparison
+  - Used in real compilers: V8 (JavaScript), rustc (partially), Lua
+
+  Source: let result = if x > 0 then x * 2 + f(y, 3) else -x
+
++- Let(result)
+   +- If
+      |- BinOp(>)
+      |  |- Ident(x)
+      |  +- Number(0)
+      |- BinOp(+)
+      |  |- BinOp(*)
+      |  |  |- Ident(x)
+      |  |  +- Number(2)
+      |  +- Call
+      |     |- Ident(f)
+      |     |- Ident(y)
+      |     +- Number(3)
+      +- UnaryOp(-)
+         +- Ident(x)
+
+======================================================================
+3. TYPE INFERENCE -- Simplified Hindley-Milner
+======================================================================
+
+Hindley-Milner (HM) type inference can determine types WITHOUT annotations.
+Used in: ML, Haskell, Rust (partially), TypeScript (partially).
+
+Algorithm W steps:
+  1. Assign fresh type variables to unknowns
+  2. Generate constraints from AST structure
+  3. Solve constraints via unification (Robinson's algorithm)
+  4. Apply resulting substitution to get concrete types
+
+Key concepts:
+  - Substitution: maps type variables to types {t1 := Int, t2 := Bool}
+  - Unification: given t1 and t2, find substitution making them equal
+  - Occurs check: prevents infinite types (t1 = List[t1])
+
+Comparison across languages:
+  Language     | Type System       | Inference Level
+  -------------|-------------------|------------------
+  Python       | Dynamic (gradual) | None (runtime)
+  TypeScript   | Structural        | Local + contextual
+  Rust         | Nominal + traits  | Local (within fn body)
+  Haskell/ML   | HM + extensions   | Global (full program)
+  Java/C#      | Nominal           | Limited (var, diamond)
+
+  let x = 42                           =>  Int   (Int from literal)
+  let y = if true then 1 else 2        =>  Int   (Int from if-branches)
+  let a = 3 + 4                        =>  Int   (Int from arithmetic)
+  let b = 10 > 5                       =>  Bool   (Bool from comparison)
+
+  Type error detection:
+    'let bad = 1 + true' => ERROR: Type mismatch: Int vs Bool
+
+======================================================================
+4. IR & OPTIMIZATION -- Three-Address Code
+======================================================================
+
+Intermediate Representation (IR) bridges the gap between AST and machine code.
+Three-address code: at most one operator per instruction, explicit temporaries.
+
+  Source:  x = (a + b) * (a + b) - 2 * 3
+  IR:     t1 = a + b
+          t2 = a + b      <- common subexpression
+          t3 = t1 * t2
+          t4 = 2 * 3      <- constant foldable
+          t5 = t3 - t4
+
+Optimization passes (applied in order):
+  1. Constant folding: evaluate 2*3 -> 6 at compile time
+  2. Common subexpression elimination: t2 = t1 (reuse a+b)
+  3. Copy propagation: replace t2 with t1 in later uses
+  4. Dead code elimination: remove unused assignments
+
+Real compilers (LLVM, GCC) apply 50+ optimization passes iteratively.
+
+  Source: let x = (a + b) * (a + b) - 2 * 3
+
+  --- Unoptimized IR ---
+      t1 = a + b
+      t2 = a + b
+      t3 = t1 * t2
+      t4 = 2
+      t5 = 3
+      t6 = t4 * t5
+      t7 = t3 - t6
+      x = t7
+
+  --- After constant folding ---
+      t1 = a + b
+      t2 = a + b
+      t3 = t1 * t2
+      t4 = 2
+      t5 = 3
+      t6 = t4 * t5
+      t7 = t3 - t6
+      x = t7
+
+  --- After CSE ---
+      t1 = a + b
+      t2 = t1
+      t3 = t1 * t2
+      t4 = 2
+      t5 = 3
+      t6 = t4 * t5
+      t7 = t3 - t6
+      x = t7
+
+  --- After copy propagation ---
+      t1 = a + b
+      t2 = t1
+      t3 = t1 * t1
+      t4 = 2
+      t5 = 3
+      t6 = t4 * t5
+      t7 = t3 - t6
+      x = t7
+
+  --- After dead code elimination ---
+      t1 = a + b
+      nop
+      t3 = t1 * t1
+      t4 = 2
+      t5 = 3
+      t6 = t4 * t5
+      t7 = t3 - t6
+      x = t7
+
+======================================================================
+5. REGISTER ALLOCATION -- Graph Coloring & Linear Scan
+======================================================================
+
+Register allocation maps unlimited virtual registers (temporaries) to
+a fixed number of physical CPU registers. This is an NP-hard problem
+(equivalent to graph coloring), so compilers use heuristics.
+
+Two main approaches:
+
+  Graph Coloring (Chaitin, 1981):
+    1. Build interference graph: edge between vars alive at same time
+    2. Simplify: remove nodes with degree < K (K = num registers)
+    3. Select: assign colors in reverse removal order
+    4. Spill: if stuck, move a variable to memory (stack)
+    Used in: GCC, LLVM (with enhancements)
+
+  Linear Scan (Poletto, 1999):
+    1. Compute live intervals (start/end for each variable)
+    2. Walk intervals left-to-right, greedily assign registers
+    3. Spill the longest-lived variable when registers exhausted
+    Used in: JIT compilers (V8, HotSpot C1) for fast compilation
+
+  IR instructions:
+      a = 1
+      b = 2
+      c = a + b
+      d = 3
+      e = c * d
+      f = e - a
+      g = f + b
+
+  Liveness (live-in, live-out):
+    [0] in={}                   out={'a'}
+    [1] in={'a'}                out={'a', 'b'}
+    [2] in={'a', 'b'}           out={'a', 'c', 'b'}
+    [3] in={'a', 'c', 'b'}      out={'a', 'c', 'd', 'b'}
+    [4] in={'a', 'c', 'd', 'b'} out={'a', 'b', 'e'}
+    [5] in={'a', 'b', 'e'}      out={'f', 'b'}
+    [6] in={'f', 'b'}           out={}
+
+  Interference graph:
+    a -- ['b', 'c', 'd', 'e']
+    b -- ['a', 'c', 'd', 'e', 'f']
+    c -- ['a', 'b', 'd']
+    d -- ['a', 'b', 'c']
+    e -- ['a', 'b']
+    f -- ['b']
+    g -- []
+
+  Graph coloring (3 registers):
+    a -> SPILL
+    b -> R2
+    c -> R1
+    d -> R0
+    e -> R0
+    f -> R0
+    g -> R0
+
+  Linear scan (3 registers):
+    a -> R2
+    b -> R1
+    c -> R0
+    d -> SPILL
+    e -> R0
+    f -> R2
+    g -> R2
+
+======================================================================
+6. GARBAGE COLLECTION
+======================================================================
+
+  --- 6a. Mark-Sweep GC ---
+
+  The simplest tracing GC. Two phases:
+    Mark: traverse from roots, mark all reachable objects
+    Sweep: free all unmarked objects
+
+  Pros: handles cycles, simple implementation
+  Cons: stop-the-world pauses, heap fragmentation
+
+    Before GC: Heap: ['A', 'B', 'C', 'D'], Roots: ['A']
+    After GC:  Heap: ['A', 'B', 'C'], Roots: ['A'] (freed 1 object: D)
+
+  --- 6b. Copying Collector (Cheney's Algorithm) ---
+
+  Divides heap into two semi-spaces (from/to).
+    1. Allocate in from-space
+    2. When full, copy live objects to to-space (BFS via scan pointer)
+    3. Swap spaces; from-space is now clean
+
+  Pros: no fragmentation (compaction built-in), allocation = pointer bump
+  Cons: wastes 50% of heap, copies live objects (expensive if many alive)
+  Used in: Java young generation, many Lisp/Scheme implementations
+
+    Before: Space[0..5]: ['X', 'Y', 'Z', 'garbage1', 'garbage2']
+    After:  Space[0..3]: ['X', 'Y', 'Z'] (freed 2: garbage1, garbage2, unreachable)
+
+  --- 6c. Generational GC ---
+
+  Observation: most objects die young (generational hypothesis).
+  Strategy: separate heap into generations:
+    - Nursery (young gen): small, collected frequently (minor GC)
+    - Tenured (old gen): large, collected rarely (major GC)
+    - Objects that survive N minor GCs get promoted to tenured
+
+  Write barrier: when old object references new object, record it in
+  a "remembered set" so minor GC can find cross-generation references.
+
+  Used by: JVM (G1, ZGC, Shenandoah), .NET, V8, Python (via gc module)
+
+    Initial:     Nursery: ['A', 'B', 'C', 'D'], Tenured: [], Minor GCs: 0, Major GCs: 0
+    After alloc: Nursery: ['A', 'B', 'C', 'E'], Tenured: [], Minor GCs: 1, Major GCs: 0
+    After minor: Nursery: [], Tenured: ['A', 'B', 'C'], Minor GCs: 2, Major GCs: 0
+    After 2nd:   Nursery: [], Tenured: ['A', 'B', 'C'], Minor GCs: 3, Major GCs: 0
+
+  --- 6d. Reference Counting (CPython approach) ---
+
+  Each object has a reference count. When it reaches 0, object is freed.
+
+  Pros: immediate reclamation, no pauses, simple
+  Cons: overhead per assignment, cannot handle cycles alone
+
+  CPython solution: ref counting + periodic cycle detector
+  The cycle detector uses "tentative decrement":
+    1. For all container objects, decrement refs' counts by internal refs
+    2. Objects with count > 0 have external references (roots)
+    3. Unreachable from roots = cyclic garbage
+
+    After dropping external refs: [RC(P, rc=1), RC(Q, rc=1), RC(R, rc=1)]
+    All alive (cycle keeps them)! refcounts: P=1, Q=1, R=1
+    Cycle detector found: [['P', 'Q', 'R']]
+    After cycle collection: []
+
+  --- 6e. Tri-Color Marking (Concurrent GC) ---
+
+  For concurrent GC, we need to allow mutator to run during collection.
+  Tri-color abstraction:
+    WHITE: not yet visited (garbage candidate)
+    GRAY:  discovered but children not scanned yet
+    BLACK: fully scanned (alive)
+
+  Invariant: no BLACK object points directly to a WHITE object
+  (maintained via write barriers: SATB or incremental update)
+
+  Process: roots->GRAY, then repeatedly pick GRAY, scan its refs, mark BLACK
+  When no GRAY left, all WHITE objects are garbage.
+
+    Roots marked GRAY: [A=G, B=W, C=W, D=W, E=W]
+    Step 2: scan A -> BLACK: [A=B, B=G, C=W, D=W, E=W]
+    Step 3: scan B -> BLACK: [A=B, B=B, C=G, D=W, E=W]
+    Step 4: scan C -> BLACK: [A=B, B=B, C=B, D=W, E=W]
+    Sweep: freed 2 objects: [A=B, B=B, C=B]
+
+  --- 6f. Modern GC Concepts (G1, ZGC, Shenandoah) ---
+
+  G1 (Garbage First) - JVM default since Java 9:
+    - Divides heap into equal-sized regions (not contiguous generations)
+    - Each region can be: Eden, Survivor, Old, Humongous
+    - Collects regions with most garbage first (hence "Garbage First")
+    - Mixed collections: young + some old regions
+    - Target: configurable pause time goal (e.g., 200ms)
+
+  ZGC (Z Garbage Collector) - JVM, ultra-low latency:
+    - Colored pointers: metadata stored in pointer bits
+      (marked0, marked1, remapped, finalizable)
+    - Load barriers: when reading a reference, fix it up if needed
+    - Concurrent everything: marking, relocation, reference processing
+    - Pause times < 10ms regardless of heap size (tested up to 16TB)
+    - Region-based: small (2MB), medium (32MB), large (N*2MB)
+
+  Shenandoah - OpenJDK alternative to ZGC:
+    - Brooks forwarding pointers: extra word per object for relocation
+    - Concurrent compaction via forwarding pointer indirection
+    - Similar pause characteristics to ZGC, different mechanism
+
+  Key concepts comparison:
+    Collector    | Concurrent Mark | Concurrent Compact | Barrier Type
+    -------------|-----------------|--------------------|--------------
+    G1           | Yes             | Partial (evac)     | Write (SATB)
+    ZGC          | Yes             | Yes                | Load
+    Shenandoah   | Yes             | Yes                | Load + Write
+    Serial/CMS   | CMS only        | No                 | Write
+
+======================================================================
+7. JIT COMPILATION
+======================================================================
+
+JIT (Just-In-Time) compilation converts bytecode/IR to native machine code
+at runtime, guided by profiling data.
+
+Key techniques:
+
+  Hot Method Detection:
+    Count method invocations. When count > threshold, trigger compilation.
+    JVM: invocation counter + backedge counter (loop iterations).
+
+  Tiered Compilation (JVM HotSpot):
+    Tier 0: Interpreter (collect profile data)
+    Tier 1: C1 baseline compiler (fast compile, modest optimization)
+    Tier 2: C2 optimizing compiler (slow compile, aggressive optimization)
+
+  Inline Caching (V8, HotSpot):
+    Cache the resolved method for a callsite based on receiver type.
+    Monomorphic: 1 type seen -> direct call (fastest)
+    Polymorphic: 2-4 types -> linear search
+    Megamorphic: too many types -> always do full lookup
+
+  On-Stack Replacement (OSR):
+    A long-running loop is still in interpreted code.
+    OSR compiles the method and switches to compiled code mid-execution.
+    Requires mapping interpreter state to compiled frame layout.
+
+  Deoptimization:
+    Optimized code made assumptions (e.g., "x is always int").
+    When assumption breaks, bail out to interpreter with correct state.
+    Uncommon trap: patched into compiled code at speculation points.
+
+  --- Tiered Compilation Simulation ---
+    [JIT] calculateTotal: interpreted -> baseline (call #10)
+    [JIT] calculateTotal: baseline -> optimized (call #100)
+    [JIT] parseInput: interpreted -> baseline (call #10)
+    [DEOPT] calculateTotal: optimized -> interp (reason: type guard failed: expected Int, got String, deopt #1)
+    [JIT] calculateTotal: interpreted -> baseline (call #121)
+    [JIT] calculateTotal: baseline -> optimized (call #121)
+
+  --- Inline Cache Simulation ---
+    Call Circle.draw() -> IC state: monomorphic, cached: 1 types
+    Call Circle.draw() -> IC state: monomorphic, cached: 1 types
+    Call Circle.draw() -> IC state: monomorphic, cached: 1 types
+    Call Square.draw() -> IC state: polymorphic, cached: 2 types
+    Call Triangle.draw() -> IC state: polymorphic, cached: 3 types
+    Call Hexagon.draw() -> IC state: polymorphic, cached: 4 types
+    Call Pentagon.draw() -> IC state: megamorphic, cached: 0 types
+    Call Star.draw() -> IC state: megamorphic, cached: 0 types
+
+  --- On-Stack Replacement ---
+    [OSR] longLoop: on-stack replacement at iteration 1500
+
+======================================================================
+8. RUNTIME MEMORY -- Stack Frames & Object Layout
+======================================================================
+
+  Stack Frame Layout (x86-64, simplified):
+  +-----------------------+  High address
+  |   Caller's frame      |
+  +-----------------------+
+  |   Return address      |  <- pushed by CALL instruction
+  +-----------------------+
+  |   Saved RBP (old FP)  |  <- frame pointer (RBP)
+  +-----------------------+
+  |   Local var 1         |  [RBP - 8]
+  |   Local var 2         |  [RBP - 16]
+  |   ...                 |
+  +-----------------------+
+  |   Spilled registers   |
+  +-----------------------+
+  |   Outgoing args       |  <- stack pointer (RSP)
+  +-----------------------+  Low address
+
+  Calling Conventions (x86-64 System V ABI):
+    Args 1-6:  RDI, RSI, RDX, RCX, R8, R9
+    Float args: XMM0-XMM7
+    Return:    RAX (integer), XMM0 (float)
+    Callee-saved: RBX, RBP, R12-R15
+    Caller-saved: RAX, RCX, RDX, RSI, RDI, R8-R11
+
+  Windows x64 is different:
+    Args: RCX, RDX, R8, R9 (only 4 in registers)
+    32-byte "shadow space" always reserved on stack
+
+  Escape Analysis:
+    Determines if an object's lifetime is bounded by its creating method.
+
+    No escape:   Object used only within the method
+                 -> Allocate on stack (no GC needed!)
+                 -> Scalar replacement: break object into local vars
+
+    Arg escape:  Object passed to called method but doesn't outlive caller
+                 -> May still stack-allocate if callee is inlined
+
+    Global escape: Object stored in field, returned, or assigned to global
+                 -> Must heap-allocate
+
+    Example (Java/Go):
+      func newPoint(x, y int) *Point {
+          p := &Point{x, y}   // p escapes (returned)
+          return p             // -> must heap-allocate
+      }
+      func distance(a, b Point) float64 {
+          dx := a.x - b.x     // dx does NOT escape
+          dy := a.y - b.y     // -> stack allocated
+          return math.Sqrt(dx*dx + dy*dy)
+      }
+
+  Object Header Layout (JVM HotSpot, 64-bit):
+  +--------------------+
+  | Mark Word (8 bytes)|  hash code, GC age, lock state, GC bits
+  +--------------------+
+  | Klass Pointer (4B) |  compressed class pointer -> method table (vtable)
+  +--------------------+
+  | Instance fields     |  laid out by field type, with alignment padding
+  +--------------------+
+  | Padding (0-7 bytes)|  align to 8-byte boundary
+  +--------------------+
+
+  Vtable (Virtual Method Table):
+  +--------------------+
+  | Klass metadata     |
+  +--------------------+
+  | vtable[0]          |  -> Object.hashCode native code
+  | vtable[1]          |  -> Object.equals native code
+  | vtable[2]          |  -> MyClass.myMethod native code
+  +--------------------+
+
+  Virtual dispatch: obj->klass->vtable[method_index]()
+    - 2 pointer dereferences (cache-friendly if hot)
+    - Devirtualization: JIT proves only one implementation -> direct call
+
+  Memory alignment matters:
+    struct Bad  { char a; long b; char c; }  // 24 bytes (padding!)
+    struct Good { long b; char a; char c; }  // 16 bytes (packed)
+
+  --- Escape Analysis Simulation ---
+    point                escape=global   -> HEAP
+    temp_buffer          escape=none     -> STACK (scalar replacement possible)
+    shared_map           escape=global   -> HEAP
+    callback_arg         escape=arg      -> HEAP (maybe stack if inlined)
+    helper_obj           escape=none     -> STACK (scalar replacement possible)
+
+======================================================================
+9. LEARNING PRIORITY -- Tier 1-4
+======================================================================
+
+  TIER 1 -- Must Know (Interview Essentials)
+  -------------------------------------------
+  [x] Garbage Collection: mark-sweep, generational, GC roots concept
+      -> "Explain how GC works in JVM/Python/Go"
+      -> Know: stop-the-world vs concurrent, generational hypothesis
+  [x] Stack vs Heap: when objects go where, stack frame basics
+      -> "Why is stack allocation faster? What causes stack overflow?"
+  [x] Reference counting vs tracing GC trade-offs
+      -> CPython uses refcount + cycle detector. JVM uses tracing only.
+  [x] Basic compilation pipeline: source -> tokens -> AST -> IR -> machine code
+      -> Know the stages even if you can't implement them
+
+  TIER 2 -- Should Know (Senior Engineer Level)
+  -----------------------------------------------
+  [x] Type systems: static vs dynamic, structural vs nominal
+      -> TypeScript: structural. Java: nominal. Python: dynamic (gradual).
+  [x] JIT basics: why V8/JVM are fast, tiered compilation concept
+      -> Interpreter collects profiles, JIT optimizes hot code
+  [x] Inline caching: why polymorphic code is slower
+      -> Monomorphic callsites are 10-100x faster than megamorphic
+  [x] IR and basic optimizations: constant folding, dead code elimination
+      -> LLVM IR is SSA-based; optimizations are composable passes
+  [x] Escape analysis: stack allocation optimization
+      -> Go does this aggressively; JVM since Java 6
+
+  TIER 3 -- Deep Knowledge (Compiler/Runtime Engineer)
+  -----------------------------------------------------
+  [x] Pratt parsing / operator precedence parsing
+      -> Elegant alternative to recursive descent for expressions
+  [x] Register allocation: graph coloring, linear scan
+      -> Graph coloring: optimal but NP-hard. Linear scan: JIT-friendly.
+  [x] Hindley-Milner type inference: unification algorithm
+      -> Foundation of ML/Haskell type systems. Rust uses partial HM.
+  [x] Tri-color marking, concurrent GC invariants
+      -> SATB (snapshot-at-beginning) vs incremental update barriers
+  [x] Copying collector: Cheney's algorithm, semi-space
+  [x] On-stack replacement, deoptimization
+
+  TIER 4 -- Expert (Language Implementor)
+  -----------------------------------------
+  [ ] SSA construction (dominance frontiers, phi nodes)
+  [ ] Register allocation with coalescing (Iterated Register Coalescing)
+  [ ] Advanced GC: ZGC colored pointers, Shenandoah Brooks pointers
+  [ ] Partial evaluation, supercompilation
+  [ ] Profile-guided optimization (PGO), auto-vectorization
+  [ ] Polymorphic inline caches with guards and side exits
+  [ ] Garbage collection for real-time systems (Metronome, RTGC)
+
+  Key Interview Questions:
+  ========================
+  Q: "How does Python manage memory?"
+  A: Reference counting for immediate cleanup + cyclic garbage collector
+     (generational, 3 generations) for cycles. gc module lets you control it.
+
+  Q: "Why is Java faster than Python for compute?"
+  A: JVM JIT (C2) compiles hot methods to native code with type speculation,
+     inlining, loop unrolling, vectorization. CPython is pure interpreter
+     (though PyPy has a tracing JIT, and Python 3.13+ adds basic JIT).
+
+  Q: "What happens when you call a virtual method?"
+  A: Look up object's class pointer -> find vtable -> index into vtable
+     -> call function pointer. JIT can devirtualize if only one impl exists.
+
+  Q: "Explain how V8 executes JavaScript."
+  A: Parse -> AST -> Ignition (bytecode interpreter, collects type feedback)
+     -> TurboFan (optimizing JIT using Sea of Nodes IR)
+     -> Deoptimize if type assumptions fail.
+     Inline caches at every property access / method call.
+
+  Q: "What is escape analysis and why does it matter?"
+  A: Compiler proves object doesn't escape method scope -> allocates on stack
+     instead of heap -> no GC pressure, better cache locality. Go and JVM
+     both do this. Key for high-allocation-rate code (e.g., iterators).
+
+======================================================================
+END -- All compiler & runtime topics covered.
+======================================================================

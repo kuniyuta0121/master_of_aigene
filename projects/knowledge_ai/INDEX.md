@@ -1,6 +1,6 @@
 # KnowledgeAI - 全体目次 (Table of Contents)
 
-**総ファイル数: 54ファイル / 約75,300行**
+**総ファイル数: 63ファイル / 約87,600行**
 **対象: データサイエンティスト → テックリード/PM (Google/Tesla/IBM レベル)**
 
 ---
@@ -9,9 +9,26 @@
 
 | ファイル | 行数 | 内容 |
 |---------|------|------|
-| [unified_system_story.py](unified_system_story.py) | 3,612 | 「TechPulse」構築物語 - 全54ファイルの知識を1つのシステムで串刺し (13 Chapter) |
+| [unified_system_story.py](unified_system_story.py) | 3,612 | 「TechPulse」構築物語 - 全知識を1つのシステムで串刺し (13 Chapter) |
 
 > 全体像を掴みたいなら、まずこのファイルを読んでから各詳細ファイルに進むのがおすすめ。
+
+## 深掘り解説シリーズ (用語定義・なぜ・アナロジー・面接対策)
+
+| ファイル | 行数 | 内容 |
+|---------|------|------|
+| [unified_system_story_explained.py](unified_system_story_explained.py) | 2,727 | TechPulse全13章の深掘り解説 |
+| [compiler_runtime_explained.py](compiler_runtime_explained.py) | 1,244 | Lexer/Parser/AST・型推論・IR最適化・GC全種・JIT・バイトコード |
+| [concurrency_explained.py](concurrency_explained.py) | 955 | メモリモデル・同期プリミティブ・Lock-Free・デッドロック・async/await・Go/Actor・分散並行 |
+| [data_engineering_explained.py](data_engineering_explained.py) | 1,015 | 正規化・SQL深掘り・NoSQL・DB内部・Airflow/dbt・Kafka/Flink・レイクハウス |
+| [data_science_explained.py](data_science_explained.py) | 1,435 | 統計・ML/DL基礎・Transformer・LLM・RAG・エージェント・MLOps・評価・ガードレール |
+| [programming_practices_explained.py](programming_practices_explained.py) | 2,513 | テスト戦略・パフォーマンス・Python高度・GoF全23パターン・SOLID・Go/TS比較 |
+| [frontend_explained.py](frontend_explained.py) | 1,673 | ブラウザレンダリング・V8・React/Next.js・状態管理・TypeScript・Web API・ビルドツール |
+| [leadership_explained.py](leadership_explained.py) | 1,280 | Staff+・チームトポロジー・SPACE・アジャイル・PM・組織設計・ADR・ビジネス思考 |
+| [security_explained.py](security_explained.py) | 938 | 暗号学・PKI/TLS・OWASP・OAuth/JWT・ゼロトラスト・クラウド/コンテナセキュリティ |
+| [system_design_explained.py](system_design_explained.py) | 1,213 | 面接フレームワーク・設計問題9選・概算・DB選定・マイクロサービス |
+
+> 各ファイルは全用語を初出で定義し、「なぜ」を必ず説明。⚠誤解と【面接向けまとめ】付き。
 
 ---
 
