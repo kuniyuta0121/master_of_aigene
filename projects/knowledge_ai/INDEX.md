@@ -540,6 +540,18 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 ### フェーズ別サマリ
 
 ```
+Cat 目次:
+  1  アルゴリズム・データ構造      11 インフラ・DevOps・SRE
+  2  OS・ハードウェア              12 セキュリティ・暗号
+  3  ネットワーク                  13 プログラミング実践
+  4  ストレージエンジン            14 フロントエンド
+  5  コンパイラ・ランタイム        15 PM・リーダーシップ
+  6  並行・並列処理                16 クラウドサービス
+  7  データベース・データエンジニアリング  17 QA・品質保証
+  8  API・バックエンド             18 PMO・ポートフォリオ管理
+  9  AI・機械学習                  19 ITIL / ITSM
+  10 アーキテクチャ・分散システム  20 ネットワーク実務
+
 Phase  期間目安     冊数   カバーカテゴリ
 ─────  ──────────  ─────  ────────────────────────────────────
   1    2〜3ヶ月    5冊    Cat 1, 2, 3, 7(基礎)
@@ -550,6 +562,53 @@ Phase  期間目安     冊数   カバーカテゴリ
   6    随時        選択    Cat 5, 6 + 各カテゴリ深化
 ─────  ──────────  ─────  ────────────────────────────────────
 合計   10〜15ヶ月  26冊(必須) + 選択で全20カテゴリ網羅
+```
+
+### 書籍のコスト最適化ガイド
+
+> 全冊購入だと15万円以上。サブスク+無料版+日本語本の組み合わせで半額以下に。
+
+#### サブスクリプション
+
+| サービス | 費用 | 内容 |
+|---------|------|------|
+| **ACM会員 (最推奨)** | $99/年 (≒月1,250円) | O'Reilly Online Learning が**付帯特典**。推薦書の英語版の約半数が読み放題。論文アクセスも付く |
+| O'Reilly Online Learning (単体) | $49/月 (≒月7,500円) | ACM経由の方が圧倒的に安い |
+| Kindle Unlimited | 980円/月 | 技術書は少ない。入門書が稀に対象。期待薄 |
+
+**ACM 会員で読める推薦書 (O'Reilly カタログ):**
+DDIA, Building Microservices, SRE本, Hands-On ML, Fluent Python,
+Learning React, Go言語による並行処理, Database Internals, Streaming Systems,
+Java Concurrency in Practice, Fundamentals of Data Engineering,
+System Design Interview, Web Performance in Action, Zero Trust Networks,
+マイクロサービスパターン, Engineering a Compiler, GC Handbook ほか
+
+#### 無料で全文公開されている推薦書
+
+| 書籍 | URL |
+|------|-----|
+| Crafting Interpreters | craftinginterpreters.com |
+| Is Parallel Programming Hard | kernel.org (PDF) |
+| ハイパフォーマンス ブラウザ ネットワーキング | hpbn.co |
+| SRE サイトリライアビリティエンジニアリング | sre.google/books |
+| Googleのソフトウェアエンジニアリング | abseil.io/resources/swe-book |
+
+#### 購入が必要な日本語書籍（サブスクでカバーできない分）
+
+| Phase | 書籍 | 参考価格 |
+|-------|------|---------|
+| 1 | プログラムはなぜ動くのか / ネットワークはなぜつながるのか / 達人に学ぶDB設計 / SQL実践入門 / アルゴリズムとデータ構造(大槻) | 約13,000円 |
+| 2 | 暗号技術入門(結城) / 徳丸本 / ゼロから作るDL 1-2巻 | 約11,000円 |
+| 3 | テスト駆動開発 / Head First デザインパターン / Docker/K8s入門 / Web API Good Parts | 約13,000円 |
+| 4 | アジャイルサムライ / プロを目指す人のためのTS入門 | 約6,000円 |
+| 5 | AWS SAA教科書 / テストの教科書 / PMの基本 / マスタリングTCP/IP | 約12,000円 |
+| **合計** | **約17冊** | **約55,000円** |
+
+```
+コスト比較:
+  全冊購入          → 約150,000円+
+  ACM + 日本語本のみ → 約 70,000円 (ACM $99/年 + 日本語本 55,000円)
+                       ★ 約半額で全20カテゴリ網羅
 ```
 
 ---
