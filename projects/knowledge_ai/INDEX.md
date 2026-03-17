@@ -1,6 +1,6 @@
 # KnowledgeAI - 全体目次 (Table of Contents)
 
-**総ファイル数: 67ファイル / 約91,500行**
+**総ファイル数: 70ファイル / 約95,000行**
 **対象: データサイエンティスト → テックリード/PM (Google/Tesla/IBM レベル)**
 
 ---
@@ -186,7 +186,10 @@ Tier 4: Cell-Based Architecture, Phi Accrual, Merkle Tree, TLA+, 形式検証
 | 26 | [design_patterns.py](phase_programming/design_patterns.py) | 2,653 | GoF 23パターン・SOLID・並行処理パターン・Repository・DI | Tier1 |
 | 27 | [performance_engineering.py](phase_programming/performance_engineering.py) | 894 | CPU cache・Bloom Filter・HyperLogLog・Tail Latency・ベンチマーク | Tier2 |
 | 28 | [polyglot_guide.py](phase_programming/polyglot_guide.py) | 1,238 | 5言語比較(Python/TS/Go/Rust/Java)・言語選定フレームワーク | Tier2 |
-| 29 | [testing_engineering.py](phase_programming/testing_engineering.py) | 1,296 | テストピラミッド・5種テストダブル・TDD・Property-Based Testing・Mutation Testing・Contract Testing | Tier1 |
+| 29 | [lang_java_explained.py](phase_programming/lang_java_explained.py) | 1,231 | Python使いのためのJava入門・型宣言・Stream API・Spring Boot・対照表 | Tier2 |
+| 30 | [lang_go_explained.py](phase_programming/lang_go_explained.py) | 1,406 | Python使いのためのGo入門・goroutine/channel・if err!=nil・ポインタ・対照表 | Tier2 |
+| 31 | [lang_rust_explained.py](phase_programming/lang_rust_explained.py) | 931 | Python使いのためのRust入門・所有権/借用・String vs &str・Option/Result・対照表 | Tier2 |
+| 32 | [testing_engineering.py](phase_programming/testing_engineering.py) | 1,296 | テストピラミッド・5種テストダブル・TDD・Property-Based Testing・Mutation Testing・Contract Testing | Tier1 |
 
 **面接での重要度: ★★★★☆**
 ```
@@ -397,6 +400,14 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | 『Head First デザインパターン 第2版』 | Freeman, Robson | GoF 23パターンをストーリー形式で解説 |
 | 『Fluent Python 第2版』邦訳あり | Luciano Ramalho | Python上級者向け。メタクラス・async・型ヒント |
 
+### 言語習得（Java / Go / Rust）
+
+| 書籍 | 著者 | ひとこと |
+|------|------|---------|
+| 『Effective Java 第3版』 | Joshua Bloch | Java実践の聖典。Stream/Optional/並行処理のベストプラクティス |
+| 『Go言語プログラミングエッセンス』 | mattn (松本行弘 監修) | 日本語Go本の決定版。実践パターンを網羅 |
+| 『プログラミングRust 第2版』 | Blandy, Orendorff, Tindall | Rust体系書。所有権・トレイト・async を丁寧に解説。邦訳あり |
+
 ### フロントエンド
 
 | 書籍 | 著者 | ひとこと |
@@ -537,6 +548,56 @@ cd lang_java_maven && mvn package -q && java -jar target/maven-demo-1.0.0.jar
 | Web性能 | ☆ Web Performance in Action | Cat 14 |
 | PM認定 | ☆ PMBOK 第7版 | Cat 18 |
 
+### 言語トラック（Phase 1〜3 と並行）── SES案件の幅を広げる
+
+> Python以外に Java / Go / Rust を「案件で使える」レベルまで引き上げる。
+> 読書フェーズと並行し、毎日30分〜1時間を言語学習に充てる。
+
+#### 月 1〜2: Java（最も案件に直結）
+
+| やること | 教材 | ゴール |
+|----------|------|--------|
+| 基礎確認 | 既存の `lang_java_maven.py` を通読 | Java構文・Maven・型システムを再確認 |
+| 書籍 | ★ 『Effective Java 第3版』(Joshua Bloch) | Stream/Optional/ジェネリクスの実践イディオム |
+| 実践 | Spring Boot で REST API 1本作る | CRUD + バリデーション + JUnit5 テスト |
+| **到達点** | 「Java可」で SES 案件に応募できる状態 | |
+
+#### 月 3〜4: Go（クラウドネイティブ案件用）
+
+| やること | 教材 | ゴール |
+|----------|------|--------|
+| 基礎確認 | 既存の `lang_go.py` を通読 | Go構文・goroutine・channel を再確認 |
+| 書籍 | ★ 『Go言語プログラミングエッセンス』(mattn) | 日本語でGoの実践パターンを網羅 |
+| 実践 | net/http + goroutine で API 1本 | JSON API + graceful shutdown + テスト |
+| **到達点** | 「Go可」で K8s/マイクロサービス案件に応募できる | |
+
+#### 月 5〜6: Rust（長期的な差別化）
+
+| やること | 教材 | ゴール |
+|----------|------|--------|
+| 基礎確認 | 既存の `lang_rust.py` を通読 | 所有権・借用・ライフタイムを再確認 |
+| 書籍 | ★ 『プログラミングRust 第2版』(O'Reilly) | Rust の体系書。所有権〜async まで |
+| 実践 | CLI ツール 1本 (clap + serde + tokio) | ファイル処理 or API クライアント |
+| **到達点** | 「Rust可」でシステムプログラミング案件に応募できる | |
+
+#### 言語トラック サマリ
+
+```
+月     言語    書籍                            成果物
+────  ──────  ──────────────────────────────  ────────────────────
+1-2   Java    Effective Java 第3版            Spring Boot REST API
+3-4   Go      Go言語プログラミングエッセンス      Go net/http API
+5-6   Rust    プログラミングRust 第2版          Rust CLI ツール
+────  ──────  ──────────────────────────────  ────────────────────
+                                              → 3言語で案件応募可能
+```
+
+> **SES案件の需要**: Java >>> Go > Rust。Java を最優先にすることで
+> 最短で案件の幅が広がる。Go は K8s/クラウド案件で急増中。
+> Rust は案件数は少ないが単価が高く、長期的な差別化になる。
+
+---
+
 ### フェーズ別サマリ
 
 ```
@@ -561,7 +622,9 @@ Phase  期間目安     冊数   カバーカテゴリ
   5    2〜3ヶ月    5冊    Cat 16, 17, 18, 19, 20
   6    随時        選択    Cat 5, 6 + 各カテゴリ深化
 ─────  ──────────  ─────  ────────────────────────────────────
-合計   10〜15ヶ月  26冊(必須) + 選択で全20カテゴリ網羅
+  言語  Phase1-3並行  3冊    Java → Go → Rust
+─────  ──────────  ─────  ────────────────────────────────────
+合計   10〜15ヶ月  29冊(必須) + 選択で全20カテゴリ網羅
 ```
 
 ### 書籍のコスト最適化ガイド
@@ -581,7 +644,8 @@ DDIA, Building Microservices, SRE本, Hands-On ML, Fluent Python,
 Learning React, Go言語による並行処理, Database Internals, Streaming Systems,
 Java Concurrency in Practice, Fundamentals of Data Engineering,
 System Design Interview, Web Performance in Action, Zero Trust Networks,
-マイクロサービスパターン, Engineering a Compiler, GC Handbook ほか
+マイクロサービスパターン, Engineering a Compiler, GC Handbook,
+Effective Java, Programming Rust 2nd Ed. ほか
 
 #### 無料で全文公開されている推薦書
 
@@ -602,12 +666,13 @@ System Design Interview, Web Performance in Action, Zero Trust Networks,
 | 3 | テスト駆動開発 / Head First デザインパターン / Docker/K8s入門 / Web API Good Parts | 約13,000円 |
 | 4 | アジャイルサムライ / プロを目指す人のためのTS入門 | 約6,000円 |
 | 5 | AWS SAA教科書 / テストの教科書 / PMの基本 / マスタリングTCP/IP | 約12,000円 |
-| **合計** | **約17冊** | **約55,000円** |
+| 言語 | Go言語プログラミングエッセンス | 約3,000円 |
+| **合計** | **約18冊** | **約58,000円** |
 
 ```
 コスト比較:
   全冊購入          → 約150,000円+
-  ACM + 日本語本のみ → 約 70,000円 (ACM $99/年 + 日本語本 55,000円)
+  ACM + 日本語本のみ → 約 73,000円 (ACM $99/年 + 日本語本 58,000円)
                        ★ 約半額で全20カテゴリ網羅
 ```
 

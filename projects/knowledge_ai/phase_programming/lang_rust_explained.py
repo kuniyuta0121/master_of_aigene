@@ -1,0 +1,1360 @@
+#!/usr/bin/env python3
+"""
+lang_rust_explained.py - Python使いのためのRust入門ガイド
+
+「Pythonで十分じゃない？」── パフォーマンスとメモリ安全性の両立が必要な瞬間、
+Rust は最強の選択肢になる。
+
+実行方法:
+    python lang_rust_explained.py
+
+標準ライブラリのみ使用。
+"""
+
+import textwrap
+
+# ============================================================
+# ユーティリティ
+# ============================================================
+
+def section(title: str) -> None:
+    """セクション区切り"""
+    print()
+    print("=" * 70)
+    print(f"  {title}")
+    print("=" * 70)
+    print()
+
+
+def subsection(title: str) -> None:
+    print()
+    print(f"  -- {title} --")
+    print()
+
+
+def question(text: str) -> None:
+    """考えてほしい疑問"""
+    print(f"  [?] 考えてみよう: {text}")
+    print()
+
+
+def task(text: str) -> None:
+    """実装タスク"""
+    print(f"  [実装してみよう] {text}")
+    print()
+
+
+def point(text: str) -> None:
+    print(f"    - {text}")
+
+
+def code_block(title: str, code: str) -> None:
+    print(f"    --- {title} ---")
+    for line in code.strip().split("\n"):
+        print(f"    {line}")
+    print()
+
+
+def p(text: str) -> None:
+    for line in textwrap.dedent(text).strip().split("\n"):
+        print(f"  {line}")
+
+
+def table(headers: list, rows: list) -> None:
+    """シンプルなテーブル表示"""
+    widths = [max(len(str(row[i])) for row in [headers] + rows)
+              for i in range(len(headers))]
+    fmt = "  | " + " | ".join(f"{{:<{w}}}" for w in widths) + " |"
+    sep = "  +-" + "-+-".join("-" * w for w in widths) + "-+"
+    print(sep)
+    print(fmt.format(*headers))
+    print(sep)
+    for row in rows:
+        print(fmt.format(*row))
+    print(sep)
+    print()
+
+
+# ============================================================
+# 第1章: 環境と Hello World
+# ============================================================
+
+def chapter1_hello_world():
+    section("第1章: 環境と Hello World ── Rust vs Python の根本的な違い")
+
+    p("""
+    まず最も大事なことから。
+
+    Python: インタプリタ言語。書いたらすぐ動く。
+    Rust:   コンパイル言語。ビルドしてから動く。
+
+    この違いが開発体験のすべてに影響する。
+    """)
+
+    subsection("1.1 インストールと最初のプロジェクト")
+
+    p("""
+    Python には pip がある。Rust には cargo がある。
+    ただし cargo は pip よりずっと多機能。
+    パッケージマネージャ、ビルドツール、テストランナー、すべてが一体化している。
+    """)
+
+    code_block("Rust のインストール (macOS/Linux)", """
+# rustup = Rust のバージョン管理ツール (pyenv に相当)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# バージョン確認
+rustc --version
+cargo --version
+    """)
+
+    code_block("最初のプロジェクト作成", """
+# Python なら:
+#   mkdir myproject && cd myproject && touch main.py
+
+# Rust なら:
+cargo new myproject
+cd myproject
+cargo run       # ビルド + 実行を一発で
+    """)
+
+    p("""
+    cargo new で作られるファイル構成:
+
+    myproject/
+      Cargo.toml     ... pyproject.toml / requirements.txt に相当
+      src/
+        main.rs      ... main.py に相当
+    """)
+
+    subsection("1.2 Hello World を比較する")
+
+    code_block("Python vs Rust", """
+# Python:                    // Rust:
+print("Hello, world!")       fn main() {
+                                 println!("Hello, world!");
+                             }
+    """)
+
+    p("""
+    3つの違い:
+    1. fn main() {} -- Rust は必ず main 関数から開始。Python はトップレベルでOK
+    2. println!()   -- ! 付きは「マクロ」。今は「! = マクロ」とだけ覚えればOK
+    3. セミコロン ; -- 文の末尾に必要。ただしセミコロンなし = 式(値を返す)
+    """)
+
+    subsection("1.3 コンパイラは最高の教師")
+
+    code_block("Rust コンパイラの出力例", """
+error[E0308]: mismatched types
+ --> src/main.rs:3:24
+  |
+3 |     let x: i32 = "hello";
+  |            ---   ^^^^^^^ expected `i32`, found `&str`
+  |            |
+  |            expected due to this
+help: if you want to convert a string to a number, try:
+3 |     let x: i32 = "hello".parse().unwrap();
+    """)
+
+    p("""
+    コンパイラが: 何が間違い → なぜ間違い → どう直すかを全部教えてくれる。
+    Python では実行時にエラー。Rust ではコンパイル時にほとんどのバグが見つかる。
+    「コンパイルが通ったら、だいたい動く」が Rust の醍醐味。
+    """)
+
+
+# ============================================================
+# 第2章: 変数と型
+# ============================================================
+
+def chapter2_variables_and_types():
+    section("第2章: 変数と型 ── Rust の基本中の基本")
+
+    subsection("2.1 let はデフォルトで不変")
+
+    p("""
+    Python と Rust の最大の文化の違いがここに現れる。
+    """)
+
+    code_block("Python (全て可変)", """
+x = 10
+x = 20      # 何の問題もない
+x = "hello" # 型が変わっても問題ない
+    """)
+
+    code_block("Rust (デフォルト不変)", """
+let x = 10;
+// x = 20;  // コンパイルエラー! cannot assign twice to immutable variable
+
+let mut y = 10;  // mut を付けると可変になる
+y = 20;          // OK
+// y = "hello";  // エラー! 型は変えられない
+    """)
+
+    p("""
+    なぜデフォルト不変か？
+    バグの多くは「意図せず値が変わる」ことで起きる。変更箇所を明示的にする設計。
+    最初は面倒に感じるが、1週間で慣れる。
+    """)
+
+    subsection("2.2 型システム")
+
+    p("""
+    Python は動的型付け。Rust は静的型付けだが型推論がある。
+    """)
+
+    code_block("型推論と明示的な型注釈", """
+let x = 10;              // i32 と推論
+let y = 3.14;            // f64 と推論
+let z = true;            // bool
+let c = 'a';             // char (Unicode 1文字)
+let s = "hello";         // &str (文字列スライス)
+
+let x: i32 = 10;         // 明示的な型注釈
+let name: String = String::from("Yuta");
+    """)
+
+    p("""
+    整数型: i8/i16/i32/i64/i128/isize (符号あり)
+            u8/u16/u32/u64/u128/usize (符号なし)
+    Python は任意精度。Rust はサイズを選ぶ。デフォルト i32。
+    浮動小数点: f32, f64。デフォルト f64 (Python の float と同じ)。
+    usize はポインタサイズ。配列のインデックスに使う。
+    """)
+
+    subsection("2.3 シャドーイングと定数")
+
+    code_block("シャドーイングと定数", """
+let x = 5;
+let x = x + 1;       // OK! 新しい x を宣言 (前の x は隠される)
+let x = "hello";     // OK! 型を変えることもできる (別の変数を作っている)
+
+const MAX_POINTS: u32 = 100_000;  // 型注釈が必須。コンパイル時に値が決まる
+    """)
+
+    question("let mut x = 5; x = 10; と let x = 5; let x = 10; の違いは？")
+    point("let mut は同じメモリを書き換える (型は変えられない)")
+    point("シャドーイングは新しい変数を作る (型も変えられる)")
+
+
+# ============================================================
+# 第3章: 所有権 (Ownership)
+# ============================================================
+
+def chapter3_ownership():
+    section("第3章: 所有権 (Ownership) ── Rust 最大の特徴")
+
+    p("""
+    ここが Rust の核心。Python 開発者が最も戸惑うところ。
+    でも大丈夫。アナロジーを使って一歩ずつ理解しよう。
+
+    まずは「なぜ所有権が必要なのか」を理解するために、
+    3つの言語のメモリ管理を比較する。
+    """)
+
+    subsection("3.1 メモリ管理の3つのアプローチ")
+
+    p("""
+    Python (GC方式): 全自動。楽だが GC タイミングが予測不能。
+    C/C++ (手動方式): malloc/free。高速だが解放忘れ・二重解放の地獄。
+    Rust (所有権方式): コンパイラがルールに基づいて管理。安全かつ高速。学習コストが代償。
+    """)
+
+    subsection("3.2 所有権の3つのルール")
+
+    p("""
+    Rust のメモリ管理は、たった3つのルールで成り立つ:
+
+    ルール1: 各値には「所有者 (owner)」が1つだけ存在する
+    ルール2: 所有者がスコープを抜けると、値は自動的に破棄される
+    ルール3: 所有権は別の変数に「移動 (move)」できる
+    """)
+
+    p("""
+    アナロジー: 「アパートの賃貸契約」
+
+    値 = 部屋
+    所有者 = 契約者
+    スコープ = 契約期間
+
+    - 1つの部屋には契約者が1人だけ (ルール1)
+    - 契約期間が終わったら部屋は返却される (ルール2)
+    - 契約を別の人に譲渡できるが、元の人は住めなくなる (ルール3)
+    """)
+
+    subsection("3.3 move (移動) を理解する ── 最重要概念")
+
+    code_block("Python: 参照のコピー (どちらからもアクセス可能)", """
+s1 = "hello"
+s2 = s1         # s1 と s2 は同じオブジェクトを指す
+print(s1)       # OK! "hello"
+print(s2)       # OK! "hello"
+# Python では両方から自由にアクセスできる
+    """)
+
+    code_block("Rust: 所有権の移動 (元の変数は使えなくなる)", """
+let s1 = String::from("hello");
+let s2 = s1;    // 所有権が s1 から s2 に移動 (move)
+
+// println!("{}", s1);  // コンパイルエラー!
+//   error[E0382]: borrow of moved value: `s1`
+//   value used here after move
+
+println!("{}", s2);     // OK! "hello"
+    """)
+
+    p("""
+    なぜ move するのか？
+
+    String はヒープメモリを使う。もし s1 と s2 の両方が同じヒープ領域を
+    「所有」していたら、スコープを抜けるときに二重解放 (double free) が起きる。
+
+    Python の GC は参照カウントで管理するからこの問題は起きない。
+    Rust は GC なしで安全にするために、所有者を1つに限定する。
+
+    図で見ると:
+    """)
+
+    code_block("メモリの動き", """
+    move 前:
+    s1 ---> [ptr] ---> ヒープ: "hello"
+
+    move 後:
+    s1 (無効)
+    s2 ---> [ptr] ---> ヒープ: "hello"
+
+    s1 のポインタはコピーされるが、s1 自体は無効化される。
+    これにより「所有者は常に1つ」が保証される。
+    """)
+
+    subsection("3.4 clone() で明示的にコピーする")
+
+    code_block("clone: ヒープデータの深いコピー", """
+let s1 = String::from("hello");
+let s2 = s1.clone();   // ヒープ上のデータも含めて完全にコピー
+
+println!("{}", s1);     // OK! s1 はまだ有効
+println!("{}", s2);     // OK! s2 は独立したコピー
+    """)
+
+    p("""
+    Python の copy.deepcopy() に近い。ただしコストがかかる。
+    Rust では「コピーのコストを意識させる」設計になっている。
+    Python ではコピーのコストが隠蔽されている。
+    """)
+
+    subsection("3.5 Copy トレイト ── 小さい型は自動コピー")
+
+    code_block("整数は move しない (Copy される)", """
+let x = 42;
+let y = x;      // Copy! (move ではない)
+println!("{}", x);  // OK! x はまだ使える
+println!("{}", y);  // OK!
+    """)
+
+    p("""
+    i32 はスタック上4バイト → コピーは一瞬 → Copy
+    String はヒープにデータ → コピーは高コスト → move
+
+    Copy する型: 整数, 浮動小数点, bool, char, これらのタプル
+    move する型: String, Vec<T> 等のヒープを使う型
+    """)
+
+    subsection("3.6 関数と所有権")
+
+    code_block("関数に値を渡すと所有権が移動する", """
+fn take_ownership(s: String) {
+    println!("{}", s);
+}   // ここで s が破棄される
+
+fn main() {
+    let s = String::from("hello");
+    take_ownership(s);      // s の所有権が関数に移動
+
+    // println!("{}", s);   // エラー! s はもう使えない
+}
+    """)
+
+    code_block("Python ではこの問題は起きない", """
+def take_value(s):
+    print(s)
+
+s = "hello"
+take_value(s)
+print(s)       # OK! Python では参照カウントで管理される
+    """)
+
+    p("""
+    「関数に渡したら使えなくなる」は最初びっくりする。
+    でもこれが安全性の源。次の章で「借用」を学ぶと解決策がわかる。
+    """)
+
+    question("関数に String を渡して、その後も使いたい場合どうする？")
+
+    p("""
+    3つの方法がある:
+    1. clone() してからコピーを渡す (コストが高い)
+    2. 関数が所有権を返す (面倒)
+    3. 参照を渡す (借用) ← 次章で学ぶベストな方法
+    """)
+
+
+# ============================================================
+# 第4章: 借用 (Borrowing) と参照 (References)
+# ============================================================
+
+def chapter4_borrowing():
+    section("第4章: 借用 (Borrowing) と参照 (References)")
+
+    p("""
+    前章の問題:「関数に値を渡すと所有権が移動して使えなくなる」
+    解決策: 所有権を渡さずに「貸す」= 借用 (borrowing)
+    """)
+
+    subsection("4.1 不変参照 (&) ── 読むだけ貸す")
+
+    p("""
+    アナロジー: 「本を貸す」
+
+    友達に本を貸すとき、所有権は移転しない。
+    友達は読めるけど、ページを破ったり書き込んだりはしない (不変参照)。
+    あなたはまだ本の持ち主。
+    """)
+
+    code_block("不変参照の例", """
+fn calculate_length(s: &String) -> usize {
+    s.len()
+}   // s はここで消えるが、参照先のデータは破棄されない
+
+fn main() {
+    let s = String::from("hello");
+    let len = calculate_length(&s);  // &s = s への参照を渡す
+
+    println!("{} の長さは {}", s, len);  // s はまだ使える!
+}
+    """)
+
+    code_block("Python との比較", """
+# Python では何も考えずにこうなる:
+def calculate_length(s):
+    return len(s)
+
+s = "hello"
+length = calculate_length(s)
+print(f"{s} の長さは {length}")  # 当然 s は使える
+    """)
+
+    p("""
+    Rust の & は「所有権を移さずに参照だけ渡す」という明示的な宣言。
+    Python では暗黙的にすべて参照渡しのように見えるが、
+    Rust では参照と所有権の移動を区別する。
+    """)
+
+    subsection("4.2 可変参照 (&mut) ── 書き換えも許可して貸す")
+
+    p("""
+    アナロジー: 「ノートを貸す」
+
+    友達にノートを貸して「書き込んでいいよ」と言う (可変参照)。
+    ただし、同時に2人には貸せない。書き込みが衝突するから。
+    """)
+
+    code_block("可変参照の例", """
+fn add_world(s: &mut String) {
+    s.push_str(", world!");
+}
+
+fn main() {
+    let mut s = String::from("hello");  // mut が必要!
+    add_world(&mut s);                   // &mut = 可変参照を渡す
+
+    println!("{}", s);  // "hello, world!"
+}
+    """)
+
+    subsection("4.3 借用のルール ── データ競合を防ぐ")
+
+    p("""
+    Rust の借用には厳格なルールがある:
+
+    ルール1: 不変参照 (&T) は何個でも同時に持てる
+    ルール2: 可変参照 (&mut T) は同時に1つだけ
+    ルール3: 不変参照と可変参照は同時に持てない
+    """)
+
+    code_block("借用ルールの具体例", """
+let s = String::from("hello");
+let r1 = &s;       // OK: 不変参照
+let r2 = &s;       // OK: 不変参照は複数OK
+
+let mut s = String::from("hello");
+let r1 = &mut s;   // OK: 可変参照
+// let r2 = &mut s; // NG! 可変参照は同時に1つだけ
+
+let mut s = String::from("hello");
+let r1 = &s;       // 不変参照
+// let r2 = &mut s; // NG! 不変と可変は共存不可
+    """)
+
+    p("""
+    なぜこんなに厳しいのか？
+
+    これは「データ競合 (data race)」を防ぐため。
+    データ競合の条件:
+    1. 2つ以上のポインタが同じデータにアクセス
+    2. 少なくとも1つが書き込み
+    3. アクセスの同期が取れていない
+
+    Rust はこの条件をコンパイル時に禁止する。
+    Python では GIL がこの問題を(部分的に)隠蔽している。
+    """)
+
+    subsection("4.4 ダングリング参照の防止")
+
+    code_block("コンパイラがダングリング参照を防ぐ", """
+// この関数はコンパイルエラーになる
+// fn dangle() -> &String {
+//     let s = String::from("hello");
+//     &s  // s への参照を返そうとしている
+// }       // s はここで破棄される → 参照先が消える!
+
+// 正しくは所有権ごと返す:
+fn no_dangle() -> String {
+    let s = String::from("hello");
+    s   // 所有権を返す (move)
+}
+    """)
+
+    p("""
+    C/C++ ではダングリングポインタは実行時にクラッシュ (か静かなバグ) を引き起こす。
+    Rust ではコンパイル時に防がれる。実行する前にバグが見つかる。
+    """)
+
+    question("所有権と借用のルールをまとめると？")
+
+    p("""
+    1. 値の所有者は常に1つ
+    2. 所有権は move で移動する
+    3. & で借用 (不変参照) を作れる
+    4. &mut で可変参照を作れる (元の変数も mut である必要がある)
+    5. 不変参照はいくつでもOK、可変参照は1つだけ、混在は不可
+    6. 参照は所有者より長生きできない
+    """)
+
+
+# ============================================================
+# 第5章: 文字列
+# ============================================================
+
+def chapter5_strings():
+    section("第5章: 文字列 ── Rust で最初に躓くポイント")
+
+    p("""
+    Python では文字列は str 一種類。シンプル。
+    Rust では文字列が2種類ある。これが初心者を混乱させる。
+    """)
+
+    subsection("5.1 String と &str の違い")
+
+    p("""
+    String:
+    - ヒープ上に確保される可変の文字列
+    - 所有権を持つ
+    - Python の str に一番近い
+
+    &str (文字列スライス):
+    - 文字列データへの参照 (ポインタ + 長さ)
+    - 不変
+    - 所有権を持たない
+    """)
+
+    code_block("2つの文字列型", """
+// &str: 文字列リテラルは &str 型
+let s1: &str = "hello";         // スタック上のポインタ → バイナリ内のデータ
+
+// String: ヒープ上の可変文字列
+let s2: String = String::from("hello");  // ヒープに確保
+let s3: String = "hello".to_string();    // 同じこと
+    """)
+
+    code_block("Python との比較", """
+# Python: 文字列は1種類
+s = "hello"         # str 型。以上。
+s2 = s + " world"   # 新しい str を生成
+
+# Rust: 場面によって使い分ける
+# let s: &str = "hello";                    // 固定文字列
+# let mut s: String = String::from("hello"); // 変更する文字列
+# s.push_str(" world");                      // 直接追加できる
+    """)
+
+    subsection("5.2 よくある変換パターン")
+
+    code_block("&str から String へ", """
+let s: &str = "hello";
+let owned: String = s.to_string();
+let owned: String = String::from(s);
+let owned: String = s.to_owned();
+// 3つとも同じ結果。to_string() が最もよく使われる
+    """)
+
+    code_block("String から &str へ", """
+let owned: String = String::from("hello");
+let slice: &str = &owned;           // 自動的に変換 (Deref coercion)
+let slice: &str = owned.as_str();   // 明示的に変換
+    """)
+
+    subsection("5.3 文字列操作")
+
+    code_block("フォーマットとスライス", """
+let name = "Yuta";
+let age = 30;
+let msg = format!("My name is {name}, age {age}");  // Python の f-string 相当
+
+let s = String::from("hello world");
+let hello: &str = &s[0..5];    // "hello"  (Python: s[0:5])
+    """)
+
+    p("""
+    関数の引数には &str を使うのが一般的。String も &str も渡せる:
+    fn greet(name: &str) -> String { format!("Hello, {}!", name) }
+    greet("world");                    // &str を直接
+    greet(&String::from("world"));     // String の参照
+    """)
+
+
+# ============================================================
+# 第6章: 制御構文
+# ============================================================
+
+def chapter6_control_flow():
+    section("第6章: 制御構文")
+
+    subsection("6.1 if は式!")
+
+    code_block("Python", """
+# Python の三項演算子
+x = 10 if condition else 20
+    """)
+
+    code_block("Rust: if は値を返す", """
+let x = if condition { 10 } else { 20 };
+// if が式なので変数に代入できる。Python の三項演算子より直感的。
+    """)
+
+    subsection("6.2 ループ")
+
+    code_block("Python と Rust のループ比較", """
+# Python:                          # Rust:
+# for x in [1, 2, 3]:              for x in [1, 2, 3] {
+#     print(x)                         println!("{}", x);
+#                                  }
+
+# for i, x in enumerate(lst):     for (i, x) in vec.iter().enumerate() {
+#     print(i, x)                     println!("{} {}", i, x);
+#                                  }
+
+# while condition:                 while condition {
+#     do_something()                   do_something();
+#                                  }
+
+# while True:                      loop {
+#     if done: break                   if done { break; }
+#                                  }
+    """)
+
+    p("""
+    loop は無限ループ専用構文。値も返せる:
+    let result = loop { if done { break value; } };
+    """)
+
+    subsection("6.3 match ── 超強力なパターンマッチ")
+
+    code_block("Python match/case vs Rust match", """
+# Python 3.10+:                  // Rust:
+match status:                    match status {
+    case 200: print("OK")            200 => println!("OK"),
+    case 404: print("Not Found")     404 => println!("Not Found"),
+    case _: print("Other")           _ => println!("Other"),
+                                 }
+    """)
+
+    p("""
+    Rust の match は網羅性チェック付き。全パターンを網羅しないとコンパイルエラー。
+
+    if let: 1パターンだけ試す簡潔な構文:
+    if let Some(x) = some_value { println!("{}", x); }
+    // Python: if some_value is not None: に近い
+    """)
+
+
+# ============================================================
+# 第7章: 関数
+# ============================================================
+
+def chapter7_functions():
+    section("第7章: 関数")
+
+    subsection("7.1 基本的な関数定義")
+
+    code_block("Python vs Rust", """
+# Python:                         // Rust:
+def add(a: int, b: int) -> int:   fn add(a: i32, b: i32) -> i32 {
+    return a + b                      a + b  // セミコロンなし = 戻り値
+                                  }
+    """)
+
+    p("""
+    - Python の型ヒントは「ヒント」(無視可能)。Rust の型注釈は「契約」(違反 = エラー)
+    - Rust では引数・戻り値の型は省略不可
+    - 最後の式がセミコロンなしなら戻り値。return は早期リターン向き
+    """)
+
+    subsection("7.2 クロージャ (無名関数)")
+
+    code_block("Python の lambda と Rust のクロージャ", """
+# Python:                                // Rust:
+add_one = lambda x: x + 1               let add_one = |x| x + 1;
+list(map(lambda x: x*2, [1,2,3]))       [1,2,3].iter().map(|x| x*2).collect()
+    """)
+
+    p("""
+    クロージャの3種類 (コンパイラが自動判断、普段は気にしなくてOK):
+    Fn (読むだけ) / FnMut (書き換える) / FnOnce (所有権を取る、一度だけ)
+    move キーワードで明示的に所有権をキャプチャ:
+    let name = String::from("Yuta");
+    let greet = move || println!("Hello, {}!", name);  // name の所有権が移動
+    """)
+
+
+# ============================================================
+# 第8章: 構造体 (struct) とメソッド
+# ============================================================
+
+def chapter8_structs():
+    section("第8章: 構造体 (struct) とメソッド")
+
+    subsection("8.1 基本的な struct")
+
+    code_block("Python の class", """
+class User:
+    def __init__(self, name: str, age: int):
+        self.name = name
+        self.age = age
+    """)
+
+    code_block("Rust の struct", """
+struct User {
+    name: String,
+    age: u32,
+}
+
+// インスタンス生成:
+let user = User {
+    name: String::from("Yuta"),
+    age: 30,
+};
+    """)
+
+    subsection("8.2 impl ブロック ── メソッド定義")
+
+    code_block("Rust のメソッド (Python の class メソッドに対応)", """
+impl User {
+    fn new(name: String, age: u32) -> Self {   // コンストラクタ (__init__)
+        User { name, age }
+    }
+    fn greet(&self) -> String {                // メソッド (&self = 読むだけ)
+        format!("Hi, I'm {}", self.name)
+    }
+    fn birthday(&mut self) {                   // &mut self = 変更する
+        self.age += 1;
+    }
+    fn into_name(self) -> String {             // self = 所有権を消費
+        self.name
+    }
+}
+    """)
+
+    p("""
+    Python: self は常に1種類。
+    Rust:  &self (読むだけ) / &mut self (変更する) / self (所有権を取る) の3種類。
+    """)
+
+
+# ============================================================
+# 第9章: 列挙型 (enum)
+# ============================================================
+
+def chapter9_enums():
+    section("第9章: 列挙型 (enum) ── Rust の超強力な機能")
+
+    subsection("9.1 基本的な enum")
+
+    code_block("Python の Enum", """
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+    """)
+
+    code_block("Rust の enum", """
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+let c = Color::Red;
+    """)
+
+    subsection("9.2 データ付き enum ── Python にはない概念")
+
+    code_block("各バリアントにデータを持てる", """
+enum Shape {
+    Circle(f64),                          // 半径
+    Rectangle(f64, f64),                  // 幅, 高さ
+    Triangle { base: f64, height: f64 },  // 名前付きフィールドも可能
+}
+
+fn area(shape: &Shape) -> f64 {
+    match shape {
+        Shape::Circle(r) => std::f64::consts::PI * r * r,
+        Shape::Rectangle(w, h) => w * h,
+        Shape::Triangle { base, height } => base * height / 2.0,
+    }
+}
+    """)
+
+    subsection("9.3 Option<T> ── null の代わり")
+
+    p("""
+    Python: None チェックを忘れると実行時に AttributeError。
+    Rust:   Option<T> で「値があるかもしれない」を型で表現。チェック必須。
+    """)
+
+    code_block("Python vs Rust: None / Option の扱い", """
+# Python: チェック忘れバグ
+name = find_user(2)         # None が返る
+print(name.upper())         # AttributeError! 実行するまで気づかない
+
+// Rust: コンパイル時に防ぐ
+fn find_user(id: u32) -> Option<String> {
+    if id == 1 { Some(String::from("Yuta")) } else { None }
+}
+let name = find_user(2);
+// name.to_uppercase();     // コンパイルエラー! Option は String ではない
+match name {
+    Some(n) => println!("{}", n.to_uppercase()),
+    None => println!("User not found"),
+}
+    """)
+
+    subsection("9.4 Result<T, E> と ? 演算子 ── エラー処理")
+
+    p("""
+    Python の try/except に代わる仕組み。Result<T, E> = Ok(値) | Err(エラー)。
+    """)
+
+    code_block("Python vs Rust のエラー処理", """
+# Python:
+try:
+    content = open(path).read()
+except FileNotFoundError:
+    content = "File not found"
+
+// Rust:
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    fs::read_to_string(path)       // 失敗したら Err を返す
+}
+match read_file("hello.txt") {
+    Ok(content) => println!("{}", content),
+    Err(e) => println!("Error: {}", e),
+}
+    """)
+
+    code_block("? 演算子: エラー伝播の省略記法", """
+// ? = 「Ok なら中身を取り出す。Err ならそのまま return する」
+fn read_and_process(path: &str) -> Result<usize, std::io::Error> {
+    let content = fs::read_to_string(path)?;  // エラーなら即 return Err
+    Ok(content.len())
+}
+// Python の例外伝播に近いが、型で明示されるので一目でわかる
+    """)
+
+
+# ============================================================
+# 第10章: トレイト (Traits)
+# ============================================================
+
+def chapter10_traits():
+    section("第10章: トレイト (Traits) ── Python の ABC/Protocol に相当")
+
+    subsection("10.1 トレイト定義と実装")
+
+    code_block("Python Protocol vs Rust trait", """
+# Python:                                // Rust:
+class Summarizable(Protocol):            trait Summary {
+    def summarize(self) -> str: ...          fn summarize(&self) -> String;
+                                         }
+
+class Article:                           impl Summary for Article {
+    def summarize(self) -> str:              fn summarize(&self) -> String {
+        return f"{self.title}..."                format!("{}...", self.title)
+                                             }
+                                         }
+    """)
+
+    subsection("10.2 トレイト境界とジェネリクス")
+
+    p("""
+    デフォルト実装も可能 (メソッド本体を trait 内に書く)。
+    impl Summary for MyStruct {} だけで使える。
+    """)
+
+    code_block("トレイト境界", """
+// 「Summary トレイトを実装した型 T」だけ受け入れる
+fn notify<T: Summary>(item: &T) {
+    println!("速報: {}", item.summarize());
+}
+
+// 糖衣構文 (impl Trait 構文):
+fn notify(item: &impl Summary) {
+    println!("速報: {}", item.summarize());
+}
+    """)
+
+    subsection("10.3 derive マクロ ── 自動実装")
+
+    code_block("derive で標準トレイトを自動実装", """
+#[derive(Debug, Clone, PartialEq)]
+struct Point { x: f64, y: f64 }
+
+let p = Point { x: 1.0, y: 2.0 };
+println!("{:?}", p);        // Debug (Python の __repr__)
+let p2 = p.clone();         // Clone (Python の copy.deepcopy)
+assert_eq!(p, p2);          // PartialEq (Python の __eq__)
+    """)
+
+    p("""
+    よく使う derive: Debug, Clone, PartialEq, Hash, Serialize/Deserialize (serde)
+    Python なら __repr__, __eq__ 等を手動で書くところを一行で済ませる。
+    """)
+
+
+# ============================================================
+# 第11章: コレクション
+# ============================================================
+
+def chapter11_collections():
+    section("第11章: コレクション")
+
+    subsection("11.1 Vec<T> ── Python の list")
+
+    code_block("Python list vs Rust Vec", """
+# Python:                         // Rust:
+nums = [1, 2, 3]                  let mut nums = vec![1, 2, 3];
+nums.append(4)                    nums.push(4);
+first = nums[0]                   let first = nums[0];
+    """)
+
+    subsection("11.2 HashMap<K, V> ── Python の dict")
+
+    code_block("Python dict vs Rust HashMap", """
+# Python:                                // Rust:
+scores = {"Alice": 90}                   let mut scores = HashMap::new();
+scores["Bob"] = 85                       scores.insert("Bob", 85);
+scores.get("Alice", 0)                   scores.get("Alice").copied().unwrap_or(0);
+for k, v in scores.items():              for (k, v) in &scores {
+    print(f"{k}: {v}")                       println!("{}: {}", k, v);
+                                         }
+    """)
+
+    subsection("11.3 イテレータ ── リスト内包表記に相当")
+
+    code_block("リスト内包表記 vs イテレータチェーン", """
+# Python: [x*x for x in nums if x % 2 == 0]
+// Rust:  nums.iter().filter(|&&x| x%2==0).map(|&x| x*x).collect()
+    """)
+
+    p("""
+    イテレータは遅延評価。collect() を呼ぶまで計算されない (Python の generator 的)。
+    """)
+
+    table(
+        ["Python", "Rust", "説明"],
+        [
+            ["map(func, iter)", ".map(|x| ...)", "各要素を変換"],
+            ["filter(func, iter)", ".filter(|x| ...)", "条件で絞り込み"],
+            ["sum(iter)", ".sum()", "合計"],
+            ["any(iter)", ".any(|x| ...)", "1つでも真か"],
+            ["all(iter)", ".all(|x| ...)", "全て真か"],
+            ["enumerate(iter)", ".enumerate()", "インデックス付き"],
+            ["zip(a, b)", "a.zip(b)", "2つを組み合わせ"],
+            ["len(list)", ".count()", "要素数"],
+            ["min(iter)", ".min()", "最小値"],
+            ["max(iter)", ".max()", "最大値"],
+            ["sorted(iter)", "-- (別途)", "ソート"],
+        ]
+    )
+
+
+# ============================================================
+# 第12章: Cargo とパッケージ管理
+# ============================================================
+
+def chapter12_cargo():
+    section("第12章: Cargo とパッケージ管理")
+
+    subsection("12.1 Cargo.toml ── pyproject.toml に相当")
+
+    code_block("Cargo.toml の例", """
+[package]
+name = "my_project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+    """)
+
+    subsection("12.2 コマンド対照表")
+
+    table(
+        ["Python", "Rust (Cargo)", "説明"],
+        [
+            ["pip install pkg", "cargo add pkg", "パッケージ追加"],
+            ["python main.py", "cargo run", "実行"],
+            ["pytest", "cargo test", "テスト実行"],
+            ["flake8 / ruff", "cargo clippy", "リント"],
+            ["black / ruff format", "cargo fmt", "フォーマット"],
+            ["python -m build", "cargo build --release", "リリースビルド"],
+            ["pip install -e .", "-- (自動)", "開発モード"],
+            ["pypi.org", "crates.io", "パッケージレジストリ"],
+        ]
+    )
+
+    p("""
+    cargo はビルド/テスト/lint/フォーマットが全て標準搭載。virtualenv 不要。
+    """)
+
+    subsection("12.3 テストの書き方")
+
+    code_block("Python (pytest) vs Rust (組み込みテスト)", """
+# Python:                        // Rust:
+def test_add():                  #[cfg(test)]
+    assert add(2, 3) == 5       mod tests {
+                                     use super::*;
+                                     #[test]
+                                     fn test_add() {
+                                         assert_eq!(add(2, 3), 5);
+                                     }
+                                 }
+// テストが同じファイルに書ける! 別ファイルも可能。
+    """)
+
+
+# ============================================================
+# 第13章: Python vs Rust 対照表まとめ
+# ============================================================
+
+def chapter13_comparison_table():
+    section("第13章: Python vs Rust 対照表まとめ")
+
+    table(
+        ["概念", "Python", "Rust"],
+        [
+            ["変数宣言", "x = 10", "let x = 10;"],
+            ["可変変数", "x = 10 (常に可変)", "let mut x = 10;"],
+            ["定数", "MY_CONST = 10 (慣習)", "const MY_CONST: i32 = 10;"],
+            ["型注釈", "x: int = 10 (任意)", "let x: i32 = 10; (推論も可)"],
+            ["文字列", "str のみ", "String, &str の2種類"],
+            ["配列", "list", "Vec<T>"],
+            ["辞書", "dict", "HashMap<K, V>"],
+            ["集合", "set", "HashSet<T>"],
+            ["None", "None", "Option<T> (None/Some)"],
+            ["例外処理", "try/except", "Result<T,E> + ?演算子"],
+            ["クラス", "class", "struct + impl"],
+            ["継承", "class B(A)", "trait (継承なし、合成)"],
+            ["インタフェース", "Protocol/ABC", "trait"],
+            ["ラムダ", "lambda x: x+1", "|x| x + 1"],
+            ["内包表記", "[x*2 for x in lst]", ".iter().map().collect()"],
+            ["for文", "for x in lst:", "for x in &lst {}"],
+            ["print", "print(f\"{x}\")", "println!(\"{}\", x)"],
+            ["パッケージ", "pip / pyproject.toml", "cargo / Cargo.toml"],
+            ["テスト", "pytest", "cargo test"],
+            ["リント", "ruff / flake8", "cargo clippy"],
+            ["フォーマット", "black / ruff format", "cargo fmt"],
+            ["メモリ管理", "GC (参照カウント)", "所有権システム"],
+            ["実行方式", "インタプリタ", "コンパイル (LLVM)"],
+            ["null安全", "なし (None使用)", "Option<T>で型安全"],
+            ["並行処理", "GIL制約あり", "Send/Sync で安全保証"],
+        ]
+    )
+
+
+# ============================================================
+# 優先度順まとめ
+# ============================================================
+
+def priority_summary():
+    section("優先度順まとめ ── この順で覚える")
+
+    p("""
+    【Tier 1: 最優先 -- これがないとコードが読めない】
+
+      - let / let mut (変数宣言)
+        Rust は不変がデフォルト。mut を書いたら「ここは変わる」の宣言。
+
+      - 所有権と移動 (move)
+        値を別の変数に渡すと元は使えなくなる。
+        Rust の全てがここに繋がる。
+
+      - String vs &str
+        ヒープ上の所有データか、スライス (参照) かの違い。
+        関数の引数には &str を使うのが基本。
+    """)
+
+    p("""
+    【Tier 2: 重要 -- Rust の核心】
+
+      - 借用 (&, &mut)
+        所有権を渡さずに参照だけ貸す仕組み。
+        不変参照は複数OK、可変参照は1つだけ。
+
+      - Option<T> と Result<T, E>
+        null やエラーを型で表現。コンパイル時に処理漏れを防ぐ。
+
+      - match と ? 演算子
+        パターンマッチ (網羅性チェック付き) とエラー伝播の省略記法。
+
+      - struct と impl
+        データ構造の定義とメソッドの実装。Python の class に対応。
+    """)
+
+    p("""
+    【Tier 3: 上級 -- 自分でコードを書くために】
+
+      - トレイト (trait)
+        インタフェース。ポリモーフィズムの基盤。derive で自動実装。
+
+      - ジェネリクス <T>
+        型パラメータ。Vec<T> や HashMap<K, V> の T, K, V がこれ。
+
+      - イテレータチェーン
+        .iter().filter().map().collect() の読み書き。
+
+      - ライフタイム 'a
+        参照がどのスコープまで有効かをコンパイラに教える注釈。
+        最初は「コンパイラの指示に従って付ける」で十分。
+    """)
+
+    p("""
+    【Tier 4: 実践 -- プロジェクトで必要】
+
+      - Cargo の使い方
+        cargo run / test / clippy / fmt を日常的に使う。
+
+      - エラー型の設計
+        独自エラー型を定義して Result で返す。thiserror クレートが便利。
+
+      - クロージャの3種類 (Fn / FnMut / FnOnce)
+        普段は意識しない。コンパイラに怒られたら見直す。
+
+      - async/await (tokio)
+        非同期処理。Web サーバーやAPIクライアントで必須。
+        tokio クレートがデファクトスタンダード。
+    """)
+
+    subsection("最後に: Rust を学ぶ意味")
+
+    p("""
+    Rust を学ぶのは「Rust でコードを書く」ためだけではない。
+
+    - 所有権を理解 → Python でもメモリを意識した設計ができる
+    - 型システムを理解 → Python の型ヒントをもっと効果的に使える
+    - パフォーマンスを理解 → ボトルネック部分だけ Rust で書き直せる (PyO3)
+
+    Rust は Python を捨てるための言語ではない。
+    Python をもっと深く理解するための言語だ。
+    """)
+
+
+# ============================================================
+# 14. プロジェクト構成
+# ============================================================
+
+def chapter14_project_structure():
+    section("第14章: 中規模以上のプロジェクト構成 ── Cargo ワークスペース")
+
+    print(textwrap.dedent("""\
+    Rust は Cargo が全てを管理する。
+    中〜大規模になると「ワークスペース」で複数クレートを束ねる。
+    Python の monorepo + 複数パッケージに似た概念。
+    """))
+
+    subsection("14-1. 単一クレート (小規模)")
+
+    code_block("Rust: 小規模 CLI / ライブラリ",
+    """\
+my-tool/
+├── Cargo.toml              # パッケージ定義 (= pyproject.toml)
+├── Cargo.lock              # 依存ロック (= poetry.lock)
+├── src/
+│   ├── main.rs             # バイナリのエントリポイント (fn main)
+│   ├── lib.rs              # ライブラリのルート (他クレートから使える)
+│   ├── config.rs           # モジュール (mod config; で読み込み)
+│   ├── error.rs            # カスタムエラー型
+│   └── utils.rs
+├── tests/                  # 結合テスト (src/ の外)
+│   └── integration_test.rs
+├── benches/                # ベンチマーク
+│   └── benchmark.rs
+└── examples/               # 使用例 (cargo run --example xxx)
+    └── basic_usage.rs
+""")
+
+    point("src/main.rs = バイナリクレート、src/lib.rs = ライブラリクレート。両方持てる")
+    point("tests/ は結合テスト。ユニットテストは各 .rs ファイル内に #[cfg(test)] mod tests {} で書く")
+    point("Python と違い、テストはソースファイル内に書くのが慣習 (Go と似ている)")
+    print()
+
+    subsection("14-2. ワークスペース (中〜大規模)")
+
+    code_block("Rust: ワークスペース構成 (Web API サービス)",
+    """\
+my-platform/
+├── Cargo.toml                     # [workspace] 定義 (メンバー一覧)
+├── Cargo.lock                     # ワークスペース全体で1つのロック
+├── crates/                        # ★ クレート群 (= Python の packages/)
+│   ├── api-server/                # Web API サーバー (バイナリ)
+│   │   ├── Cargo.toml             #   依存: domain, infra
+│   │   └── src/
+│   │       ├── main.rs            #   エントリポイント
+│   │       ├── handler/           #   HTTP ハンドラー (= controller)
+│   │       │   ├── mod.rs         #   モジュール定義
+│   │       │   ├── user.rs
+│   │       │   └── order.rs
+│   │       ├── middleware.rs
+│   │       └── router.rs
+│   ├── worker/                    # バックグラウンドワーカー (バイナリ)
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       └── main.rs
+│   ├── domain/                    # ★ ドメインロジック (ライブラリ)
+│   │   ├── Cargo.toml             #   外部依存なし (純粋ロジック)
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── model/             #   エンティティ / VO
+│   │       │   ├── mod.rs
+│   │       │   ├── user.rs
+│   │       │   └── order.rs
+│   │       ├── service/           #   ビジネスロジック
+│   │       │   ├── mod.rs
+│   │       │   └── user_service.rs
+│   │       └── repository.rs      #   トレイト定義 (= interface)
+│   └── infra/                     # ★ インフラ層 (ライブラリ)
+│       ├── Cargo.toml             #   依存: domain, sqlx, redis
+│       └── src/
+│           ├── lib.rs
+│           ├── postgres.rs        #   PostgreSQL 実装
+│           ├── redis_cache.rs     #   Redis 実装
+│           └── config.rs          #   環境変数読み込み
+├── migrations/                    # DB マイグレーション (sqlx)
+│   └── 20240101_create_users.sql
+├── deployments/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+└── Makefile
+""")
+
+    subsection("14-3. Rust 固有の重要ルール")
+
+    point("mod.rs — ディレクトリをモジュールにする。Python の __init__.py に相当")
+    point("crates/ — ワークスペースのメンバー。クレート間の依存は Cargo.toml で宣言")
+    point("domain クレートは外部依存ゼロが理想 — クリーンアーキテクチャの核心")
+    point("pub / pub(crate) — Rust のアクセス制御。Go の大文字小文字に似ているが、より細かい")
+    point("features フラグ — コンパイル時に機能を ON/OFF。Python の extras に相当")
+    print()
+
+    subsection("14-4. Python との対応関係")
+
+    table(
+        ["概念", "Rust", "Python (FastAPI)"],
+        [
+            ["エントリポイント",   "crates/api-server/main.rs", "app/main.py"],
+            ["ルーティング",       "handler/ (Axum/Actix)",     "routers/"],
+            ["ビジネスロジック",   "domain/service/",           "services/"],
+            ["DB アクセス",        "infra/ (impl trait)",       "repositories/"],
+            ["データモデル",       "domain/model/",             "models/"],
+            ["設定",               "infra/config.rs",           "config.py"],
+            ["DBマイグレーション", "migrations/ (sqlx)",        "alembic/"],
+            ["ユニットテスト",     "#[cfg(test)] 同ファイル内", "tests/ (別Dir)"],
+            ["結合テスト",         "tests/ ディレクトリ",        "tests/ (別Dir)"],
+            ["ビルド設定",         "Cargo.toml (workspace)",    "pyproject.toml"],
+            ["モジュール公開",     "pub / pub(crate)",          "_ prefix (慣習)"],
+            ["パッケージ分割",     "ワークスペース + crates/",  "monorepo + packages/"],
+        ]
+    )
+
+    print(textwrap.dedent("""\
+    Rust の Cargo.toml (ワークスペース):
+
+      [workspace]
+      members = [
+          "crates/api-server",
+          "crates/worker",
+          "crates/domain",
+          "crates/infra",
+      ]
+
+    Python の pyproject.toml (monorepo) では Poetry workspace plugin や
+    uv workspace が近い概念だが、Rust の方がツール統合度が高い。
+    """))
+
+    question("domain クレートに外部依存を持たせないのはなぜか？\n"
+             "    → ビジネスロジックがフレームワークやDBに依存しない\n"
+             "    → テストが高速 (DB接続不要)\n"
+             "    → フレームワーク変更 (Axum→Actix) が domain に影響しない")
+
+
+# ============================================================
+# メイン実行
+# ============================================================
+
+def main():
+    print()
+    print("=" * 70)
+    print("  Python使いのための Rust 入門ガイド")
+    print("  ── 所有権を理解すれば、プログラミングの世界が変わる")
+    print("=" * 70)
+
+    chapter1_hello_world()
+    chapter2_variables_and_types()
+    chapter3_ownership()
+    chapter4_borrowing()
+    chapter5_strings()
+    chapter6_control_flow()
+    chapter7_functions()
+    chapter8_structs()
+    chapter9_enums()
+    chapter10_traits()
+    chapter11_collections()
+    chapter12_cargo()
+    chapter13_comparison_table()
+    priority_summary()
+    chapter14_project_structure()
+
+    print()
+    print("=" * 70)
+    print("  ガイド完了!")
+    print("  次のステップ: cargo new my_first_rust && cd my_first_rust && cargo run")
+    print("=" * 70)
+    print()
+
+
+if __name__ == "__main__":
+    main()
