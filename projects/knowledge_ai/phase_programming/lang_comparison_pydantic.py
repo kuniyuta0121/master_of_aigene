@@ -1511,10 +1511,311 @@ pub struct Order {
 
 
 # ============================================================
-# 8. 全体まとめ対応表
+# 8. パッケージ管理 ── pip / PyPI の各言語版
 # ============================================================
 
-def chapter8_summary():
+def chapter8_package_management():
+    section("8. パッケージ管理 ── pip install / PyPI の各言語版")
+
+    note("""\
+    Python の「pip install ライブラリ名」と「PyPI (pypi.org)」に相当するものが
+    各言語に存在する。ツール名・設定ファイル・コマンドを一気に比較する。
+    """)
+
+    # ------------------------------------------------------------------
+    # 8-1. ツールとリポジトリの全体像
+    # ------------------------------------------------------------------
+    subsection("8-1. ツールとリポジトリの全体像")
+
+    table(
+        ["", "Python", "Go", "Java (Maven)", "Rust"],
+        [
+            ["パッケージ管理ツール", "pip / uv / poetry",   "go (組み込み)",      "mvn / gradle",        "cargo (組み込み)"],
+            ["パッケージリポジトリ", "PyPI (pypi.org)",      "pkg.go.dev (検索)",  "Maven Central",       "crates.io"],
+            ["設定ファイル",         "pyproject.toml",       "go.mod",             "pom.xml / build.gradle","Cargo.toml"],
+            ["ロックファイル",       "uv.lock / poetry.lock","go.sum",             "pom.xml (バージョン固定)","Cargo.lock"],
+            ["インストール先",       "venv / site-packages","$GOPATH/pkg/mod",    "~/.m2/repository",    "~/.cargo/registry"],
+        ]
+    )
+
+    note("""\
+    Go と Rust はツールが言語に組み込まれている。
+    Python や Java は「どのツールを使うか」を自分で選ぶ必要がある。
+    """)
+
+    # ------------------------------------------------------------------
+    # 8-2. よく使うコマンド対応表
+    # ------------------------------------------------------------------
+    subsection("8-2. よく使うコマンド対応表")
+
+    table(
+        ["やりたいこと", "Python (pip/uv)", "Go", "Java (Maven)", "Rust (cargo)"],
+        [
+            ["パッケージをインストール",
+             "pip install requests\nuv add requests",
+             "go get github.com/xxx/yyy",
+             "pom.xml に追記\n→ mvn install",
+             "cargo add serde"],
+            ["requirements.txt から一括インストール",
+             "pip install -r requirements.txt\nuv sync",
+             "go mod download",
+             "mvn dependency:resolve",
+             "cargo build (自動)"],
+            ["パッケージを削除",
+             "pip uninstall requests",
+             "go mod tidy (未使用を削除)",
+             "pom.xml から削除\n→ mvn install",
+             "cargo remove serde"],
+            ["インストール済み一覧",
+             "pip list",
+             "go list -m all",
+             "mvn dependency:tree",
+             "cargo tree"],
+            ["パッケージを検索",
+             "pip search (廃止→pypi.org)",
+             "pkg.go.dev で検索",
+             "search.maven.org",
+             "cargo search serde"],
+            ["バージョンを上げる",
+             "pip install -U requests",
+             "go get xxx@latest",
+             "versions-maven-plugin",
+             "cargo update serde"],
+            ["未使用の依存を削除",
+             "(手動)",
+             "go mod tidy",
+             "(手動)",
+             "cargo machete (外部)"],
+            ["仮想環境を作る",
+             "python -m venv .venv\nuv venv",
+             "(不要: モジュール単位で分離)",
+             "(不要: ~/.m2 で共有)",
+             "(不要: プロジェクト単位)"],
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # 8-3. 設定ファイルの書き方比較
+    # ------------------------------------------------------------------
+    subsection("8-3. 設定ファイルの書き方比較")
+
+    compare(
+        python_code="""\
+# pyproject.toml (現代的な Python プロジェクトの標準)
+
+[project]
+name = "my-app"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic>=2.6",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.9",
+    "ruff>=0.3",
+]
+
+# インストール:
+#   uv sync            # 全依存をインストール (lockfile 使用)
+#   uv sync --dev      # dev 依存も含む
+#   pip install -e .   # 開発モード (editable install)
+""",
+
+        go_code="""\
+// go.mod ── go get / go mod tidy で自動管理
+
+module my-app    // モジュール名 (GitHub URL が慣習)
+
+go 1.22          // 最小 Go バージョン
+
+require (
+    github.com/gin-gonic/gin       v1.9.1
+    github.com/go-playground/validator/v10 v10.22.0
+    github.com/jmoiron/sqlx        v1.3.5
+    github.com/lib/pq              v1.10.9   // PostgreSQL ドライバー
+)
+
+// 間接依存 (直接使っていないが必要なもの)
+require (
+    github.com/bytedance/sonic v1.11.3 // indirect
+)
+
+// コマンド:
+//   go get github.com/gin-gonic/gin   → require に追記 + go.sum 更新
+//   go mod tidy                       → 未使用削除 + go.sum 整合
+//   go mod download                   → ローカルキャッシュにダウンロード
+""",
+
+        java_code="""\
+<!-- pom.xml (Maven) -->
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>my-app</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.2.4</version>  <!-- バージョン管理を親に委譲 -->
+  </parent>
+
+  <dependencies>
+    <!-- Web + REST -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <!-- version 省略可 → 親 POM が管理 -->
+    </dependency>
+
+    <!-- DB -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <!-- テスト (scope=test → 本番ビルドに含まれない) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
+
+<!-- コマンド:
+     mvn install          → 依存ダウンロード + ビルド + テスト
+     mvn dependency:tree  → 依存ツリー表示
+     mvn versions:display-dependency-updates  → 更新可能なバージョン確認 -->
+""",
+
+        rust_code="""\
+# Cargo.toml
+
+[package]
+name = "my-app"
+version = "0.1.0"
+edition = "2021"   # Rust エディション (2015/2018/2021)
+
+[dependencies]
+axum       = "0.7"
+serde      = { version = "1", features = ["derive"] }  # feature フラグで機能選択
+serde_json = "1"
+sqlx       = { version = "0.7", features = ["postgres", "runtime-tokio"] }
+tokio      = { version = "1",   features = ["full"] }
+validator  = { version = "0.18", features = ["derive"] }
+
+[dev-dependencies]    # テスト時のみ (Python の optional-dependencies dev と同じ)
+tokio-test = "0.4"
+
+[build-dependencies]  # ビルドスクリプト用 (Python にはない概念)
+build = "0.1"
+
+# コマンド:
+#   cargo add serde --features derive    → Cargo.toml に追記
+#   cargo build                          → 依存ダウンロード + ビルド
+#   cargo update                         → Cargo.lock を最新に更新
+#   cargo tree                           → 依存ツリー表示
+""")
+
+    # ------------------------------------------------------------------
+    # 8-4. バージョン指定の書き方
+    # ------------------------------------------------------------------
+    subsection("8-4. バージョン指定の書き方 (Semantic Versioning)")
+
+    note("""\
+    バージョン番号は「メジャー.マイナー.パッチ」(例: 2.6.1) の SemVer が標準。
+    各言語のバージョン指定記法を比較する。
+    """)
+
+    table(
+        ["意味", "Python (PEP 440)", "Go", "Java (Maven)", "Rust (Cargo)"],
+        [
+            ["完全一致",          "==2.6.1",    "v2.6.1 (タグ固定)",    "<version>2.6.1</version>","= \"2.6.1\""],
+            ["以上",              ">=2.6",      "v2.6.0 以降は go get", "未対応(範囲指定は別)",    ">= \"2.6\""],
+            ["メジャー固定",      "~=2.6 (>=2.6,<3)","(慣習で管理)",   "2.6.x (範囲指定)",       "\"2\" (^2.0.0)"],
+            ["マイナー固定",      "~=2.6.1 (>=2.6.1,<2.7)","(go.sum固定)","[2.6.1,2.7)",         "~\"2.6\" (~2.6.0)"],
+            ["キャレット (互換)", "(相当なし)",  "-",                    "-",                       "\"2.6\" (^2.6.0)"],
+            ["最新を取得",        "pip install X (指定なし)","go get X@latest","LATEST (非推奨)",  "\"*\" (非推奨)"],
+        ]
+    )
+
+    note("""\
+    Rust の Cargo は ^ (キャレット) がデフォルト:
+      "1.2.3"  →  ^1.2.3  →  >=1.2.3, <2.0.0  (メジャーバージョンは変えない)
+      "0.2.3"  →  ^0.2.3  →  >=0.2.3, <0.3.0  (0.x は マイナーも変えない)
+    Go の go.sum はチェックサムを記録して改ざん検知 → Python の hash オプションに相当
+    """)
+
+    # ------------------------------------------------------------------
+    # 8-5. パッケージリポジトリ詳細
+    # ------------------------------------------------------------------
+    subsection("8-5. パッケージリポジトリ詳細")
+
+    table(
+        ["項目", "PyPI", "pkg.go.dev / GitHub", "Maven Central", "crates.io"],
+        [
+            ["URL",          "pypi.org",         "pkg.go.dev",          "central.sonatype.com","crates.io"],
+            ["登録方法",     "twine upload",     "GitHub に push するだけ","Sonatype OSSRH",   "cargo publish"],
+            ["認証",         "APIトークン",      "不要 (GitHub URL = ID)","GPG署名 + 審査",    "APIトークン"],
+            ["プライベート", "PyPI 有料 or 自前","GitHub Private Repo",   "Artifactory等",     "Cloudsmith等"],
+            ["ミラー",       "devpi (社内)",     "(go env GOPROXY)",      "Nexus/Artifactory",  "(vendoring)"],
+            ["検索",         "pypi.org/search",  "pkg.go.dev",            "search.maven.org",  "crates.io/search"],
+            ["DL数表示",     "○",                "△ (GitHub stars)",     "○",                  "○"],
+            ["メンテ状況",   "○ (更新日)",       "○ (GitHub commits)",   "○",                  "○"],
+        ]
+    )
+
+    note("""\
+    Go が特殊: パッケージリポジトリが存在せず、GitHub (や GitLab) が直接ソース。
+      - go get github.com/gin-gonic/gin  → GitHub から直接取得
+      - pkg.go.dev は「ドキュメント表示サービス」であって配布元ではない
+      - GOPROXY=https://proxy.golang.org がキャッシュ・配信を担う (デフォルト)
+    """)
+
+    # ------------------------------------------------------------------
+    # 8-6. 社内/オフライン環境での使い方
+    # ------------------------------------------------------------------
+    subsection("8-6. 社内 / オフライン環境での依存管理")
+
+    table(
+        ["手法", "Python", "Go", "Java", "Rust"],
+        [
+            ["オフラインキャッシュ",
+             "pip download → ローカルdir",
+             "go mod vendor",
+             "mvn dependency:go-offline",
+             "cargo vendor"],
+            ["社内プロキシ/ミラー",
+             "pip --index-url http://内部サーバー",
+             "GOPROXY=http://内部サーバー",
+             "settings.xml にミラー設定",
+             ".cargo/config.toml に [source]"],
+            ["ベンダリング (依存をコミット)",
+             "vendor/ に copy",
+             "go mod vendor → vendor/",
+             "(通常しない)",
+             "cargo vendor → vendor/"],
+        ]
+    )
+
+    point("Go の `go mod vendor` はオフライン・セキュリティ審査環境でよく使われる")
+    point("Rust の `cargo vendor` も同様。CI で外部通信を禁止する場合に有効")
+    point("Java は ~/.m2 をまるごと共有ストレージに置けるのでオフライン対応が容易")
+    point("Python は uv の --offline モードや devpi サーバーでオフライン対応できる")
+
+
+# ============================================================
+# 9. 全体まとめ対応表
+# ============================================================
+
+def chapter9_summary():
     section("7. 全体まとめ ── Pydantic エコシステム対応表")
 
     note("""\
@@ -1571,7 +1872,8 @@ def main():
     chapter5_error_handling()
     chapter6_serialization()
     chapter7_imports()
-    chapter8_summary()
+    chapter8_package_management()
+    chapter9_summary()
 
     print()
     print("=" * 76)

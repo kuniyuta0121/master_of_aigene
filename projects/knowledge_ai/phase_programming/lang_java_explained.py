@@ -1599,6 +1599,621 @@ my-app/
              "    controller → service → repository の依存関係を自動解決する。\n"
              "    Python で同じことをする場合、depends() や DI コンテナを自前で用意する必要がある。")
 
+    subsection("13-4. Web API 以外のアプリケーション構成")
+
+    code_block("CLI ツール (picocli / 標準入力)",
+    """\
+my-cli/
+├── pom.xml
+└── src/main/java/com/example/cli/
+    ├── Main.java                  # public static void main(String[] args)
+    ├── command/
+    │   ├── RootCommand.java       # @Command(name="mycli") picocli のルート
+    │   ├── UserCommand.java       # サブコマンド "mycli user ..."
+    │   └── OrderCommand.java      # サブコマンド "mycli order ..."
+    ├── service/                   # ビジネスロジック (Web版と同じ)
+    ├── repository/                # DB/ファイルアクセス
+    └── model/                     # データ構造
+
+# Python 換算:
+#   argparse / click の @command → picocli の @Command
+#   python mycli.py user list     → java -jar mycli.jar user list
+#   if __name__ == "__main__":    → public static void main(String[] args)
+""")
+
+    code_block("バッチ処理 / スケジューラー (Spring Batch)",
+    """\
+my-batch/
+├── pom.xml
+└── src/main/java/com/example/batch/
+    ├── BatchApplication.java      # エントリポイント
+    ├── config/
+    │   └── BatchConfig.java       # Job / Step の定義 (@Configuration)
+    ├── job/
+    │   ├── UserSyncJob.java       # ジョブ定義 (= Python の def run_job())
+    │   └── ReportJob.java
+    ├── step/
+    │   ├── reader/
+    │   │   └── CsvUserReader.java  # データ読み込み (CSV/DB/API)
+    │   ├── processor/
+    │   │   └── UserProcessor.java  # 変換・加工ロジック
+    │   └── writer/
+    │       └── DbUserWriter.java   # 書き込み (DB/ファイル)
+    └── model/
+        └── UserRecord.java
+
+# Python 換算:
+#   Airflow の DAG/Task → Spring Batch の Job/Step
+#   pandas で読んで加工して書く流れ → Reader/Processor/Writer の3層
+#   cron で定期実行               → @Scheduled or Kubernetes CronJob
+""")
+
+    code_block("デスクトップ GUI アプリ (JavaFX)",
+    """\
+my-desktop/
+├── pom.xml
+└── src/main/java/com/example/desktop/
+    ├── MainApp.java               # Application を継承、start() メソッド
+    ├── controller/                # ← FXML の各画面に対応するコントローラー
+    │   ├── MainController.java    #   (Python/Tkinter の class MainWindow に相当)
+    │   └── SettingsController.java
+    ├── service/                   # ビジネスロジック (UI に依存しない)
+    ├── model/                     # データモデル (JavaFX Property で双方向バインド)
+    │   └── UserModel.java         #   StringProperty, IntegerProperty など
+    └── resources/
+        ├── fxml/
+        │   ├── main.fxml          # GUI レイアウト (XML) ← Python の .ui ファイル相当
+        │   └── settings.fxml
+        └── css/
+            └── style.css
+
+# Python 換算:
+#   tkinter の Tk() / mainloop()  → JavaFX の Application.launch()
+#   tk.Button(command=...)        → FXML の onAction="#handleClick"
+#   StringVar / IntVar            → StringProperty / IntegerProperty
+""")
+
+    code_block("ライブラリ (他プロジェクトから依存される jar)",
+    """\
+my-library/
+├── pom.xml
+└── src/
+    ├── main/java/com/example/mylib/
+    │   ├── MyLib.java             # public API のエントリポイント
+    │   ├── core/                  # 内部実装 (package-private で外から見えない)
+    │   │   └── CoreLogic.java
+    │   └── model/
+    │       └── Result.java        # public なデータ型
+    └── test/java/com/example/mylib/
+        └── MyLibTest.java
+
+# pom.xml で packaging を jar にして mvn install → ~/.m2 にインストール
+# 使う側の pom.xml に <dependency> を追加するだけで参照できる
+
+# Python 換算:
+#   pip install mylib              → mvn dependency:get ...
+#   pypi.org に公開                → Maven Central に公開
+#   __all__ = [...]                → public / package-private で制御
+""")
+
+    widths = [20, 28, 28]
+    print(table_sep(widths))
+    print(table_row(["アプリ種別", "Java の主要フレームワーク", "Python の対応物"], widths))
+    print(table_sep(widths))
+    for r in [
+        ["Web API",        "Spring Boot (REST)",        "FastAPI / Flask"],
+        ["CLI ツール",     "picocli / Apache Commons CLI","click / argparse"],
+        ["バッチ処理",     "Spring Batch",              "Airflow / Prefect"],
+        ["スケジューラー", "@Scheduled / Quartz",       "APScheduler / cron"],
+        ["デスクトップ",   "JavaFX / Swing",            "tkinter / PyQt"],
+        ["ライブラリ",     "Maven jar",                 "PyPI パッケージ"],
+        ["マイクロサービス","Spring Cloud",             "FastAPI + Docker"],
+    ]:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    point("どのアプリ種別でも service/ と model/ の構成は共通 ── ここがビジネスロジックの核")
+    point("CLI もバッチも Spring DI (依存注入) の仕組みをそのまま使えるのが Java の強み")
+    point("JavaFX は controller/ と service/ を分けることで GUI ロジックの混入を防ぐ")
+
+
+def chapter_14_testing():
+    section("14. 単体テスト ── JUnit5 で書くテスト")
+
+    print(textwrap.dedent("""\
+    Java のテストには JUnit5 (外部ライブラリ) を使う。
+    Python の pytest に相当するが、pom.xml への追加が必要。
+    テストは src/test/ ディレクトリに、本番と同じパッケージ構成で配置する。
+    """))
+
+    subsection("14-1. 基本的なテスト")
+
+    code_block("Python: pytest",
+    """\
+# user_service.py
+def is_adult(age: int) -> bool:
+    return age >= 18
+
+# tests/test_user_service.py
+def test_is_adult():
+    assert is_adult(18) == True
+    assert is_adult(17) == False
+""")
+
+    code_block("Java: JUnit5",
+    """\
+// src/main/java/com/example/service/UserService.java
+package com.example.service;
+
+public class UserService {
+    public boolean isAdult(int age) {
+        return age >= 18;
+    }
+}
+
+// src/test/java/com/example/service/UserServiceTest.java  ← 別ディレクトリ
+package com.example.service;
+
+import org.junit.jupiter.api.Test;                    // JUnit5
+import static org.junit.jupiter.api.Assertions.*;     // assert 群
+
+class UserServiceTest {
+
+    private final UserService service = new UserService();  // テスト対象
+
+    @Test                                              // テストの目印
+    void testIsAdult() {
+        assertTrue(service.isAdult(18));                // assert + True
+        assertFalse(service.isAdult(17));               // assert + False
+    }
+
+    @Test
+    void testWithMessage() {
+        assertEquals(true, service.isAdult(20),
+            "20歳は成人のはず");                         // 失敗時メッセージ
+    }
+}
+""")
+
+    point("@Test アノテーションがないとテスト関数として認識されない")
+    point("assertTrue / assertFalse / assertEquals など assert が豊富")
+    point("テストクラスは本番と同じパッケージ名 → package-private なメソッドにアクセス可能")
+    print()
+
+    subsection("14-2. pom.xml への追加")
+
+    code_block("JUnit5 の依存を追加",
+    """\
+<!-- pom.xml の <dependencies> に追加 -->
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.10.2</version>
+    <scope>test</scope>           <!-- ★ test スコープ = 本番JARに含まれない -->
+</dependency>
+""")
+
+    code_block("Python との対比",
+    """\
+# Python: pip install pytest  → すぐ使える
+# Java:   pom.xml に dependency 追加 → mvn test で自動ダウンロード
+
+# scope の意味:
+#   compile (デフォルト) → 本番 + テスト両方で使う
+#   test               → テスト時のみ。本番JARには含まれない
+#   provided           → コンパイル時のみ。実行時はサーバーが提供 (Servlet等)
+""")
+    print()
+
+    subsection("14-3. 例外のテスト")
+
+    code_block("Python: pytest.raises",
+    """\
+import pytest
+
+def validate_age(age):
+    if age < 0:
+        raise ValueError("年齢は0以上")
+    return age
+
+def test_negative_age():
+    with pytest.raises(ValueError, match="年齢は0以上"):
+        validate_age(-1)
+""")
+
+    code_block("Java: assertThrows",
+    """\
+public class UserService {
+    public int validateAge(int age) {
+        if (age < 0) {
+            throw new IllegalArgumentException("年齢は0以上");
+        }
+        return age;
+    }
+}
+
+@Test
+void testNegativeAge() {
+    IllegalArgumentException ex = assertThrows(
+        IllegalArgumentException.class,            // 期待する例外の型
+        () -> service.validateAge(-1)              // ラムダで実行
+    );
+    assertEquals("年齢は0以上", ex.getMessage());   // メッセージも検証
+}
+""")
+    print()
+
+    subsection("14-4. パラメータ化テスト")
+
+    code_block("Python: @pytest.mark.parametrize",
+    """\
+import pytest
+
+@pytest.mark.parametrize("age, expected", [
+    (0,   False),
+    (17,  False),
+    (18,  True),
+    (100, True),
+])
+def test_is_adult(age, expected):
+    assert is_adult(age) == expected
+""")
+
+    code_block("Java: @ParameterizedTest + @CsvSource",
+    """\
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+// 追加の依存が必要:
+// <dependency>
+//     <groupId>org.junit.jupiter</groupId>
+//     <artifactId>junit-jupiter-params</artifactId>
+//     <version>5.10.2</version>
+//     <scope>test</scope>
+// </dependency>
+
+@ParameterizedTest                              // @Test の代わり
+@CsvSource({                                    // CSV 形式でデータ定義
+    "0,    false",
+    "17,   false",
+    "18,   true",
+    "100,  true"
+})
+void testIsAdult(int age, boolean expected) {
+    assertEquals(expected, service.isAdult(age));
+}
+""")
+    print()
+
+    subsection("14-5. 実行コマンド")
+
+    code_block("テストの実行",
+    """\
+# Python
+pytest                                   # 全テスト
+pytest tests/test_user.py                # ファイル指定
+pytest -k "test_is_adult"                # 名前で絞り込み
+pytest --cov                             # カバレッジ
+
+# Java (Maven)
+mvn test                                 # 全テスト
+mvn test -Dtest=UserServiceTest          # クラス指定
+mvn test -Dtest="UserServiceTest#testIsAdult"  # メソッド指定
+mvn test -pl module-name                 # モジュール指定
+# カバレッジは JaCoCo プラグインを pom.xml に追加して使う
+""")
+
+    subsection("14-6. Python との対比まとめ")
+
+    widths = [22, 28, 28]
+    print(table_sep(widths))
+    print(table_row(["観点", "Java (JUnit5)", "Python (pytest)"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フレームワーク",   "外部 (JUnit5)",         "外部 (pytest)"],
+        ["テストファイル",   "src/test/ (別Dir)",     "tests/ (別Dir)"],
+        ["テスト目印",       "@Test アノテーション",   "test_ prefix"],
+        ["assert",           "assertEquals 等 (豊富)","assert 文 (シンプル)"],
+        ["パラメータ化",     "@ParameterizedTest",    "@parametrize"],
+        ["例外テスト",       "assertThrows()",        "pytest.raises()"],
+        ["実行",             "mvn test",              "pytest"],
+        ["カバレッジ",       "JaCoCo (別途追加)",     "pytest-cov"],
+        ["モック",           "Mockito (別途追加)",    "unittest.mock"],
+        ["private テスト",   "不可 (別Dir)",          "可能"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    question("Java のテストが別ディレクトリ (src/test/) にある理由:\n"
+             "    → 本番コードとテストコードのビルド成果物を完全分離するため。\n"
+             "    → mvn package で作る JAR にテストコードが混入しない。\n"
+             "    → Python も tests/ を分けるが、Java はビルドツールが強制する。")
+
+    subsection("14-7. モック ── Python の monkeypatch に相当するもの")
+
+    print(textwrap.dedent("""\
+    Python では monkeypatch や unittest.mock で外部依存を差し替える。
+    Java では Mockito (モキート) というライブラリが事実上の標準。
+    Spring Boot プロジェクトでは最初から含まれていることが多い。
+    """))
+
+    code_block("Python: monkeypatch で外部APIを差し替え",
+    """\
+# user_service.py
+import requests
+
+def get_user_name(user_id: int) -> str:
+    resp = requests.get(f"https://api.example.com/users/{user_id}")
+    return resp.json()["name"]
+
+# tests/test_user_service.py
+def test_get_user_name(monkeypatch):
+    class FakeResponse:
+        def json(self):
+            return {"name": "Alice"}
+
+    monkeypatch.setattr("user_service.requests.get", lambda url: FakeResponse())
+    assert get_user_name(1) == "Alice"
+""")
+
+    code_block("Java: Mockito でモック",
+    """\
+// ── 本番コード ──
+
+// 1. interface を定義 (Python にはない概念)
+public interface UserAPI {
+    User getUser(int userId);
+}
+
+// 2. 本番実装
+public class RealUserAPI implements UserAPI {
+    @Override
+    public User getUser(int userId) {
+        // 実際にHTTPリクエストを送る
+        // ...
+    }
+}
+
+// 3. Service は interface に依存
+public class UserService {
+    private final UserAPI api;     // ★ interface 型で持つ
+
+    public UserService(UserAPI api) {     // コンストラクタ注入
+        this.api = api;
+    }
+
+    public String getUserName(int userId) {
+        User user = api.getUser(userId);   // interface 経由で呼ぶ
+        return user.getName();
+    }
+}
+""")
+
+    code_block("Java: Mockito を使ったテスト",
+    """\
+// ── テストコード ──
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)      // Mockito を有効化
+class UserServiceTest {
+
+    @Mock                                 // ★ モックを自動生成
+    UserAPI api;                          // interface の偽物が作られる
+
+    @InjectMocks                          // ★ モックを自動注入
+    UserService service;                  // api フィールドにモックが入る
+
+    @Test
+    void testGetUserName() {
+        // when: api.getUser(1) が呼ばれたら User("Alice") を返す
+        when(api.getUser(1)).thenReturn(new User("Alice"));
+
+        // then: service 経由で呼ぶとモックの値が返る
+        assertEquals("Alice", service.getUserName(1));
+
+        // verify: api.getUser が1回呼ばれたことを検証
+        verify(api, times(1)).getUser(1);
+    }
+
+    @Test
+    void testGetUserName_APIError() {
+        // 例外を投げるモック
+        when(api.getUser(1)).thenThrow(new RuntimeException("connection refused"));
+
+        assertThrows(RuntimeException.class, () -> {
+            service.getUserName(1);
+        });
+    }
+}
+""")
+
+    code_block("pom.xml に Mockito を追加",
+    """\
+<dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-core</artifactId>
+    <version>5.11.0</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-junit-jupiter</artifactId>
+    <version>5.11.0</version>
+    <scope>test</scope>
+</dependency>
+""")
+
+    subsection("14-8. Mockito の主要メソッド (Python 対比)")
+
+    widths = [22, 32, 30]
+    print(table_sep(widths))
+    print(table_row(["やりたいこと", "Java (Mockito)", "Python (mock)"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["モック作成",       "@Mock / mock(Class.class)","Mock() / patch()"],
+        ["戻り値を指定",     "when(x).thenReturn(val)",  "x.return_value = val"],
+        ["例外を投げる",     "when(x).thenThrow(ex)",    "x.side_effect = Exception"],
+        ["呼ばれた回数検証", "verify(x, times(1))",      "x.assert_called_once()"],
+        ["引数キャプチャ",   "ArgumentCaptor",           "x.call_args"],
+        ["一部だけモック",   "@Spy / spy(obj)",          "patch.object()"],
+        ["全て差し替え",     "不可 (interface 必須)",     "monkeypatch (何でも可)"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    point("Java は interface + Mockito が定番。設計段階で interface を作る文化")
+    point("Python は monkeypatch で「何でも差し替え可能」。設計を変えなくてもテストできる")
+    point("Java の方がコード量は多いが、「何をモックしているか」が型で明示される")
+    point("@Mock + @InjectMocks で DI コンテナのようにモックを自動注入できる")
+    print()
+
+    question("Python の monkeypatch は「あとから何でも差し替え」。\n"
+             "    Java の Mockito は「interface を通じて差し替え」。\n"
+             "    → Java は事前に interface を設計しないとモックできない。\n"
+             "    → これが逆に「テストしやすい設計」を強制する効果がある。")
+
+
+def chapter_15_formatter():
+    section("15. フォーマッター / リンター ── Python の ruff vs Java のツール群")
+
+    p("""\
+    Python は ruff 1つでフォーマット + リントができる。
+    Java はフォーマッターとリンターが別ツールで、
+    プロジェクトや企業ごとに使うものが異なる。
+    """)
+
+    subsection("15-1. Java のフォーマッター")
+
+    code_block("主要フォーマッター比較",
+    """\
+# ① google-java-format (Google 公式)
+#    Google のコーディング規約に準拠。設定不要。ruff/black に近い思想。
+java -jar google-java-format.jar --replace src/**/*.java
+
+# ② Spotless (Maven / Gradle プラグイン)
+#    ビルドツールに統合。google-java-format や Eclipse formatter を内部で使える。
+mvn spotless:apply              # 自動整形
+mvn spotless:check              # CI 用チェック (差分があれば fail)
+
+# ③ IntelliJ IDEA 内蔵フォーマッター
+#    IDE の設定で制御。チーム共有は .editorconfig や設定ファイルで。
+#    ショートカット: Cmd+Option+L (Mac) / Ctrl+Alt+L (Windows)
+""")
+
+    point("google-java-format = 設定ゼロで統一スタイル (Go の gofmt 思想に近い)")
+    point("Spotless = Maven/Gradle に組み込むので CI で自動チェックしやすい")
+    point("IntelliJ = IDE 内で完結。個人開発ならこれだけで十分")
+    print()
+
+    subsection("15-2. pom.xml に Spotless を追加する例")
+
+    code_block("pom.xml (Spotless + google-java-format)",
+    """\
+<build>
+  <plugins>
+    <plugin>
+      <groupId>com.diffplug.spotless</groupId>
+      <artifactId>spotless-maven-plugin</artifactId>
+      <version>2.43.0</version>
+      <configuration>
+        <java>
+          <googleJavaFormat>
+            <version>1.22.0</version>
+          </googleJavaFormat>
+          <removeUnusedImports/>     <!-- 未使用 import を自動削除 -->
+        </java>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+
+<!-- 実行:
+  mvn spotless:apply    ← 自動整形
+  mvn spotless:check    ← 差分チェック (CI 用)
+-->
+""")
+
+    subsection("15-3. Java のリンター / 静的解析")
+
+    code_block("主要リンター",
+    """\
+# ① SpotBugs (旧 FindBugs)
+#    バイトコードレベルの静的解析。NullPointerException の危険箇所などを検出。
+mvn spotbugs:check
+
+# ② Checkstyle
+#    コーディング規約の強制。Google Style / Sun Style から選択。
+mvn checkstyle:check
+
+# ③ PMD
+#    コードの複雑度、未使用変数、重複コードなどを検出。
+mvn pmd:check
+
+# ④ SonarQube / SonarLint
+#    セキュリティ脆弱性 + コード品質を総合的に分析。企業で最も普及。
+#    SonarLint は IDE プラグインとして IntelliJ / VSCode で動作。
+""")
+
+    subsection("15-4. Python との対応関係")
+
+    widths = [22, 28, 26]
+    print(table_sep(widths))
+    print(table_row(["用途", "Java", "Python"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フォーマッター",   "google-java-format",     "ruff format / black"],
+        ["ビルド統合整形",   "Spotless (Maven/Gradle)","pre-commit + ruff"],
+        ["リンター",         "Checkstyle / PMD",       "ruff check / flake8"],
+        ["バグ検出",         "SpotBugs",               "mypy / pyright"],
+        ["総合品質分析",     "SonarQube",              "SonarQube (Python版もある)"],
+        ["未使用import削除", "Spotless / IntelliJ",    "ruff (isort互換)"],
+        ["設定ファイル",     "pom.xml + checkstyle.xml","pyproject.toml"],
+        ["パッケージ管理所", "Maven Central",          "PyPI (pypi.org)"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    subsection("15-5. VSCode 設定")
+
+    code_block("settings.json (Java 用)",
+    """\
+{
+    "java.format.settings.profile": "GoogleStyle",
+    "java.format.enabled": true,
+    "editor.formatOnSave": true,
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java"
+    }
+}
+// 拡張機能「Extension Pack for Java」(vscjava.vscode-java-pack)
+// に Language Support for Java (redhat.java) が含まれている
+""")
+
+    subsection("15-6. 現場での使い分け")
+
+    point("個人/小規模 → IntelliJ フォーマッター + SonarLint で十分")
+    point("チーム開発 → Spotless (CI) + Checkstyle (規約強制)")
+    point("エンタープライズ → SonarQube (品質ゲート) + SpotBugs (バグ検出)")
+    print()
+
+    question("Python は ruff 1つで「フォーマット + リント + import整理」が完結する。\n"
+             "    Java は用途ごとにツールが分かれている。\n"
+             "    これは言語の歴史の長さとエコシステムの成熟度の違いによるもの。\n"
+             "    → 新しいプロジェクトでは Spotless + google-java-format が最も手軽。")
+
 
 def main():
     print()
@@ -1625,6 +2240,8 @@ def main():
     chapter_12_comparison_table()
     chapter_priority_summary()
     chapter_13_project_structure()
+    chapter_14_testing()
+    chapter_15_formatter()
 
     print()
     print("=" * 70)

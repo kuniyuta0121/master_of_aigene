@@ -75,6 +75,17 @@ def table(headers: list, rows: list) -> None:
     print()
 
 
+def table_row(cols: list, widths: list) -> str:
+    """テーブル行を生成"""
+    cells = [str(c).ljust(w) for c, w in zip(cols, widths)]
+    return "  | " + " | ".join(cells) + " |"
+
+
+def table_sep(widths: list) -> str:
+    """テーブル区切り線を生成"""
+    return "  +-" + "-+-".join("-" * w for w in widths) + "-+"
+
+
 # ============================================================
 # 第1章: 環境と Hello World
 # ============================================================
@@ -1320,6 +1331,752 @@ my-platform/
              "    → テストが高速 (DB接続不要)\n"
              "    → フレームワーク変更 (Axum→Actix) が domain に影響しない")
 
+    subsection("14-5. Web API 以外のアプリケーション構成")
+
+    code_block("CLI ツール (clap)",
+    """\
+my-cli/
+├── Cargo.toml
+└── src/
+    ├── main.rs              # fn main() エントリポイント
+    ├── cli.rs               # clap の引数定義 (#[derive(Parser)])
+    ├── cmd/
+    │   ├── mod.rs
+    │   ├── user.rs          # サブコマンド "mycli user ..."
+    │   └── order.rs         # サブコマンド "mycli order ..."
+    ├── service/             # ビジネスロジック
+    └── config.rs            # 設定読み込み
+
+# clap の例:
+# #[derive(Parser)]
+# #[command(name = "mycli")]
+# struct Cli {
+#     #[command(subcommand)]
+#     command: Commands,
+# }
+# #[derive(Subcommand)]
+# enum Commands {
+#     User { name: String },
+#     Order { id: u32 },
+# }
+
+# Python 換算:
+#   @click.command()              → #[derive(Parser)] struct Cli
+#   @click.option("--name")       → name: String  (フィールドが自動的にオプションに)
+#   python mycli.py user --name X → cargo run -- user --name X
+""")
+
+    code_block("バッチ処理 / バックグラウンドワーカー (tokio)",
+    """\
+my-worker/
+├── Cargo.toml
+└── src/
+    ├── main.rs              # tokio::main で非同期起動
+    ├── worker/
+    │   ├── mod.rs
+    │   ├── dispatcher.rs    # キューからジョブを取り出す
+    │   └── handlers/
+    │       ├── mod.rs
+    │       ├── user_sync.rs # ユーザー同期ジョブ
+    │       └── report.rs   # レポート生成ジョブ
+    ├── queue/
+    │   └── redis.rs         # deadpool-redis でキュー接続
+    └── repository/
+
+# Python 換算:
+#   Celery worker              → tokio::spawn でワーカータスク起動
+#   @app.task def process():   → async fn process(job: Job) -> Result<(), AppError>
+#   Redis broker               → deadpool-redis / lapin (RabbitMQ)
+""")
+
+    code_block("スケジューラー (tokio-cron-scheduler)",
+    """\
+my-scheduler/
+├── Cargo.toml               # tokio-cron-scheduler = "0.10"
+└── src/
+    ├── main.rs
+    └── jobs/
+        ├── mod.rs
+        ├── daily_report.rs  # 毎日実行
+        └── cleanup.rs       # 定期クリーンアップ
+
+# main.rs の例:
+# #[tokio::main]
+# async fn main() {
+#     let sched = JobScheduler::new().await.unwrap();
+#     sched.add(Job::new_async("0 2 * * *", |_, _| Box::pin(async {
+#         jobs::daily_report::run().await;
+#     })).unwrap()).await.unwrap();
+#     sched.start().await.unwrap();
+# }
+
+# Python 換算:
+#   APScheduler の CronTrigger   → cron 文字列 "0 2 * * *"
+#   asyncio.create_task(...)     → tokio::spawn(...)
+""")
+
+    code_block("デスクトップ GUI アプリ (egui / tauri)",
+    """\
+# パターン A: egui (純 Rust GUI)
+my-gui/
+├── Cargo.toml               # egui = "0.27", eframe = "0.27"
+└── src/
+    ├── main.rs              # eframe::run_native(...)
+    ├── app.rs               # struct MyApp { state } + impl eframe::App
+    ├── ui/
+    │   ├── mod.rs
+    │   ├── main_panel.rs    # メイン画面の描画
+    │   └── settings.rs      # 設定画面
+    └── state/               # アプリ状態 (Python の self.xxx 相当)
+
+# パターン B: Tauri (Rust バックエンド + HTML/JS フロントエンド)
+my-tauri-app/
+├── src-tauri/               # Rust バックエンド
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs
+│       └── commands/        # #[tauri::command] で JS から呼べる関数
+│           └── user.rs
+└── src/                     # フロントエンド (React/Vue 等)
+    └── App.tsx
+
+# Python 換算:
+#   tkinter の Tk().mainloop() → eframe::run_native(...)
+#   tk.Button(command=...)    → ui.button("Click") でクロージャ
+#   Electron (JS製)           → Tauri の位置づけ (より軽量・安全)
+""")
+
+    code_block("ライブラリ クレート (他プロジェクトから使われる)",
+    """\
+my-library/
+├── Cargo.toml               # [lib] セクション (main.rs は不要)
+├── src/
+│   ├── lib.rs               # pub use で外部公開する型・関数を列挙
+│   ├── core/
+│   │   ├── mod.rs
+│   │   └── logic.rs         # pub(crate) = ライブラリ内部のみ
+│   └── model.rs             # pub struct (外から使える)
+├── tests/                   # 結合テスト
+│   └── integration.rs
+├── examples/                # 使い方サンプル
+│   └── basic.rs             # cargo run --example basic
+└── benches/                 # ベンチマーク
+    └── bench_core.rs        # cargo bench
+
+# Cargo.toml の [lib] セクション:
+# [lib]
+# name = "my_library"
+# crate-type = ["lib"]       # rlib (Rust用) デフォルト
+# # crate-type = ["cdylib"]  # .so/.dll にして他言語から使う場合
+
+# 使う側の Cargo.toml:
+# [dependencies]
+# my-library = { path = "../my-library" }        # ローカル参照
+# my-library = { git = "https://github.com/..." } # Git 参照
+# my-library = "1.0"                              # crates.io 公開後
+
+# Python 換算:
+#   pip install mylib               → cargo add my-library
+#   __all__ = ["Foo", "bar"]        → lib.rs の pub use
+#   pypi.org で公開                 → cargo publish → crates.io
+""")
+
+    table(
+        ["アプリ種別", "Rust の主要クレート", "Python の対応物"],
+        [
+            ["Web API",         "Axum / Actix-web",            "FastAPI / Flask"],
+            ["CLI ツール",      "clap",                         "click / argparse / typer"],
+            ["バッチ/ワーカー", "tokio + deadpool-redis",       "Celery / rq"],
+            ["スケジューラー",  "tokio-cron-scheduler",         "APScheduler / Celery beat"],
+            ["GUI (純Rust)",    "egui / iced / Slint",          "tkinter / PyQt"],
+            ["GUI (Web hybrid)","Tauri",                        "Electron (JS製)"],
+            ["ライブラリ",      "crates.io",                    "PyPI パッケージ"],
+            ["WebAssembly",     "wasm-pack + wasm-bindgen",    "(相当なし)"],
+            ["組み込み/OS",     "#![no_std] クレート",          "(相当なし)"],
+        ]
+    )
+    print()
+
+    point("Rust の CLI は clap が圧倒的シェア。derive マクロで Python/click に近い書き心地")
+    point("バッチ/ワーカーは tokio の非同期タスクで実装。Python asyncio + Celery の合体版")
+    point("Tauri は Electron の代替として注目。メモリ使用量が 1/10 程度")
+    point("WebAssembly と組み込みは Rust が最も得意な領域 (Python には実質ない)")
+
+
+# ============================================================
+# 15. 単体テスト
+# ============================================================
+
+def chapter15_testing():
+    section("第15章: 単体テスト ── 同じファイルに書く Rust のテスト")
+
+    print(textwrap.dedent("""\
+    Rust はテストが標準搭載。外部ライブラリ不要。
+    最大の特徴: テストを本番コードと同じファイル内に書く。
+    #[cfg(test)] により、本番バイナリにはテストコードが含まれない。
+    """))
+
+    subsection("15-1. 基本的なテスト")
+
+    code_block("Python: pytest",
+    """\
+# user_service.py
+def is_adult(age: int) -> bool:
+    return age >= 18
+
+# tests/test_user_service.py  ← 別ファイル
+def test_is_adult():
+    assert is_adult(18) == True
+    assert is_adult(17) == False
+""")
+
+    code_block("Rust: 同じファイル内にテスト",
+    """\
+// src/user_service.rs
+
+pub fn is_adult(age: u32) -> bool {
+    age >= 18
+}
+
+// ↓ 同じファイルの末尾にテストを書く
+#[cfg(test)]                    // テストビルド時のみコンパイル
+mod tests {                     // tests モジュール (慣習的な名前)
+    use super::*;               // 親モジュールの関数をインポート
+
+    #[test]                     // テスト関数の目印
+    fn test_is_adult() {
+        assert!(is_adult(18));           // assert!(bool)
+        assert!(!is_adult(17));          // ! で否定
+    }
+
+    #[test]
+    fn test_child() {
+        assert_eq!(is_adult(0), false);  // assert_eq!(left, right)
+    }
+
+    #[test]
+    fn test_with_message() {
+        assert!(is_adult(20), "20歳は成人のはず");  // 失敗時メッセージ
+    }
+}
+""")
+
+    point("#[cfg(test)] → 本番バイナリにテストコードは含まれない")
+    point("use super::* → 親モジュールの関数 (プライベートも含む) にアクセス可能")
+    point("assert! / assert_eq! / assert_ne! の3つがよく使われる")
+    print()
+
+    subsection("15-2. プライベート関数もテストできる")
+
+    code_block("Rust: private 関数のテスト",
+    """\
+// Python: private 関数は慣習的に _prefix をつけるだけ → テスト可能
+// Java:   private メソッドは別ディレクトリから直接テスト不可
+// Go:     同パッケージ内なら小文字関数もテスト可能
+
+// Rust: 同じファイル内なので private 関数も直接テストできる
+fn validate_internal(age: u32) -> bool {   // pub なし = private
+    age > 0 && age < 150
+}
+
+pub fn is_valid_adult(age: u32) -> bool {
+    validate_internal(age) && is_adult(age)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_private_validation() {
+        assert!(validate_internal(25));    // private 関数に直接アクセス可能！
+        assert!(!validate_internal(200));
+    }
+}
+""")
+    print()
+
+    subsection("15-3. パニックのテスト (= 例外テスト)")
+
+    code_block("Python: pytest.raises",
+    """\
+import pytest
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("ゼロ除算")
+    return a / b
+
+def test_zero_division():
+    with pytest.raises(ValueError, match="ゼロ除算"):
+        divide(1, 0)
+""")
+
+    code_block("Rust: #[should_panic]",
+    """\
+fn divide(a: f64, b: f64) -> f64 {
+    if b == 0.0 {
+        panic!("ゼロ除算");            // panic! = Python の raise に近い
+    }
+    a / b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]                     // パニックすることを期待
+    fn test_zero_division() {
+        divide(1.0, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "ゼロ除算")]  // メッセージも検証
+    fn test_zero_division_message() {
+        divide(1.0, 0.0);
+    }
+}
+""")
+    print()
+
+    subsection("15-4. Result を返すテスト")
+
+    code_block("Rust: Result<()> を返すテスト",
+    """\
+// Rust は panic の代わりに Result でエラーを返すのが一般的
+// テスト関数も Result を返せる
+
+use std::num::ParseIntError;
+
+fn parse_age(s: &str) -> Result<u32, ParseIntError> {
+    s.parse::<u32>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_valid() -> Result<(), ParseIntError> {
+        let age = parse_age("25")?;     // ? でエラーをテスト失敗にできる
+        assert_eq!(age, 25);
+        Ok(())                          // 成功時は Ok(()) を返す
+    }
+
+    #[test]
+    fn test_parse_invalid() {
+        assert!(parse_age("abc").is_err());  // Result の is_err() で検証
+    }
+}
+""")
+    print()
+
+    subsection("15-5. 結合テスト (tests/ ディレクトリ)")
+
+    code_block("ユニットテスト vs 結合テストの配置",
+    """\
+my-app/
+├── src/
+│   ├── lib.rs                      # pub fn is_adult() → ライブラリ公開API
+│   └── user_service.rs             # #[cfg(test)] mod tests {} → ユニットテスト
+├── tests/                          # ★ 結合テスト (外部クレートとして実行)
+│   ├── user_test.rs                #   pub な関数のみテスト可能
+│   └── integration_test.rs         #   複数モジュールを組み合わせたテスト
+└── Cargo.toml
+""")
+
+    code_block("tests/user_test.rs (結合テスト)",
+    """\
+// tests/ は外部クレートとして扱われる
+// → pub な関数しかアクセスできない (private は不可)
+
+use my_app::is_adult;               // ライブラリクレートからインポート
+
+#[test]
+fn test_adult_from_outside() {
+    assert!(is_adult(18));
+}
+""")
+    print()
+
+    subsection("15-6. 実行コマンド")
+
+    code_block("テストの実行",
+    """\
+# Python
+pytest                          # 全テスト
+pytest -k "test_is_adult"       # 名前で絞り込み
+pytest --cov                    # カバレッジ
+
+# Rust
+cargo test                      # 全テスト (ユニット + 結合)
+cargo test test_is_adult        # 名前で絞り込み
+cargo test --lib                # ユニットテストのみ (src/ 内)
+cargo test --test user_test     # 結合テストのみ (tests/ 内)
+cargo test -- --nocapture       # println! の出力を表示
+cargo test -- --show-output     # 成功テストの出力も表示
+# カバレッジは cargo-tarpaulin (外部ツール) を使う
+""")
+
+    subsection("15-7. Python との対比まとめ")
+
+    widths = [22, 28, 28]
+    print(table_sep(widths))
+    print(table_row(["観点", "Rust", "Python (pytest)"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フレームワーク",   "標準搭載",               "外部 (pytest)"],
+        ["ユニットテスト",   "同ファイル内 #[cfg(test)]","tests/ (別Dir)"],
+        ["結合テスト",       "tests/ ディレクトリ",     "tests/ (別Dir)"],
+        ["assert",           "assert! / assert_eq!",  "assert 文"],
+        ["例外テスト",       "#[should_panic]",        "pytest.raises()"],
+        ["private テスト",   "可能 (同ファイル内)",     "可能"],
+        ["パラメータ化",     "マクロ or 外部クレート",  "@parametrize"],
+        ["実行",             "cargo test",             "pytest"],
+        ["カバレッジ",       "cargo-tarpaulin (外部)", "pytest-cov"],
+        ["モック",           "mockall クレート (外部)", "unittest.mock"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    question("なぜ Rust はテストを同じファイルに書くのか？\n"
+             "    → #[cfg(test)] でコンパイル時に除外されるので本番への影響ゼロ。\n"
+             "    → private 関数をテストできる (外部ファイルからは不可能)。\n"
+             "    → コードとテストが近い → 仕様変更時に一緒に修正しやすい。")
+
+    subsection("15-8. モック ── Python の monkeypatch に相当するもの")
+
+    print(textwrap.dedent("""\
+    Python では monkeypatch で関数を差し替える。
+    Rust では trait (= Go の interface に近い) を使って差し替える。
+    外部クレート mockall を使うと自動生成も可能だが、
+    まずは trait による手動モックを理解することが重要。
+    """))
+
+    code_block("Python: monkeypatch で外部APIを差し替え",
+    """\
+# user_service.py
+import requests
+
+def get_user_name(user_id: int) -> str:
+    resp = requests.get(f"https://api.example.com/users/{user_id}")
+    return resp.json()["name"]
+
+# tests/test_user_service.py
+def test_get_user_name(monkeypatch):
+    class FakeResponse:
+        def json(self):
+            return {"name": "Alice"}
+
+    monkeypatch.setattr("user_service.requests.get", lambda url: FakeResponse())
+    assert get_user_name(1) == "Alice"
+""")
+
+    code_block("Rust: trait で外部APIを差し替え",
+    """\
+// ── 本番コード ──
+
+// 1. trait を定義 (= Python の ABC / Go の interface)
+trait UserAPI {
+    fn get_user(&self, user_id: u32) -> Result<User, String>;
+}
+
+// 2. 本番用の実装
+struct RealUserAPI;
+
+impl UserAPI for RealUserAPI {
+    fn get_user(&self, user_id: u32) -> Result<User, String> {
+        // 実際にHTTPリクエストを送る
+        // reqwest::get(...)
+        todo!()
+    }
+}
+
+// 3. Service はジェネリクスで trait に依存 (具体型を知らない)
+struct UserService<A: UserAPI> {
+    api: A,                  // ★ trait 境界で型を制約
+}
+
+impl<A: UserAPI> UserService<A> {
+    fn get_user_name(&self, user_id: u32) -> Result<String, String> {
+        let user = self.api.get_user(user_id)?;
+        Ok(user.name)
+    }
+}
+""")
+
+    code_block("Rust: テスト用のモック実装",
+    """\
+// ── テストコード (同じファイル内) ──
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 4. テスト用のモック構造体
+    struct MockUserAPI;
+
+    impl UserAPI for MockUserAPI {
+        fn get_user(&self, _user_id: u32) -> Result<User, String> {
+            // APIを呼ばず、固定値を返す
+            Ok(User { name: "Alice".to_string() })
+        }
+    }
+
+    #[test]
+    fn test_get_user_name() {
+        // 5. モックを注入
+        let service = UserService {
+            api: MockUserAPI,     // ★ 本番の RealUserAPI の代わりにモックを渡す
+        };
+
+        let name = service.get_user_name(1).unwrap();
+        assert_eq!(name, "Alice");
+    }
+
+    // 6. エラーケースのモック
+    struct ErrorUserAPI;
+
+    impl UserAPI for ErrorUserAPI {
+        fn get_user(&self, _user_id: u32) -> Result<User, String> {
+            Err("connection refused".to_string())
+        }
+    }
+
+    #[test]
+    fn test_get_user_name_api_error() {
+        let service = UserService {
+            api: ErrorUserAPI,
+        };
+
+        let result = service.get_user_name(1);
+        assert!(result.is_err());
+    }
+}
+""")
+
+    subsection("15-9. mockall クレート ── 自動モック生成")
+
+    code_block("mockall: trait から自動でモック構造体を生成",
+    """\
+// Cargo.toml
+// [dev-dependencies]       ← テスト時のみの依存
+// mockall = "0.12"
+
+use mockall::automock;
+
+#[automock]                   // ★ この1行で MockUserAPI が自動生成される
+trait UserAPI {
+    fn get_user(&self, user_id: u32) -> Result<User, String>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_with_mockall() {
+        let mut mock = MockUserAPI::new();     // 自動生成されたモック
+
+        // expect: get_user(1) が呼ばれたら Ok(User) を返す
+        mock.expect_get_user()
+            .with(mockall::predicate::eq(1))   // 引数の検証
+            .times(1)                           // 呼び出し回数の検証
+            .returning(|_| Ok(User { name: "Alice".to_string() }));
+
+        let service = UserService { api: mock };
+        assert_eq!(service.get_user_name(1).unwrap(), "Alice");
+    }
+    // mock がドロップされる時、expect が満たされていなければパニック
+}
+""")
+    print()
+
+    subsection("15-10. Python との対比 ── モックの考え方の違い")
+
+    widths = [22, 30, 30]
+    print(table_sep(widths))
+    print(table_row(["観点", "Rust", "Python"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["手法",         "trait + 差し替え",         "monkeypatch / mock.patch"],
+        ["自動生成",     "mockall クレート",         "Mock() (標準)"],
+        ["外部ライブラリ","手動なら不要",             "pytest (monkeypatch)"],
+        ["差し替え対象",  "trait を実装した構造体",    "関数・メソッド・属性 何でも"],
+        ["型安全性",      "コンパイル時にチェック",    "実行時まで不明"],
+        ["柔軟性",        "trait 設計が必要",         "何でも差し替え可能"],
+        ["エラーモック",  "別の構造体 or returning()", "side_effect で指定"],
+        ["呼び出し検証",  "mockall: times(1)",       "assert_called_once()"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    point("Rust は trait (Go の interface と同じ概念) を使って依存を差し替える")
+    point("Python の monkeypatch のような「グローバルに関数を書き換え」は Rust にはない")
+    point("手動モックはコード量が多いが、mockall を使えば #[automock] の1行で解決")
+    point("ジェネリクス <A: UserAPI> により、コンパイル時にモック実装の正しさが保証される")
+    print()
+
+    question("3言語のモック手法の共通点:\n"
+             "    Go:   interface → テスト用構造体で実装\n"
+             "    Java: interface → Mockito で自動生成\n"
+             "    Rust: trait     → 手動 or mockall で自動生成\n"
+             "    → 全て「抽象(interface/trait)に依存する設計」がテスタビリティの鍵。\n"
+             "    → Python だけが「設計を変えずに何でも差し替えられる」特殊な言語。")
+
+
+# ============================================================
+# 16. フォーマッター / リンター
+# ============================================================
+
+def chapter16_formatter():
+    section("第16章: フォーマッター / リンター ── Python の ruff vs Rust の rustfmt")
+
+    p("""\
+    Rust は Go と同じく「公式ツールで統一」の文化。
+    フォーマッターもリンターも Rust のインストールに含まれている。
+    Python のように「どのツールを使うか」で悩む必要がない。
+    """)
+
+    subsection("16-1. rustfmt (公式フォーマッター・標準搭載)")
+
+    code_block("フォーマット実行",
+    """\
+# Python (ruff)
+ruff format .                    # 自動整形
+ruff format --check .            # 差分チェック (CI 用)
+
+# Rust (rustfmt) ── rustup に含まれる
+cargo fmt                        # 全 .rs ファイルを自動整形
+cargo fmt -- --check             # 差分チェック (CI 用、整形せず差分があれば fail)
+cargo fmt -- --edition 2021      # エディション指定
+rustfmt src/main.rs              # 個別ファイル指定も可能
+""")
+
+    point("cargo fmt = rustfmt のラッパー (Go の go fmt = gofmt と同じ関係)")
+    point("Go と同じく「全員同じスタイル」が強制される")
+    point("タブではなくスペース4つ (Go はタブ)")
+    print()
+
+    subsection("16-2. rustfmt.toml (設定ファイル)")
+
+    code_block("rustfmt.toml (プロジェクトルートに配置)",
+    """\
+# デフォルトのままで十分だが、カスタマイズも可能
+max_width = 100                  # 行の最大幅 (デフォルト 100)
+tab_spaces = 4                   # インデント幅 (デフォルト 4)
+use_small_heuristics = "Default" # 短い関数の整形ルール
+edition = "2021"                 # Rust エディション
+
+# nightly 限定の設定 (unstable)
+# imports_granularity = "Crate"  # use 文のグルーピング
+# group_imports = "StdExternalCrate"  # std → 外部 → 内部 の順に整理
+""")
+
+    point("ほとんどのプロジェクトは rustfmt.toml を作らない (デフォルトで十分)")
+    point("Python の pyproject.toml [tool.ruff] セクションに相当")
+    print()
+
+    subsection("16-3. Clippy (公式リンター・標準搭載)")
+
+    code_block("リンター実行",
+    """\
+# Python (ruff)
+ruff check .                     # リントチェック
+ruff check . --fix               # 自動修正
+
+# Rust (Clippy) ── rustup に含まれる
+cargo clippy                     # 全チェック実行
+cargo clippy --fix               # 自動修正可能なものは修正
+cargo clippy -- -D warnings      # 警告をエラーとして扱う (CI 用)
+""")
+
+    code_block("Clippy が検出する例",
+    """\
+// NG: Clippy が指摘する
+if x == true { ... }             // → if x { ... } に簡略化
+let _ = vec.len() == 0;          // → vec.is_empty() を使え
+for i in 0..vec.len() {          // → for item in &vec を使え
+    let item = &vec[i];
+}
+let s = format!("{}", x);        // → x.to_string() を使え
+
+// Clippy のリントレベル:
+//   clippy::pedantic   — 厳格なルール (任意で有効化)
+//   clippy::nursery    — 実験的なルール
+//   clippy::all        — 全ルール
+""")
+
+    point("Clippy は ruff よりも厳しい — Rust のイディオムに沿ったコードを強制する")
+    point("Python の ruff check ≒ Rust の cargo clippy")
+    point("Clippy は「こう書け」まで提案してくれる (ruff --fix と同じ)")
+    print()
+
+    subsection("16-4. Python との対応関係")
+
+    widths = [22, 28, 26]
+    print(table_sep(widths))
+    print(table_row(["用途", "Rust", "Python"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フォーマッター",   "rustfmt (公式・標準)",   "ruff format / black"],
+        ["リンター",         "Clippy (公式・標準)",    "ruff check / flake8"],
+        ["静的型チェック",   "コンパイラ自体",         "mypy / pyright"],
+        ["import 整理",      "rustfmt (nightly)",      "ruff (isort互換)"],
+        ["設定ファイル",     "rustfmt.toml",           "pyproject.toml"],
+        ["CI チェック",      "cargo fmt -- --check",   "ruff format --check"],
+        ["自動修正",         "cargo clippy --fix",     "ruff check --fix"],
+        ["パッケージ管理所", "crates.io",              "PyPI (pypi.org)"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    subsection("16-5. VSCode 設定")
+
+    code_block("settings.json (Rust 用)",
+    """\
+{
+    "rust-analyzer.checkOnSave": true,           // 保存時に cargo check
+    "rust-analyzer.check.command": "clippy",      // check の代わりに clippy を実行
+    "editor.formatOnSave": true,                  // 保存時フォーマット
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    }
+}
+// 拡張機能「rust-analyzer」(rust-lang.rust-analyzer) 1つで
+// rustfmt + Clippy + 型推論 + 補完が全て動く
+""")
+
+    subsection("16-6. 3言語のフォーマッター比較")
+
+    widths = [18, 22, 22, 22]
+    print(table_sep(widths))
+    print(table_row(["", "Rust", "Go", "Java"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フォーマッター", "rustfmt (公式)", "gofmt (公式)",   "google-java-format"],
+        ["リンター",       "Clippy (公式)",  "golangci-lint",  "Checkstyle/SpotBugs"],
+        ["標準搭載?",      "はい",           "はい",            "いいえ (要追加)"],
+        ["設定の自由度",   "低い (良い事)",  "ゼロ",            "高い"],
+        ["思想",           "公式で統一",     "公式で統一",      "選択の自由"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    question("Rust と Go は「フォーマッターが公式で統一」。\n"
+             "    Java と Python は「複数ツールから選ぶ自由がある」。\n"
+             "    → 新しい言語ほど「議論の余地を減らす」方向に進化している。\n"
+             "    → ruff が Python 界で急速に普及したのも同じ理由。")
+
 
 # ============================================================
 # メイン実行
@@ -1347,6 +2104,8 @@ def main():
     chapter13_comparison_table()
     priority_summary()
     chapter14_project_structure()
+    chapter15_testing()
+    chapter16_formatter()
 
     print()
     print("=" * 70)

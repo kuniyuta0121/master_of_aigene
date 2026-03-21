@@ -1658,6 +1658,526 @@ my-platform/
              "    Python の _ prefix は「お願いベースのプライベート」。\n"
              "    チーム開発では、どちらが安全か？")
 
+    subsection("13-4. Web API 以外のアプリケーション構成")
+
+    code_block("CLI ツール (cobra / flag)",
+    """\
+my-cli/
+├── go.mod
+├── main.go                  # cobra.Command のルート起動
+├── cmd/
+│   ├── root.go              # ルートコマンド定義 (= click の @cli.command())
+│   ├── user.go              # サブコマンド "mycli user ..."
+│   └── order.go             # サブコマンド "mycli order ..."
+├── internal/
+│   ├── service/             # ビジネスロジック (コマンドから呼ぶ)
+│   └── config/              # 設定読み込み (環境変数 / YAML)
+└── Makefile
+
+# Python 換算:
+#   @click.command()          → cobra.Command{Use: "user", Run: func(...)}
+#   @click.option("--name")   → cmd.Flags().StringP("name", "n", "", "説明")
+#   python mycli.py user list → go run . user list  /  ./mycli user list
+""")
+
+    code_block("バッチ処理 / バックグラウンドワーカー",
+    """\
+my-worker/
+├── go.mod
+├── cmd/
+│   └── worker/
+│       └── main.go          # goroutine でワーカー起動
+├── internal/
+│   ├── worker/
+│   │   ├── dispatcher.go    # ジョブをキューから取り出して振り分ける
+│   │   ├── user_sync.go     # ユーザー同期ジョブ
+│   │   └── report.go        # レポート生成ジョブ
+│   ├── queue/
+│   │   └── redis.go         # Redis / SQS キュー接続
+│   └── repository/          # DB アクセス
+└── Makefile
+
+# Python 換算:
+#   Celery worker              → Go の goroutine + channel
+#   @app.task def process():   → func (w *Worker) Process(job Job) error
+#   Redis broker               → redis.go の queue 実装
+""")
+
+    code_block("スケジューラー (定期実行 / cron 的なもの)",
+    """\
+my-scheduler/
+├── go.mod
+├── main.go
+└── internal/
+    ├── scheduler/
+    │   └── scheduler.go     # gocron / robfig/cron でタスク登録
+    ├── job/
+    │   ├── daily_report.go  # 毎日実行ジョブ
+    │   └── cleanup.go       # 定期クリーンアップ
+    └── repository/
+
+# 例: gocron でのスケジュール定義
+# s := gocron.NewScheduler(time.UTC)
+# s.Every(1).Day().At("02:00").Do(dailyReport)
+# s.Every(10).Minutes().Do(cleanup)
+# s.StartBlocking()
+
+# Python 換算:
+#   APScheduler の @scheduler.scheduled_job("cron", hour=2)
+#   Celery beat のスケジュール定義
+""")
+
+    code_block("ライブラリ (他プロジェクトからインポートされるパッケージ)",
+    """\
+my-library/
+├── go.mod                   # module github.com/yourname/my-library
+├── mylib.go                 # package mylib  公開 API のエントリ
+├── mylib_test.go
+├── internal/                # 非公開の実装詳細
+│   └── core.go
+├── examples/                # 使い方サンプル (go doc で表示される)
+│   └── basic/
+│       └── main.go
+└── README.md
+
+# 使う側:
+#   go get github.com/yourname/my-library
+#   import "github.com/yourname/my-library"
+
+# Python 換算:
+#   pip install mylib          → go get github.com/yourname/my-library
+#   pypi.org に公開            → GitHub に push するだけ (中央リポジトリ不要)
+#   __all__ = [...]            → 大文字始まり = public、小文字始まり = private
+""")
+
+    widths = [20, 26, 26]
+    print(table_sep(widths))
+    print(table_row(["アプリ種別", "Go の主要ライブラリ", "Python の対応物"], widths))
+    print(table_sep(widths))
+    for r in [
+        ["Web API",         "Gin / Echo / chi / Axum", "FastAPI / Flask"],
+        ["CLI ツール",      "cobra / urfave/cli",       "click / argparse / typer"],
+        ["バッチ/ワーカー", "goroutine + channel",      "Celery / rq"],
+        ["スケジューラー",  "gocron / robfig/cron",     "APScheduler / Celery beat"],
+        ["GUI デスクトップ","Fyne / Gio",               "tkinter / PyQt"],
+        ["ライブラリ",      "Go module (GitHub直接)",   "PyPI パッケージ"],
+        ["gRPC サービス",   "google.golang.org/grpc",  "grpcio"],
+    ]:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    point("Go の CLI は cobra が事実上の標準 (kubectl, gh コマンドも cobra 製)")
+    point("バッチは goroutine + channel で自前実装が多い。重厚なフレームワーク不要")
+    point("GUI は Go の弱点。Fyne などあるが Python/tkinter より普及していない")
+    point("ライブラリは GitHub に push するだけで公開完了。PyPI のような登録作業が不要")
+
+
+# ============================================================
+# 14. 単体テスト
+# ============================================================
+
+def chapter_14_testing():
+    section("14. 単体テスト ── Go のテスト文化")
+
+    print(textwrap.dedent("""\
+    Go はテストフレームワークが標準搭載 (testing パッケージ)。
+    外部ライブラリ不要で、ファイル名に _test.go をつけるだけ。
+    Python の pytest とは対照的に、assert 関数がない。
+    """))
+
+    subsection("14-1. 基本的なテスト")
+
+    code_block("Python: pytest",
+    """\
+# user_service.py
+def is_adult(age: int) -> bool:
+    return age >= 18
+
+# test_user_service.py  ← 別ディレクトリに置くことが多い
+def test_is_adult():
+    assert is_adult(18) == True
+    assert is_adult(17) == False
+
+def test_child():
+    assert is_adult(0) == False
+""")
+
+    code_block("Go: testing パッケージ",
+    """\
+// user_service.go
+package service
+
+func IsAdult(age int) bool {
+    return age >= 18
+}
+
+// user_service_test.go  ← 同じディレクトリに置く (必須)
+package service          // 同じパッケージ名
+
+import "testing"         // 標準ライブラリのみ
+
+func TestIsAdult(t *testing.T) {       // 関数名は Test で始める (必須)
+    if !IsAdult(18) {
+        t.Error("18歳は成人のはず")     // assert がない → if + t.Error
+    }
+}
+
+func TestChild(t *testing.T) {
+    if IsAdult(17) {
+        t.Errorf("17歳は未成年: got %v", IsAdult(17))
+    }
+}
+""")
+
+    point("テスト関数は必ず Test で始める (小文字だと認識されない)")
+    point("assert がない → if + t.Error() で書く (Go のシンプル哲学)")
+    point("_test.go は本番バイナリに含まれない (Go コンパイラが自動除外)")
+    print()
+
+    subsection("14-2. テーブル駆動テスト (Go の定番パターン)")
+
+    code_block("Python: pytest.mark.parametrize",
+    """\
+import pytest
+
+@pytest.mark.parametrize("age, expected", [
+    (0,   False),
+    (17,  False),
+    (18,  True),
+    (100, True),
+])
+def test_is_adult(age, expected):
+    assert is_adult(age) == expected
+""")
+
+    code_block("Go: テーブル駆動テスト",
+    """\
+func TestIsAdultTable(t *testing.T) {
+    // テストケースをスライスで定義
+    tests := []struct {
+        name string    // テスト名 (失敗時に表示)
+        age  int
+        want bool
+    }{
+        {"新生児",    0,   false},
+        {"17歳",     17,  false},
+        {"18歳",     18,  true},
+        {"100歳",    100, true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {    // サブテストとして実行
+            got := IsAdult(tt.age)
+            if got != tt.want {
+                t.Errorf("IsAdult(%d) = %v, want %v", tt.age, got, tt.want)
+            }
+        })
+    }
+}
+""")
+
+    point("テーブル駆動テストは Go で最も一般的なパターン")
+    point("t.Run() でサブテスト化 → 失敗時にどのケースか特定しやすい")
+    point("pytest.mark.parametrize と同じ目的だが、Go は言語機能ではなく慣習")
+    print()
+
+    subsection("14-3. 実行コマンド")
+
+    code_block("テストの実行",
+    """\
+# Python
+pytest                          # 全テスト
+pytest test_user_service.py     # ファイル指定
+pytest -k "test_is_adult"       # 名前で絞り込み
+pytest --cov                    # カバレッジ
+
+# Go
+go test ./...                   # 全パッケージのテスト
+go test ./service/              # パッケージ指定
+go test -run TestIsAdult        # 名前で絞り込み
+go test -cover ./...            # カバレッジ
+go test -v ./...                # 詳細出力
+""")
+
+    subsection("14-4. Python との対比まとめ")
+
+    widths = [22, 28, 28]
+    print(table_sep(widths))
+    print(table_row(["観点", "Go", "Python (pytest)"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フレームワーク",   "標準 (testing)",       "外部 (pytest)"],
+        ["テストファイル",   "同Dir *_test.go",      "別Dir tests/"],
+        ["assert",           "なし (if + t.Error)",  "assert 文"],
+        ["パラメータ化",     "テーブル駆動 (慣習)",   "@parametrize"],
+        ["実行",             "go test ./...",         "pytest"],
+        ["カバレッジ",       "go test -cover",       "pytest --cov"],
+        ["モック",           "interface で差し替え",  "unittest.mock"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    question("Go に assert がないのはなぜか？\n"
+             "    → 「テストも普通の Go コードで書く」という設計思想。\n"
+             "    → 特別な DSL を覚える必要がない = 学習コストゼロ。\n"
+             "    → 冗長だが、何をテストしているか明確。")
+
+    subsection("14-5. モック ── Python の monkeypatch に相当するもの")
+
+    print(textwrap.dedent("""\
+    Python の pytest では monkeypatch や unittest.mock で
+    外部依存 (DB, API, ファイル等) を差し替えてテストする。
+
+    Go にはモックライブラリもあるが、最も一般的な方法は
+    「interface を使って本番実装をテスト用に差し替える」こと。
+    外部ライブラリなしで実現できる Go らしいアプローチ。
+    """))
+
+    code_block("Python: monkeypatch で外部APIを差し替え",
+    """\
+# user_service.py
+import requests
+
+def get_user_name(user_id: int) -> str:
+    resp = requests.get(f"https://api.example.com/users/{user_id}")
+    return resp.json()["name"]
+
+# tests/test_user_service.py
+def test_get_user_name(monkeypatch):
+    # requests.get を偽物に差し替え
+    class FakeResponse:
+        def json(self):
+            return {"name": "Alice"}
+
+    monkeypatch.setattr("user_service.requests.get", lambda url: FakeResponse())
+
+    assert get_user_name(1) == "Alice"  # 実際のAPIは呼ばれない
+""")
+
+    code_block("Go: interface で外部APIを差し替え",
+    """\
+// ── 本番コード ──
+
+// 1. まず interface を定義 (Python にはこの概念がない)
+type UserAPI interface {
+    GetUser(userID int) (User, error)
+}
+
+// 2. 本番用の実装
+type RealUserAPI struct{}
+
+func (r *RealUserAPI) GetUser(userID int) (User, error) {
+    // 実際に HTTP リクエストを送る
+    resp, err := http.Get(fmt.Sprintf("https://api.example.com/users/%d", userID))
+    // ... レスポンスをパースして返す
+}
+
+// 3. Service は interface に依存 (具体的な実装を知らない)
+type UserService struct {
+    api UserAPI          // ★ interface 型で持つ (RealUserAPI ではない)
+}
+
+func (s *UserService) GetUserName(userID int) (string, error) {
+    user, err := s.api.GetUser(userID)  // interface 経由で呼ぶ
+    if err != nil {
+        return "", err
+    }
+    return user.Name, nil
+}
+""")
+
+    code_block("Go: テスト用のモック実装",
+    """\
+// ── テストコード (user_service_test.go) ──
+
+// 4. テスト用のモック実装 (interface を満たすだけ)
+type MockUserAPI struct{}
+
+func (m *MockUserAPI) GetUser(userID int) (User, error) {
+    // APIを呼ばず、固定値を返す
+    return User{Name: "Alice"}, nil
+}
+
+func TestGetUserName(t *testing.T) {
+    // 5. モックを注入してテスト
+    service := &UserService{
+        api: &MockUserAPI{},     // ★ 本番の RealUserAPI の代わりにモックを渡す
+    }
+
+    name, err := service.GetUserName(1)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if name != "Alice" {
+        t.Errorf("got %s, want Alice", name)
+    }
+}
+""")
+
+    code_block("Go: エラーケースのモックも簡単",
+    """\
+// API がエラーを返すケースのモック
+type ErrorUserAPI struct{}
+
+func (e *ErrorUserAPI) GetUser(userID int) (User, error) {
+    return User{}, fmt.Errorf("connection refused")
+}
+
+func TestGetUserName_APIError(t *testing.T) {
+    service := &UserService{
+        api: &ErrorUserAPI{},    // エラーを返すモックを注入
+    }
+
+    _, err := service.GetUserName(1)
+    if err == nil {
+        t.Error("エラーが返るべき")
+    }
+}
+""")
+
+    subsection("14-6. Python との対比 ── モックの考え方の違い")
+
+    widths = [22, 30, 30]
+    print(table_sep(widths))
+    print(table_row(["観点", "Go", "Python"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["手法",         "interface + 差し替え",    "monkeypatch / mock.patch"],
+        ["外部ライブラリ","不要",                   "pytest (monkeypatch)"],
+        ["差し替え対象",  "interface を実装した構造体","関数・メソッド・属性 何でも"],
+        ["型安全性",      "コンパイル時にチェック",   "実行時まで不明"],
+        ["柔軟性",        "interface 設計が必要",    "何でも差し替え可能"],
+        ["エラーモック",  "別の構造体を作る",        "side_effect で指定"],
+        ["定番ライブラリ","gomock / testify",       "unittest.mock / pytest"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    point("Go は「設計でテスタビリティを確保する」思想 → interface 設計が重要")
+    point("Python は「あとからなんでも差し替えられる」思想 → 柔軟だが型安全性なし")
+    point("Go の方法はコード量が多いが、依存関係が明示的で読みやすい")
+    point("monkeypatch のような「グローバルに関数を書き換える」は Go にはない")
+    print()
+
+    question("Go で interface を使ったモックが主流な理由:\n"
+             "    → Go にはクラスがないので、monkey-patching ができない。\n"
+             "    → interface を満たす構造体は何でも渡せる (ダックタイピング)。\n"
+             "    → 本番コードの設計自体がテストしやすくなる副次効果がある。")
+
+
+# ============================================================
+# 15. フォーマッター / リンター
+# ============================================================
+
+def chapter_15_formatter():
+    section("15. フォーマッター / リンター ── Python の ruff vs Go の gofmt")
+
+    print(textwrap.dedent("""\
+    Python では ruff / black / flake8 / isort など複数ツールを組み合わせる。
+    Go は「公式ツール1つで統一」という真逆の思想。
+    """))
+
+    subsection("15-1. Go のフォーマッター: gofmt (公式・標準搭載)")
+
+    code_block("フォーマット実行",
+    """\
+# Python (ruff)
+ruff format .                  # 自動整形
+ruff check . --fix             # lint + 自動修正
+
+# Go (gofmt) ── go のインストールに含まれる
+gofmt -w .                     # 全 .go ファイルを自動整形 (-w = 上書き)
+gofmt -d .                     # 差分だけ表示 (ドライラン)
+go fmt ./...                   # go fmt = gofmt のラッパー (推奨)
+""")
+
+    point("Go はフォーマットに「選択肢がない」→ 全員同じスタイル")
+    point("タブ vs スペース論争がない (Go はタブ)")
+    point("CI で gofmt -l . して差分があったら fail にするのが定番")
+    print()
+
+    subsection("15-2. Go のリンター: golangci-lint")
+
+    code_block("リンター実行",
+    """\
+# インストール
+brew install golangci-lint      # macOS
+# or
+go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest
+
+# 実行
+golangci-lint run               # 全チェック実行
+golangci-lint run --fix         # 自動修正可能なものは修正
+
+# 設定ファイル (.golangci.yml)
+linters:
+  enable:
+    - errcheck        # エラーを握りつぶしていないかチェック
+    - govet           # 公式の静的解析
+    - staticcheck     # 高度な静的解析
+    - unused          # 未使用の変数・関数
+    - gosimple        # もっと簡潔に書けるコードの指摘
+""")
+
+    point("golangci-lint は ruff のように複数リンターを1コマンドで実行する統合ツール")
+    point("Python の ruff ≒ Go の golangci-lint (多数のルールを高速に実行)")
+    print()
+
+    subsection("15-3. Go 固有: go vet (公式静的解析)")
+
+    code_block("go vet",
+    """\
+go vet ./...                    # 構造的な問題を検出 (標準搭載)
+
+# 検出例:
+#   - fmt.Printf のフォーマット引数の型不一致
+#   - 到達不能コード
+#   - コピー禁止な構造体のコピー
+""")
+
+    subsection("15-4. Python との対応関係")
+
+    widths = [22, 26, 26]
+    print(table_sep(widths))
+    print(table_row(["用途", "Go", "Python"], widths))
+    print(table_sep(widths))
+    rows = [
+        ["フォーマッター",   "gofmt (公式・標準)",    "ruff format / black"],
+        ["リンター",         "golangci-lint",          "ruff check / flake8"],
+        ["静的解析",         "go vet (公式・標準)",    "mypy / pyright"],
+        ["import 整理",      "goimports",              "ruff (isort互換)"],
+        ["設定ファイル",     ".golangci.yml",          "pyproject.toml"],
+        ["パッケージ管理所", "pkg.go.dev",             "PyPI (pypi.org)"],
+    ]
+    for r in rows:
+        print(table_row(r, widths))
+    print(table_sep(widths))
+    print()
+
+    subsection("15-5. VSCode 設定")
+
+    code_block("settings.json (Go 用)",
+    """\
+{
+    "go.formatTool": "gofmt",          // 保存時に自動フォーマット
+    "go.lintTool": "golangci-lint",    // リンターの指定
+    "editor.formatOnSave": true,       // 保存時フォーマット
+    "[go]": {
+        "editor.defaultFormatter": "golang.go"
+    }
+}
+// 拡張機能「golang.go」が gofmt / golangci-lint を統合して実行
+""")
+
+    question("Go は「フォーマットは公式1つ」で論争を排除した。\n"
+             "    Python は「ruff / black / autopep8 / yapf」から選ぶ自由がある。\n"
+             "    チーム開発では、どちらが効率的か？")
+
 
 # ============================================================
 # メイン
@@ -1684,6 +2204,8 @@ def main():
     chapter_12_comparison_table()
     priority_summary()
     chapter_13_project_structure()
+    chapter_14_testing()
+    chapter_15_formatter()
 
     print()
     print("=" * 64)
